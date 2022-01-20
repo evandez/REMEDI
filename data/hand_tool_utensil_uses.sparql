@@ -1,0 +1,20 @@
+SELECT ?itemLabel ?itemDescription (GROUP_CONCAT(?useLabel; SEPARATOR="|") AS ?uses)
+WHERE {
+  {
+    SELECT ?item ?itemLabel ?itemDescription ?useLabel
+    WHERE
+    {
+      { ?item (wdt:P279|wdt:P31)+ wd:Q2578402 }
+      UNION { ?item (wdt:P279|wdt:P31)+ wd:Q1357761 }
+
+      ?item wdt:P366 ?use
+
+      SERVICE wikibase:label
+      {
+        bd:serviceParam wikibase:language "en"
+      }
+    }
+  }
+  FILTER(LANGMATCHES(LANG(?itemLabel), "en") && LANGMATCHES(LANG(?useLabel), "en"))
+}
+GROUP BY ?itemLabel ?itemDescription
