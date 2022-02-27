@@ -69,6 +69,7 @@ if __name__ == '__main__':
     if not occupations_file.exists():
         raise FileNotFoundError(
             f'occupations data not found, expected at: {occupations_file}')
+    print(f'reading occupations from {occupations_file}')
     with occupations_file.open('r') as handle:
         entities_and_occupations = json.load(handle)
     occupations = {
@@ -78,6 +79,7 @@ if __name__ == '__main__':
     attributes = {'occupation': occupations}
 
     # Proceed as if there were arbitrarily many attributes to process.
+    print(f'loading {args.t5_config}')
     tokenizer = transformers.T5Tokenizer.from_pretrained(args.t5_config)
     tokenizer.mask_token = tokenizer.additional_special_tokens[0]
     model = transformers.T5ForConditionalGeneration\
@@ -106,7 +108,7 @@ if __name__ == '__main__':
         loader = data.DataLoader(
             formatted,  # type: ignore
             batch_size=args.batch_size)
-        outputs: Dict[str, Dict[str, str]] = defaultdict(dict)
+        contexts: Dict[str, Dict[str, str]] = defaultdict(dict)
         for batch in tqdm(loader, desc='filling contexts with t5'):
             inputs = tokenizer(batch['text'],
                                return_tensors='pt',
@@ -118,8 +120,8 @@ if __name__ == '__main__':
             for kind, attr_value, completion in zip(batch['kind'],
                                                     batch[attr_key],
                                                     completions):
-                outputs[attr_value][kind] = completion.strip(';:. ')
+                contexts[attr_value][kind] = completion.strip(';:. ')
 
         out_json_file = data_dir / f'{attr_key}-contexts.json'
         with out_json_file.open('w') as handle:
-            json.dump(outputs, handle)
+            json.dump(contexts, handle)
