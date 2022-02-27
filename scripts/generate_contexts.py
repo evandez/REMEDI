@@ -93,7 +93,7 @@ if __name__ == '__main__':
         tokenizer = transformers.BartTokenizer.from_pretrained(args.model)
         assert tokenizer.mask_token is not None
         model = transformers.BartForConditionalGeneration\
-            .from_pretrained(args.model)\
+            .from_pretrained(args.model, forced_bos_token_id=0)\
             .to(device)
         remove_prefix = True
     else:
