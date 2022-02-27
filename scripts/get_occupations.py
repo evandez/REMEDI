@@ -57,5 +57,7 @@ if __name__ == '__main__':
             seen.add(entity)
 
     data_file = data_dir / 'occupations.json'
+    print(f'found {len(results)} (entity, occ) pairs with wikipedia articles; '
+          f'writing to {str(data_file)}')
     with data_file.open('w') as handle:
         json.dump(results, handle)
