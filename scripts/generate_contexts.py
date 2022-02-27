@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     # Proceed as if there were arbitrarily many attributes to process.
     if args.model.startswith('t5'):
-        print(f'loading t5 model: {args.args.model}')
+        print(f'loading t5 model: {args.model}')
         tokenizer = transformers.T5Tokenizer.from_pretrained(args.model)
         tokenizer.mask_token = tokenizer.additional_special_tokens[0]
         model = transformers.T5ForConditionalGeneration\
@@ -89,7 +89,7 @@ if __name__ == '__main__':
             .to(device)
         remove_prefix = False
     elif args.model.startswith('facebook/bart'):
-        print(f'loading bart model: {args.args.model}')
+        print(f'loading bart model: {args.model}')
         tokenizer = transformers.BartTokenizer.from_pretrained(args.model)
         assert tokenizer.mask_token is not None
         model = transformers.BartForConditionalGeneration\
