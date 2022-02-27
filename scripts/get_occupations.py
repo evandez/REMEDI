@@ -40,7 +40,7 @@ if __name__ == '__main__':
     # Keep only entities containing a wikipedia article, so that most large LMs
     # will have seen them during training.
     wikipedia = datasets.load_dataset('wikipedia', '20200501.en')
-    assert isinstance(wikipedia, datasets.arrow_dataset.Dataset), wikipedia
+    assert isinstance(wikipedia, datasets.dataset_dict.DatasetDict), wikipedia
 
     articles_by_title = {}
     for sample in tqdm(wikipedia['train'], desc='index wikipedia articles'):
