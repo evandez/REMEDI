@@ -24,7 +24,7 @@ if __name__ == '__main__':
     data_dir.mkdir(exist_ok=True, parents=True)
 
     # TODO(evandez): Just auto download TaskBench if needed?
-    tb_root = data_dir / 'TaskBench/atomic'
+    tb_root = data_dir / 'TaskBenchData/atomic'
     if not tb_root.exists():
         raise FileNotFoundError(
             'TaskBench not found; '
