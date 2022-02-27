@@ -1,7 +1,10 @@
+aiohttp==3.8.1
+aiosignal==1.2.0
 appnope==0.1.2
 argon2-cffi==21.3.0
 argon2-cffi-bindings==21.2.0
 asttokens==2.0.5
+async-timeout==4.0.2
 attrs==21.4.0
 backcall==0.2.0
 bleach==4.1.0
@@ -9,14 +12,18 @@ certifi==2021.10.8
 cffi==1.15.0
 charset-normalizer==2.0.12
 click==8.0.4
+datasets==1.18.3
 debugpy==1.5.1
 decorator==5.1.1
 defusedxml==0.7.1
+dill==0.3.4
 entrypoints==0.4
 executing==0.8.2
 filelock==3.6.0
 flake8==4.0.1
 flake8-docstrings==1.6.0
+frozenlist==1.3.0
+fsspec==2022.2.0
 huggingface-hub==0.4.0
 idna==3.3
 iniconfig==1.1.1
@@ -40,6 +47,8 @@ MarkupSafe==2.1.0
 matplotlib-inline==0.1.3
 mccabe==0.6.1
 mistune==0.8.4
+multidict==6.0.2
+multiprocess==0.70.12.2
 mypy==0.931
 mypy-extensions==0.4.3
 nbclient==0.5.11
@@ -49,6 +58,7 @@ nest-asyncio==1.5.4
 notebook==6.4.8
 numpy==1.22.2
 packaging==21.3
+pandas==1.4.1
 pandocfilters==1.5.0
 parso==0.8.3
 pexpect==4.8.0
@@ -59,6 +69,7 @@ prompt-toolkit==3.0.28
 ptyprocess==0.7.0
 pure-eval==0.2.2
 py==1.11.0
+pyarrow==7.0.0
 pycodestyle==2.8.0
 pycparser==2.21
 pydocstyle==6.1.1
@@ -68,6 +79,7 @@ pyparsing==3.0.7
 pyrsistent==0.18.1
 pytest==7.0.1
 python-dateutil==2.8.2
+pytz==2021.3
 PyYAML==6.0
 pyzmq==22.3.0
 qtconsole==5.2.2
@@ -93,4 +105,6 @@ urllib3==1.26.8
 wcwidth==0.2.5
 webencodings==0.5.1
 widgetsnbextension==3.5.2
+xxhash==3.0.0
 yapf==0.32.0
+yarl==1.7.2
