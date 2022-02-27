@@ -109,7 +109,7 @@ if __name__ == '__main__':
             formatted,  # type: ignore
             batch_size=args.batch_size)
         contexts: Dict[str, Dict[str, str]] = defaultdict(dict)
-        for batch in tqdm(loader, desc='filling contexts with t5'):
+        for batch in tqdm(loader, desc='filling contexts'):
             inputs = tokenizer(batch['text'],
                                return_tensors='pt',
                                padding='longest').to(device)
