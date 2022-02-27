@@ -50,9 +50,10 @@ if __name__ == '__main__':
                         type=int,
                         default=32,
                         help='t5 batch size')
-    parser.add_argument('--t5-config',
-                        default='t5-large',
-                        help='t5 config to use (default: t5-large)')
+    parser.add_argument(
+        '--model',
+        default='facebook/bart-large',
+        help='bart/t5 model to use (default: facebook/bart-large)')
     parser.add_argument('--data-dir',
                         type=pathlib.Path,
                         help='link data here (default: project data dir)')
@@ -79,12 +80,24 @@ if __name__ == '__main__':
     attributes = {'occupation': occupations}
 
     # Proceed as if there were arbitrarily many attributes to process.
-    print(f'loading {args.t5_config}')
-    tokenizer = transformers.T5Tokenizer.from_pretrained(args.t5_config)
-    tokenizer.mask_token = tokenizer.additional_special_tokens[0]
-    model = transformers.T5ForConditionalGeneration\
-        .from_pretrained(args.t5_config)\
-        .to(device)
+    if args.model.startswith('t5'):
+        print(f'loading t5 model: {args.args.model}')
+        tokenizer = transformers.T5Tokenizer.from_pretrained(args.model)
+        tokenizer.mask_token = tokenizer.additional_special_tokens[0]
+        model = transformers.T5ForConditionalGeneration\
+            .from_pretrained(args.model)\
+            .to(device)
+        remove_prefix = False
+    elif args.model.startswith('facebook/bart'):
+        print(f'loading bart model: {args.args.model}')
+        tokenizer = transformers.BartTokenizer.from_pretrained(args.model)
+        assert tokenizer.mask_token is not None
+        model = transformers.BartForConditionalGeneration\
+            .from_pretrained(args.model)\
+            .to(device)
+        remove_prefix = True
+    else:
+        raise ValueError(f'unknown model: {args.model}')
 
     for attr_key in args.generate_for:
         templates = TEMPLATES[attr_key]
@@ -115,8 +128,18 @@ if __name__ == '__main__':
                                padding='longest').to(device)
             with torch.inference_mode():
                 outputs = model.generate(**inputs)
-            completions = tokenizer.batch_decode(outputs,
-                                                 skip_special_tokens=True)
+
+            if remove_prefix:
+                starts = inputs.attention_mask.sum(dim=-1) - 1
+                completions = []
+                for ids, start in zip(outputs, starts):
+                    completion = tokenizer.decode(ids[start:],
+                                                  skip_special_tokens=True)
+                    completions.append(completion)
+            else:
+                completions = tokenizer.batch_decode(outputs,
+                                                     skip_special_tokens=True)
+
             for kind, attr_value, completion in zip(batch['kind'],
                                                     batch[attr_key],
                                                     completions):
