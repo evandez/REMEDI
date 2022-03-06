@@ -1,4 +1,4 @@
-"""Use T5 to help us fill in contexts about entity attributes.
+"""Use T5/BART to help us fill in contexts about entity attributes.
 
 Our goal is to create a dataset with sentences of the form:
 
@@ -11,9 +11,10 @@ need to find some "commonsense" about the attribute--e.g., if the attribute
 is occupation, and the occupation is "surgeon", we need a systematic way to
 know that surgeons work in hospitals, use scalpels, wear scrubs, etc.
 
-To do this, we ask T5 to fill in some ordinary sentences about the attribute,
-such as: "The surgeon went to her job at the <mask>." We'll store this as a
-mapping like: {'surgeon': {'location': '<whatever T5 fills in>'}}.
+To do this, we ask an LM to fill in some ordinary sentences about the
+attribute, such as: "The surgeon went to her job at the <mask>."
+We'll store this as a mapping like:
+{'surgeon': {'location': '<whatever LM fills in>'}}.
 """
 import argparse
 import json
