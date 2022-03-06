@@ -85,7 +85,9 @@ if __name__ == '__main__':
         print('loading t5-large-ssm')
         tokenizer = transformers.AutoTokenizer.from_pretrained(args.model)
         tokenizer.mask_token = tokenizer.additional_special_tokens[0]
-        model = transformers.AutoModelForSeq2SeqLM.from_pretrained(args.model)
+        model = transformers.AutoModelForSeq2SeqLM\
+            .from_pretrained(args.model)\
+            .to(device)
         remove_prefix = False
     elif args.model.startswith('t5'):
         print(f'loading t5 model: {args.model}')
