@@ -28,6 +28,7 @@ if __name__ == '__main__':
 
     device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
+    print(f'loading {args.model}')
     tokenizer = transformers.AutoTokenizer.from_pretrained(args.model)
     model = transformers.AutoModelForCausalLM.from_pretrained(args.model)
     model.to(device)
@@ -39,6 +40,7 @@ if __name__ == '__main__':
     if occupations_file is None:
         occupations_file = data_dir / 'occupations.json'
 
+    print(f'loading occupations from {occupations_file}')
     with occupations_file.open('r') as handle:
         entries = json.load(handle)
 
@@ -56,10 +58,8 @@ if __name__ == '__main__':
         for entry in entries
     ]
 
-    representations = torch.empty(len(entries),
-                                  model.config.n_layer + 1,
-                                  model.config.hidden_size,
-                                  device=device)
+    representations = torch.empty(len(entries), model.config.n_layer + 1,
+                                  model.config.hidden_size)
     results = []
     for index, sample in enumerate(tqdm(samples, desc='predict occupations')):
         inputs = tokenizer(sample['statements'],
@@ -99,14 +99,17 @@ if __name__ == '__main__':
         for layer in range(len(outputs.hidden_states)):
             representations[index, layer] = outputs\
                 .hidden_states[layer][chosen, sample['entity_tokens']]\
-                .mean(dim=1)
+                .mean(dim=1)\
+                .cpu()
 
     # Save the predictions.
     model_key = args.model.split('/')[-1]
     predictions_file = data_dir / f'occupations-{model_key}.json'
+    print(f'saving model predictions to {predictions_file}')
     with predictions_file.open('w') as handle:
         json.dump(results, handle)
 
     # Save the representations.
     representations_file = data_dir / f'occupations-reps-{model_key}.pth'
+    print(f'saving model reps to {representations_file}')
     torch.save(representations, representations_file)
