@@ -46,7 +46,15 @@ if __name__ == '__main__':
     with occupations_file.open('r') as handle:
         entries = json.load(handle)
 
-    occupations = sorted({entry['occupation'] for entry in entries})
+    # Determine all unique occupations, preserving order for convenience.
+    occupations, seen = [], set()
+    for entry in entries:
+        occupation = entry['occupation']
+        if occupation in seen:
+            continue
+        seen.add(occupation)
+        occupations.append(occupation)
+
     samples = [
         # For each entity, create a list of statements that the LM can eval.
         {
