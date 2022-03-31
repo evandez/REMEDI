@@ -43,7 +43,7 @@ def get_occupations(
 
     """
     occupations = []
-    for occupation_id in tqdm(occupation_ids, desc='get occupation details'):
+    for occupation_id in tqdm(occupation_ids, desc='get occupations'):
         params = linked_data_interface.get_entity_dict_from_api(occupation_id)
         occupation = entity.WikidataItem(params)
         occupations.append(occupation)
