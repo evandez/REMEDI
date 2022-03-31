@@ -48,5 +48,5 @@ if __name__ == '__main__':
         for person in people
     ]
     occupations_file = data_dir / 'occupations.json'
-    with occupations_file.open('r') as handle:
+    with occupations_file.open('w') as handle:
         json.dump(entries, handle)
