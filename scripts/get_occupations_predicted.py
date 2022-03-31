@@ -60,7 +60,11 @@ if __name__ == '__main__':
         for entry in entries
     ]
 
-    representations = torch.empty(len(entries), model.config.n_layer + 1,
+    if 'gpt-j' in args.model:
+        num_layers = model.config.n_layer
+    else:
+        num_layers = model.config.num_layers
+    representations = torch.empty(len(entries), num_layers + 1,
                                   model.config.hidden_size)
     results = []
     for index, sample in enumerate(tqdm(samples, desc='predict occupations')):
