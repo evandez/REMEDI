@@ -100,8 +100,8 @@ def get_entities_by_occupation(occupation_ids: Sequence[str],
 
     """
     entities_by_occupation = {}
-    for occupation in tqdm(occupation_ids,
-                           desc='get entities for each occupation'):
-        entities = get_entities_with_occupation(occupation.entity_id, **kwargs)
-        entities_by_occupation[occupation.entity_id] = entities
+    for occupation_id in tqdm(occupation_ids,
+                              desc='get entities for each occupation'):
+        entities = get_entities_with_occupation(occupation_id, **kwargs)
+        entities_by_occupation[occupation_id] = entities
     return entities_by_occupation
