@@ -73,7 +73,7 @@ if __name__ == '__main__':
                             return_dict=True)
 
         # Have to manually compute sequence probs...in 2022? Really?
-        ids_and_logits = zip(inputs.input_ds, outputs.logits)
+        ids_and_logits = zip(inputs.input_ids, outputs.logits)
         scores = []
         for token_ids, logits in ids_and_logits:
             logps = torch.log_softmax(logits, dim=-1)
