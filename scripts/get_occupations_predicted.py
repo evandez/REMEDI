@@ -105,7 +105,7 @@ if __name__ == '__main__':
         for layer in range(len(outputs.hidden_states)):
             representations[index, layer] = outputs\
                 .hidden_states[layer][chosen, sample['entity_tokens']]\
-                .mean(dim=1)\
+                .mean(dim=0)\
                 .cpu()
 
     # Save the predictions.
