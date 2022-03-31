@@ -30,6 +30,8 @@ if __name__ == '__main__':
 
     print(f'loading {args.model}')
     tokenizer = transformers.AutoTokenizer.from_pretrained(args.model)
+    tokenizer.pad_token = tokenizer.eos_token
+
     model = transformers.AutoModelForCausalLM.from_pretrained(args.model)
     model.to(device)
 
