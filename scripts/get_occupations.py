@@ -7,14 +7,20 @@ import argparse
 import json
 import pathlib
 
+from src import wikidata
 from src.utils import env
-
-import datasets
-from tqdm.auto import tqdm
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='dl and preprocess (entity, occ) data')
+        description='dl and preprocess (entity, occupation) data')
+    parser.add_argument('--limit-occupations',
+                        type=int,
+                        default=100,
+                        help='max occupations to query for')
+    parser.add_argument('--limit-entities-per-occupation',
+                        type=int,
+                        default=500,
+                        help='max entities to query per occupation')
     parser.add_argument('--data-dir',
                         type=pathlib.Path,
                         help='link data here (default: project data dir)')
@@ -23,41 +29,24 @@ if __name__ == '__main__':
     data_dir = args.data_dir or env.data_dir()
     data_dir.mkdir(exist_ok=True, parents=True)
 
-    # TODO(evandez): Just auto download TaskBench if needed?
-    tb_root = data_dir / 'TaskBenchData/atomic'
-    if not tb_root.exists():
-        raise FileNotFoundError(
-            'TaskBench not found; '
-            'please download and unzip to $KF_DATA_DIR/TaskBench')
+    occupation_ids = wikidata.get_occupation_ids(limit=args.limit_occupations)
 
-    tb_raw = []
-    for tb_wikidata_dir in tb_root.glob('wiki{occupation(0)}'):
-        file = tb_wikidata_dir / 'all.jsonl'
-        with file.open('r') as handle:
-            for line in tqdm(handle.readlines(), desc=file.parent.name):
-                tb_raw.append(json.loads(line))
+    occupation_entities = wikidata.get_occupations(occupation_ids)
+    occupation_entities_by_id = {
+        entity.entity_id: entity for entity in occupation_entities
+    }
 
-    # Keep only entities containing a wikipedia article, so that most large LMs
-    # will have seen them during training.
-    wikipedia = datasets.load_dataset('wikipedia', '20200501.en')
-    assert isinstance(wikipedia, datasets.dataset_dict.DatasetDict), wikipedia
+    people_entities_by_occupation = wikidata.get_entities_by_occupation(
+        occupation_ids, limit=args.limit_entities_per_occupation)
 
-    articles_by_title = {}
-    for sample in tqdm(wikipedia['train'], desc='index wikipedia articles'):
-        title = sample['title']
-        article = sample['text']
-        articles_by_title[title.lower()] = article
-
-    results, seen = [], set()
-    for entry in tqdm(tb_raw, desc='select (entity, occupation) pairs'):
-        entity = entry['inputs'][0]['ent_name'].lower()
-        occupation = entry['train_tgts'][0]['ent_name'].lower()
-        if entity in articles_by_title and entity not in seen:
-            results.append({'entity': entity, 'occupation': occupation})
-            seen.add(entity)
-
-    data_file = data_dir / 'occupations.json'
-    print(f'found {len(results)} (entity, occ) pairs with wikipedia articles; '
-          f'writing to {str(data_file)}')
-    with data_file.open('w') as handle:
-        json.dump(results, handle)
+    entries = [
+        {
+            'entity': person,
+            'occupation': occupation_entities_by_id[occupation_id].get_label()
+        }
+        for occupation_id, people in people_entities_by_occupation.items()
+        for person in people
+    ]
+    occupations_file = data_dir / 'occupations.json'
+    with occupations_file.open('r') as handle:
+        json.dump(entries, handle)
