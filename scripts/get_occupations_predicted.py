@@ -61,7 +61,7 @@ if __name__ == '__main__':
         # For each entity, create a list of statements that the LM can eval.
         {
             'statements': [
-                f'{entry["entity"]} is a {occupation}.'
+                f'{entry["entity"]} is most known for being a {occupation}.'
                 for occupation in occupations
             ],
             'entity_tokens': range(len(tokenizer(entry['entity']))),
