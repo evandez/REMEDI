@@ -109,6 +109,13 @@ if __name__ == '__main__':
                 .mean(dim=0)\
                 .cpu()
 
+    # Report agreement for debugging.
+    matching = 0
+    for result in results:
+        matching += result['occupation'] == result['prediction']
+    agreement = matching / len(results)
+    print(f'agreement score: {agreement:.3f}')
+
     # Save the predictions.
     model_key = args.model.split('/')[-1]
     predictions_file = data_dir / f'occupations-{model_key}.json'
