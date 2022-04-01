@@ -83,7 +83,7 @@ if __name__ == '__main__':
         for token_ids, logits in ids_and_logits:
             logps = torch.log_softmax(logits, dim=-1)
             score = 0.
-            for token_position, token_id in enumerate(token_ids):
+            for token_position, token_id in enumerate(token_ids[1:]):
                 if token_id.item() in {
                         tokenizer.bos_token_id,
                         tokenizer.eos_token_id,
