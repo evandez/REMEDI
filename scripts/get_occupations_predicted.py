@@ -34,7 +34,7 @@ if __name__ == '__main__':
     tokenizer.pad_token = tokenizer.eos_token
 
     model = transformers.AutoModelForCausalLM.from_pretrained(args.model)
-    model.to(device)
+    model.eval().to(device)
 
     data_dir = args.data_dir or env.data_dir()
     data_dir.mkdir(exist_ok=True, parents=True)
