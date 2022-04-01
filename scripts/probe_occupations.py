@@ -73,7 +73,7 @@ if __name__ == '__main__':
                 nn.Linear(hidden_size, hidden_size),
                 nn.LeakyReLU(),
                 nn.Linear(hidden_size, len(occupations)),
-            )
+            ).to(device)
             criterion = nn.CrossEntropyLoss()
             optimizer = optim.AdamW(probe.parameters())
             stopper = training.EarlyStopping(patience=args.patience)
