@@ -19,7 +19,7 @@ if __name__ == '__main__':
                         help='max occupations to query for')
     parser.add_argument('--limit-entities-per-occupation',
                         type=int,
-                        default=500,
+                        default=100,
                         help='max entities to query per occupation')
     parser.add_argument('--data-dir',
                         type=pathlib.Path,
