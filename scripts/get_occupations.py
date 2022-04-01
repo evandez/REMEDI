@@ -23,7 +23,7 @@ if __name__ == '__main__':
                         help='max entities to query per occupation')
     parser.add_argument('--data-dir',
                         type=pathlib.Path,
-                        help='link data here (default: project data dir)')
+                        help='write data here (default: project data dir)')
     args = parser.parse_args()
 
     data_dir = args.data_dir or env.data_dir()

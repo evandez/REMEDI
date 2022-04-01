@@ -14,11 +14,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='get model-predicted occupations')
     parser.add_argument('--model',
-                        default='EleutherAI/gpt-j-6B',
-                        help='gpt-style lm to probe (default: gpt-j)')
-    parser.add_argument('--data-dir',
-                        type=pathlib.Path,
-                        help='link data here (default: project data dir)')
+                        default='EleutherAI/gpt-neo-125M',
+                        help='gpt-style lm to probe (default: gpt-neo-125M)')
+    parser.add_argument(
+        '--data-dir',
+        type=pathlib.Path,
+        help='read and write data here (default: project data dir)')
     parser.add_argument(
         '--occupations-file',
         type=pathlib.Path,
