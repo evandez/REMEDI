@@ -133,7 +133,7 @@ if __name__ == '__main__':
                 with torch.inference_mode():
                     logits = probe(batch['rep'].to(device))
                 predictions = logits.argmax(dim=-1)
-                correct += predictions.eq(batch['target']).sum()
+                correct += predictions.eq(batch['target'].to(device)).sum()
             accuracy = correct / len(val)
             print(f'probe val accuracy: {accuracy}')
             accuracies.append({
