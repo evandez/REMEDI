@@ -153,5 +153,5 @@ if __name__ == '__main__':
             torch.save(probe.cpu(), probe_file)
 
     accuracy_file = results_dir / 'accuracies.json'
-    with accuracy_file.open('r') as handle:
+    with accuracy_file.open('w') as handle:
         json.dump(accuracies, handle)
