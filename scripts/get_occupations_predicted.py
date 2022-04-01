@@ -15,7 +15,7 @@ if __name__ == '__main__':
         description='get model-predicted occupations')
     parser.add_argument('--k',
                         type=int,
-                        default=3,
+                        default=5,
                         help='record top-k predicted occupations (default: 3)')
     parser.add_argument('--model',
                         default='EleutherAI/gpt-neo-125M',
