@@ -103,8 +103,9 @@ if __name__ == '__main__':
                 probe.train()
                 for batch in train_loader:
                     reps = batch['rep'].to(device)
+                    targets = batch['target'].to(device)
                     predictions = probe(reps)
-                    loss = criterion(predictions, reps)
+                    loss = criterion(predictions, targets)
                     loss.backward()
                     optimizer.step()
                     optimizer.zero_grad()
@@ -113,9 +114,10 @@ if __name__ == '__main__':
                 probe.eval()
                 for batch in val_loader:
                     reps = batch['reps'].to(device)
+                    target = batch['target'].to(device)
                     with torch.inference_mode():
                         predictions = probe(reps)
-                    loss += criterion(predictions, reps).item() * len(reps)
+                    loss += criterion(predictions, targets).item() * len(reps)
                 loss /= len(val)
 
                 if stopper(loss):
