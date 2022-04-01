@@ -81,8 +81,11 @@ if __name__ == '__main__':
             dataset = [
                 # Not a real PyTorch dataset, but who cares?
                 {
-                    'rep': representations[index, layer],
-                    'target': indexer[entry[target]],
+                    'rep':
+                        representations[index, layer],
+                    'target':
+                        indexer[entry[target][0]]
+                        if target == 'prediction' else indexer[entry[target]],
                     **entry,
                 } for index, entry in enumerate(entries)
             ]
