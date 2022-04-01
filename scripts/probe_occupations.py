@@ -2,6 +2,7 @@
 import argparse
 import json
 import pathlib
+import random
 
 from src.utils import env, training
 
@@ -33,6 +34,11 @@ if __name__ == '__main__':
                         type=float,
                         default=.1,
                         help='fraction of data to use for val (default: .1)')
+    parser.add_argument(
+        '--model-top-k',
+        type=int,
+        default=3,
+        help='choose predictions label from model top-k (default: 3)')
     parser.add_argument('--model-key',
                         default='gpt-neo-125M',
                         help='lm to probe (default: gpt-neo-125M)')
@@ -84,7 +90,8 @@ if __name__ == '__main__':
                     'rep':
                         representations[index, layer],
                     'target':
-                        indexer[entry[target][0]]
+                        indexer[random.choice(
+                            entry[target][:args.model_top_k])]
                         if target == 'predictions' else indexer[entry[target]],
                     **entry,
                 } for index, entry in enumerate(entries)
@@ -135,10 +142,12 @@ if __name__ == '__main__':
             # Compute the accuracy on the val set.
             correct = 0
             for batch in val_loader:
+                reps = batch['rep'].to(device)
+                targets = batch['target'].to(device)
                 with torch.inference_mode():
-                    logits = probe(batch['rep'].to(device))
+                    logits = probe(reps)
                 predictions = logits.argmax(dim=-1)
-                correct += predictions.eq(batch['target'].to(device)).sum()
+                correct += predictions.eq(targets).sum().item()
             accuracy = correct / len(val)
             print(f'probe val accuracy: {accuracy:.3f}')
             accuracies.append({
