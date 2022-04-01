@@ -98,8 +98,10 @@ if __name__ == '__main__':
                                            shuffle=True)
             val_loader = data.DataLoader(val, batch_size=args.batch_size)
 
+            progress_message = 'train probe'
+            progress_bar = tqdm(range(args.epochs), desc='train probe')
             best_state_dict = probe.state_dict()
-            for epoch in tqdm(range(args.epochs), desc='train probe'):
+            for epoch in progress_bar:
                 probe.train()
                 for batch in train_loader:
                     reps = batch['rep'].to(device)
@@ -119,6 +121,9 @@ if __name__ == '__main__':
                         predictions = probe(reps)
                     loss += criterion(predictions, targets).item() * len(reps)
                 loss /= len(val)
+
+                progress_bar.set_description(
+                    f'{progress_message} ({loss:.3f})')
 
                 if stopper(loss):
                     break
