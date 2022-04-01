@@ -2,6 +2,7 @@
 import argparse
 import json
 import pathlib
+import random
 
 from src.utils import env
 
@@ -16,7 +17,11 @@ if __name__ == '__main__':
     parser.add_argument('--k',
                         type=int,
                         default=5,
-                        help='record top-k predicted occupations (default: 3)')
+                        help='record top-k predicted occupations (default: 5)')
+    parser.add_argument(
+        '--random-subset',
+        type=int,
+        help='restrict to a subset of the dataset (default: none)')
     parser.add_argument('--model',
                         default='EleutherAI/gpt-neo-125M',
                         help='gpt-style lm to probe (default: gpt-neo-125M)')
@@ -64,6 +69,8 @@ if __name__ == '__main__':
         }
         for entry in entries
     ]
+    if args.random_subset:
+        samples = random.sample(samples, k=args.random_subset)
 
     if 'gpt-j' in args.model:
         num_layers = model.config.n_layer
