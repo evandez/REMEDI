@@ -13,6 +13,10 @@ from tqdm.auto import tqdm
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='get model-predicted occupations')
+    parser.add_argument('--k',
+                        type=int,
+                        default=3,
+                        help='record top-k predicted occupations (default: 3)')
     parser.add_argument('--model',
                         default='EleutherAI/gpt-neo-125M',
                         help='gpt-style lm to probe (default: gpt-neo-125M)')
@@ -92,27 +96,27 @@ if __name__ == '__main__':
                     continue
                 score += logps[token_position, token_id].item()
             scores.append(score)
-        chosen = torch.tensor(scores).argmax()
+        chosens = torch.tensor(scores).topk(k=args.k).indices
 
         # Recore model's prediction.
         result = {
             'entity': sample['entity'],
             'occupation': sample['occupation'],
-            'prediction': occupations[chosen],
+            'predictions': [occupations[chosen] for chosen in chosens],
         }
         results.append(result)
 
         # Record model representations as well.
         for layer in range(len(outputs.hidden_states)):
             representations[index, layer] = outputs\
-                .hidden_states[layer][chosen, sample['entity_tokens']]\
+                .hidden_states[layer][0, sample['entity_tokens']]\
                 .mean(dim=0)\
                 .cpu()
 
     # Report agreement for debugging.
     matching = 0
     for result in results:
-        matching += result['occupation'] == result['prediction']
+        matching += result['occupation'] in result['predictions']
     agreement = matching / len(results)
     print(f'agreement score: {agreement:.3f}')
 
