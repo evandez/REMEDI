@@ -59,7 +59,7 @@ if __name__ == '__main__':
                 f'{entry["entity"]} is a {occupation}.'
                 for occupation in occupations
             ],
-            'entity_tokens': range(1, 1 + len(tokenizer(entry['entity']))),
+            'entity_tokens': range(len(tokenizer(entry['entity']))),
             **entry,
         }
         for entry in entries
