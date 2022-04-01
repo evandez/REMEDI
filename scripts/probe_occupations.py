@@ -135,7 +135,7 @@ if __name__ == '__main__':
                 predictions = logits.argmax(dim=-1)
                 correct += predictions.eq(batch['target'].to(device)).sum()
             accuracy = correct / len(val)
-            print(f'probe val accuracy: {accuracy}')
+            print(f'probe val accuracy: {accuracy:.3f}')
             accuracies.append({
                 'target': target,
                 'layer': layer,
