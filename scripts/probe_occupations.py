@@ -65,7 +65,7 @@ if __name__ == '__main__':
     _, num_layers, hidden_size = representations.shape
 
     accuracies = []
-    for target in ('occupation', 'prediction'):
+    for target in ('occupation', 'predictions'):
         for layer in reversed(range(representations.shape[1])):
             print(f'---- probe {target} in layer {layer} ----')
 
@@ -85,7 +85,7 @@ if __name__ == '__main__':
                         representations[index, layer],
                     'target':
                         indexer[entry[target][0]]
-                        if target == 'prediction' else indexer[entry[target]],
+                        if target == 'predictions' else indexer[entry[target]],
                     **entry,
                 } for index, entry in enumerate(entries)
             ]
