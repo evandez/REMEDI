@@ -75,7 +75,7 @@ if __name__ == '__main__':
                 nn.Linear(hidden_size, len(occupations)),
             ).to(device)
             criterion = nn.CrossEntropyLoss()
-            optimizer = optim.AdamW(probe.parameters())
+            optimizer = optim.AdamW(probe.parameters(), lr=args.lr)
             stopper = training.EarlyStopping(patience=args.patience)
 
             dataset = [
