@@ -114,7 +114,7 @@ if __name__ == '__main__':
                 probe.eval()
                 for batch in val_loader:
                     reps = batch['rep'].to(device)
-                    target = batch['target'].to(device)
+                    targets = batch['target'].to(device)
                     with torch.inference_mode():
                         predictions = probe(reps)
                     loss += criterion(predictions, targets).item() * len(reps)
