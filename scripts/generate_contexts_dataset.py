@@ -28,7 +28,7 @@ if __name__ == '__main__':
     data_dir = args.data_dir or env.data_dir()
     data_dir.mkdir(exist_ok=True, parents=True)
 
-    occupations_file = args.data_dir / 'occupations.json'
+    occupations_file = data_dir / 'occupations.json'
     print(f'loading occupations from {occupations_file}')
     with occupations_file.open('r') as handle:
         entries = json.load(handle)
@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     contexts_file_name = f'occupations-contexts-{args.model_key}.json'
     print(f'loading contexsts from {contexts_file_name}')
-    contexts_file = args.data_dir / contexts_file_name
+    contexts_file = data_dir / contexts_file_name
     with contexts_file.open('r') as handle:
         contexts = json.load(handle)
 
