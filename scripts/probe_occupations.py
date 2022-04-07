@@ -2,7 +2,6 @@
 import argparse
 import json
 import pathlib
-import random
 
 from src.utils import env, training
 
@@ -40,10 +39,11 @@ if __name__ == '__main__':
                         default=.1,
                         help='fraction of data to use for val (default: .1)')
     parser.add_argument(
-        '--model-top-k',
+        '--top-k',
+        nargs='+',
         type=int,
-        default=3,
-        help='choose predictions label from model top-k (default: 3)')
+        default=(1, 3),
+        help='record top-k accuracies for each k (default: 1 and 3)')
     parser.add_argument('--model-key',
                         default='gpt-neo-125M',
                         help='lm to probe (default: gpt-neo-125M)')
@@ -95,8 +95,7 @@ if __name__ == '__main__':
                     'rep':
                         representations[index, layer],
                     'target':
-                        indexer[random.choice(
-                            entry[target][:args.model_top_k])]
+                        indexer[entry[target][0]]
                         if target == 'predictions' else indexer[entry[target]],
                     **entry,
                 } for index, entry in enumerate(entries)
@@ -145,22 +144,24 @@ if __name__ == '__main__':
             probe.load_state_dict(best_state_dict)
 
             # Compute the accuracy on the val set.
-            correct = 0
-            for batch in val_loader:
-                reps = batch['rep'].to(device)
-                targets = batch['target'].to(device)
-                with torch.inference_mode():
-                    logits = probe(reps)
-                predictions = logits.topk(k=args.model_top_k, dim=-1).indices
-                matches = predictions.eq(targets[:, None]).any(dim=-1)
-                correct += matches.sum().item()
-            accuracy = correct / len(val)
-            print(f'probe val top-{args.model_top_k} accuracy: {accuracy:.3f}')
-            accuracies.append({
-                'target': target,
-                'layer': layer,
-                'accuracy': accuracy,
-            })
+            for k in args.top_k:
+                correct = 0
+                for batch in val_loader:
+                    reps = batch['rep'].to(device)
+                    targets = batch['target'].to(device)
+                    with torch.inference_mode():
+                        logits = probe(reps)
+                    predictions = logits.topk(k=k, dim=-1).indices
+                    matches = predictions.eq(targets[:, None]).any(dim=-1)
+                    correct += matches.sum().item()
+                accuracy = correct / len(val)
+                print(f'probe val top-{k} accuracy: {accuracy:.3f}')
+                accuracies.append({
+                    'top-k': k,
+                    'target': target,
+                    'layer': layer,
+                    'accuracy': accuracy,
+                })
 
             # Save the probe.
             probe_file = results_dir / f'probe-{target}-layer{layer}.pth'
