@@ -58,6 +58,7 @@ if __name__ == '__main__':
         ' who watched the news this morning',
         ' who swatted a fly',
     ]
+    none_contexts = ['']
 
     print(f'loading {args.n_generic_names} generic names from names dataset')
     nd = names_dataset.NameDataset()
@@ -77,7 +78,7 @@ if __name__ == '__main__':
                 'direct': direct_contexts[occupation],
                 'indirect': indirect_contexts[occupation],
                 'random': random_contexts,
-                'none': [],
+                'none': none_contexts,
             }
             for context_type in context_types:
                 context = random.choice(context_types[context_type])
@@ -102,7 +103,7 @@ if __name__ == '__main__':
             'direct': direct_contexts[occupation],
             'indirect': indirect_contexts[occupation],
             'random': random_contexts,
-            'none': [],
+            'none': none_contexts,
         }
         for context_type in context_types:
             context = random.choice(context_types[context_type])
