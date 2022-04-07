@@ -42,7 +42,7 @@ if __name__ == '__main__':
         '--top-k',
         nargs='+',
         type=int,
-        default=(1, 3),
+        default=(1, 3, 5),
         help='record top-k accuracies for each k (default: 1 and 3)')
     parser.add_argument('--model-key',
                         default='gpt-neo-125M',
