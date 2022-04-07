@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--targets',
         nargs='+',
-        default=('occupation', 'prediction'),
+        default=('occupation', 'predictions'),
         help='target labels to train probes for (default: all)')
     parser.add_argument('--lr',
                         type=float,
