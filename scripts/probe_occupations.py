@@ -75,7 +75,22 @@ if __name__ == '__main__':
     representations = torch.load(representations_file)
     _, num_layers, hidden_size = representations.shape
 
+    # Add agreements for convenience.
     accuracies = []
+    for k in args.top_k:
+        matching = 0
+        for entry in entries:
+            matching += entry['occupation'] in entry['predictions'][:k]
+        accuracy = matching / len(entries)
+        print(f'top-{k} agreement: {accuracy:.3f}')
+        accuracies.append({
+            'k': k,
+            'target': 'agreement',
+            'layer': -1,
+            'accuracy': accuracy,
+        })
+
+    # Compute probe accuracies on different targets.
     for target in args.targets:
         for layer in reversed(range(representations.shape[1])):
             print(f'---- probe "{target}" in layer {layer} ----')
