@@ -150,7 +150,7 @@ if __name__ == '__main__':
                 matches = predictions.eq(targets[:, None]).any(dim=-1)
                 correct += matches.sum().item()
             accuracy = correct / len(val)
-            print(f'probe val accuracy: {accuracy:.3f}')
+            print(f'probe val top-{args.model_top_k} accuracy: {accuracy:.3f}')
             accuracies.append({
                 'target': target,
                 'layer': layer,
