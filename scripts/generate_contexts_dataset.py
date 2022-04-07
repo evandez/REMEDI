@@ -98,7 +98,7 @@ if __name__ == '__main__':
 
     # Generate generic examples.
     for generic_name in generic_us_names:
-        occupation = random.choice(occupation)
+        occupation = random.choice(occupations)
         context_types = {
             'direct': direct_contexts[occupation],
             'indirect': indirect_contexts[occupation],
