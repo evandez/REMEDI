@@ -60,17 +60,20 @@ if __name__ == '__main__':
     device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
     data_dir = args.data_dir or env.data_dir()
-    results_dir = args.results_dir or env.results_dir() / 'probe_occupations'
-    results_dir.mkdir(exist_ok=True, parents=True)
+    model_data_dir = data_dir / args.model_key
 
-    occupations_file = data_dir / f'occupations-{args.model_key}.json'
+    results_dir = args.results_dir or env.results_dir() / 'probe_occupations'
+    model_results_dir = results_dir / args.model_key
+    model_results_dir.mkdir(exist_ok=True, parents=True)
+
+    occupations_file = model_data_dir / 'occupations-predicted.json'
     print(f'loading occupations and model predictions from {occupations_file}')
     with occupations_file.open('r') as handle:
         entries = json.load(handle)
     occupations = sorted({entry['occupation'] for entry in entries})
     indexer = {label: index for index, label in enumerate(occupations)}
 
-    representations_file = data_dir / f'occupations-reps-{args.model_key}.pth'
+    representations_file = model_data_dir / 'occupations-reps.pth'
     print(f'loading model entity representations from {representations_file}')
     representations = torch.load(representations_file)
     _, num_layers, hidden_size = representations.shape
@@ -179,10 +182,10 @@ if __name__ == '__main__':
                 })
 
             # Save the probe.
-            probe_file = results_dir / f'probe-{target}-layer{layer}.pth'
+            probe_file = model_results_dir / f'probe-{target}-layer{layer}.pth'
             print(f'saving probe to {probe_file}')
             torch.save(probe.cpu(), probe_file)
 
-    accuracy_file = results_dir / 'accuracies.json'
+    accuracy_file = model_results_dir / 'accuracies.json'
     with accuracy_file.open('w') as handle:
         json.dump(accuracies, handle)

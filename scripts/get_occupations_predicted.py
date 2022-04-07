@@ -129,12 +129,15 @@ if __name__ == '__main__':
 
     # Save the predictions.
     model_key = args.model.split('/')[-1]
-    predictions_file = data_dir / f'occupations-{model_key}.json'
+    model_dir = data_dir / model_key
+    model_dir.mkdir(exist_ok=True, parents=True)
+
+    predictions_file = model_dir / 'occupations-predicted.json'
     print(f'saving model predictions to {predictions_file}')
     with predictions_file.open('w') as handle:
         json.dump(results, handle)
 
     # Save the representations.
-    representations_file = data_dir / f'occupations-reps-{model_key}.pth'
+    representations_file = model_dir / 'occupations-reps.pth'
     print(f'saving model reps to {representations_file}')
     torch.save(representations, representations_file)
