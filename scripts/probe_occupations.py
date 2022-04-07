@@ -146,8 +146,9 @@ if __name__ == '__main__':
                 targets = batch['target'].to(device)
                 with torch.inference_mode():
                     logits = probe(reps)
-                predictions = logits.argmax(dim=-1)
-                correct += predictions.eq(targets).sum().item()
+                predictions = logits.topk(k=args.model_top_k, dim=-1).indices
+                matches = predictions.eq(targets[:, None]).any(dim=-1)
+                correct += matches.sum().item()
             accuracy = correct / len(val)
             print(f'probe val accuracy: {accuracy:.3f}')
             accuracies.append({
