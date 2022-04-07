@@ -14,6 +14,11 @@ from tqdm.auto import tqdm
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='probe lm entity reps for occupation')
+    parser.add_argument(
+        '--targets',
+        nargs='+',
+        default=('occupation', 'prediction'),
+        help='target labels to train probes for (default: all)')
     parser.add_argument('--lr',
                         type=float,
                         default=1e-3,
@@ -71,9 +76,9 @@ if __name__ == '__main__':
     _, num_layers, hidden_size = representations.shape
 
     accuracies = []
-    for target in ('occupation', 'predictions'):
+    for target in args.targets:
         for layer in reversed(range(representations.shape[1])):
-            print(f'---- probe {target} in layer {layer} ----')
+            print(f'---- probe "{target}" in layer {layer} ----')
 
             probe = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
