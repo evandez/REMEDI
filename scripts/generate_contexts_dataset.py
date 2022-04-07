@@ -88,6 +88,8 @@ if __name__ == '__main__':
                     'prompt': f'{prefix}. {famous_name}\'s occupation is',
                 }
                 samples.append({
+                    'entity': famous_name,
+                    'occupation': occupation,
                     'condition': {
                         'entity': 'famous',
                         'occupation': occupation_type,
