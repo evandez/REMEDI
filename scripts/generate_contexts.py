@@ -154,6 +154,7 @@ if __name__ == '__main__':
                                                     completions):
                 contexts[attr_value][kind] = completion.strip(';:. ')
 
-        out_json_file = data_dir / f'{attr_key}-contexts.json'
+        model_key = args.model.split('/')[-1]
+        out_json_file = data_dir / f'{attr_key}-contexts-{model_key}.json'
         with out_json_file.open('w') as handle:
             json.dump(contexts, handle)
