@@ -46,9 +46,9 @@ if __name__ == '__main__':
     }
     indirect_contexts = {
         occupation: [
-            f' whose job is to {contexts[occupation]["role"]}',
+            f' whose job is to {contexts[occupation]["duty"]}',
             f' who works at a {contexts[occupation]["location"]}',
-            f' who has a degree in {contexts[occupation]["location"]}',
+            f' who has a degree in {contexts[occupation]["degree"]}',
         ] for occupation in occupations
     }
     # TODO(evandez): Generate these?
