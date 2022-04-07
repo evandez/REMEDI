@@ -35,7 +35,7 @@ if __name__ == '__main__':
     occupations = sorted({entry['occupation'] for entry in entries})
 
     contexts_file_name = f'occupations-contexts-{args.model_key}.json'
-    print(f'loading contexsts from {contexts_file_name}')
+    print(f'loading contexts from {contexts_file_name}')
     contexts_file = data_dir / contexts_file_name
     with contexts_file.open('r') as handle:
         contexts = json.load(handle)
