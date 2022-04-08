@@ -99,8 +99,7 @@ if __name__ == '__main__':
                                  batch_size=args.batch_size)
         batched_input_ids, batched_logits, batched_hidden_states = [], [], []
         for batch in loader:
-            inputs = tokenizer(batch['statements'],
-                               return_tensors='pt',
+            inputs = tokenizer(batch, return_tensors='pt',
                                padding='longest').to(device)
             with torch.inference_mode():
                 outputs = model(**inputs,
