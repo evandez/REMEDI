@@ -8,6 +8,7 @@ def find_token_range(
     string: str,
     substring: str,
     tokenizer: tokenization_utils_fast.PreTrainedTokenizerFast,
+    occurrence: int = 0,
     **kwargs: Any,
 ) -> Tuple[int, int]:
     """Find index range of tokenized string containing tokens for substring.
@@ -28,6 +29,8 @@ def find_token_range(
         substring (str): The substring to find token range for.
         tokenizer (tokenization_utils_fast.PreTrainedTokenizerFast): The
             tokenizer.
+        occurrence (int, optional): The occurence of the substring to look for.
+            Zero indexed. Defaults to 0, the first occurrence.
 
     Raises:
         ValueError: If substring is not actually in string or if banned
@@ -41,6 +44,12 @@ def find_token_range(
     if substring not in string:
         raise ValueError(f'"{substring}" not found in "{string}"')
     char_start = string.index(substring)
+    for _ in range(occurrence):
+        try:
+            char_start = string.index(substring, char_start + 1)
+        except ValueError as error:
+            raise ValueError(f'could not find {occurrence} occurrences '
+                             f'of "{substring} in "{string}"') from error
     char_end = char_start + len(substring)
 
     tokens = tokenizer(string, return_offsets_mapping=True, **kwargs)

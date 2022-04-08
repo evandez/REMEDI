@@ -4,26 +4,27 @@ from src.utils import tokenizers
 import pytest
 import transformers
 
+BERT_TOKENIZER = 'bert-base-uncased'
+GPT2_TOKENIZER = 'gpt2'
 
-@pytest.fixture
+
+@pytest.fixture(scope='module')
 def gpt2_tokenizer():
     """Return a GPT2 tokenizer for testing."""
-    return transformers.AutoTokenizer.from_pretrained('gpt2')
+    return transformers.AutoTokenizer.from_pretrained(GPT2_TOKENIZER,
+                                                      use_fast=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def bert_tokenizer():
     """Return a BERT tokenizer for testing."""
-    return transformers.AutoTokenizer.from_pretrained('bert-base-uncased')
-
-
-BERT_TOKENIZER_NAME = 'bert'
-GPT2_TOKENIZER_NAME = 'gpt2'
+    return transformers.AutoTokenizer.from_pretrained(BERT_TOKENIZER,
+                                                      use_fast=True)
 
 
 @pytest.mark.parametrize('tokenizer_name,string,substring,kwargs,expected', (
     (
-        BERT_TOKENIZER_NAME,
+        BERT_TOKENIZER,
         'The batman is the night.',
         'batman',
         {
@@ -32,7 +33,7 @@ GPT2_TOKENIZER_NAME = 'gpt2'
         (1, 2),
     ),
     (
-        BERT_TOKENIZER_NAME,
+        BERT_TOKENIZER,
         'The batman is the night.',
         'batman',
         {
@@ -41,7 +42,7 @@ GPT2_TOKENIZER_NAME = 'gpt2'
         (2, 3),
     ),
     (
-        GPT2_TOKENIZER_NAME,
+        GPT2_TOKENIZER,
         'The batman is the night.',
         'batman',
         {
@@ -50,7 +51,7 @@ GPT2_TOKENIZER_NAME = 'gpt2'
         (1, 3),
     ),
     (
-        GPT2_TOKENIZER_NAME,
+        GPT2_TOKENIZER,
         'The batman is the night.',
         'batman',
         {
@@ -58,14 +59,23 @@ GPT2_TOKENIZER_NAME = 'gpt2'
         },
         (1, 3),
     ),
+    (
+        GPT2_TOKENIZER,
+        'The batman is the night. The batman is cool.',
+        'batman',
+        {
+            'occurrence': 1,
+        },
+        (8, 10),
+    ),
 ))
 def test_find_token_range(gpt2_tokenizer, bert_tokenizer, tokenizer_name,
                           string, substring, kwargs, expected):
     """Test find_token_range returns correct token range."""
-    if tokenizer_name == GPT2_TOKENIZER_NAME:
+    if tokenizer_name == GPT2_TOKENIZER:
         tokenizer = gpt2_tokenizer
     else:
-        assert tokenizer_name == 'bert'
+        assert tokenizer_name == BERT_TOKENIZER
         tokenizer = bert_tokenizer
     actual = tokenizers.find_token_range(string, substring, tokenizer,
                                          **kwargs)
