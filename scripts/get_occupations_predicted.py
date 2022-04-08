@@ -105,7 +105,10 @@ if __name__ == '__main__':
                 outputs = model(**inputs,
                                 output_hidden_states=True,
                                 return_dict=True)
+
+            # Have to batch this process to support big boys like GPT-J...
             batched_logits.append(outputs.logits)
+
             # Save reps here too, since it's convenient. Just do it once.
             if batch_index == 0:
                 entity_tokens = range(*sample['entity_token_range'])
