@@ -39,6 +39,9 @@ if __name__ == '__main__':
         '--data-dir',
         type=pathlib.Path,
         help='read and write data here (default: project data dir)')
+    parser.add_argument('--no-save',
+                        action='store_true',
+                        help='do not save results')
     parser.add_argument('--device', help='device to use (default: guessed)')
     args = parser.parse_args()
 
@@ -167,11 +170,13 @@ if __name__ == '__main__':
         predictions_file_name = 'occupations-predicted.json'
         representations_file_name = 'occupations-reps.pth'
 
-    predictions_file = model_dir / predictions_file_name
-    print(f'saving model predictions to {predictions_file}')
-    with predictions_file.open('w') as handle:
-        json.dump(results, handle)
+    if not args.no_save:
+        predictions_file = model_dir / predictions_file_name
+        print(f'saving model predictions to {predictions_file}')
+        with predictions_file.open('w') as handle:
+            json.dump(results, handle)
 
-    representations_file = model_dir / representations_file_name
-    print(f'saving model reps to {representations_file}')
-    torch.save(representations, representations_file)
+    if not args.no_save:
+        representations_file = model_dir / representations_file_name
+        print(f'saving model reps to {representations_file}')
+        torch.save(representations, representations_file)
