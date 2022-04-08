@@ -25,8 +25,8 @@ if __name__ == '__main__':
                         help='record top-k predicted occupations (default: 5)')
     parser.add_argument('--batch-size',
                         type=int,
-                        default=50,
-                        help='sentence to feed at once (default: 50)')
+                        default=25,
+                        help='sentences to feed at once (default: 50)')
     parser.add_argument(
         '--random-subset',
         type=int,
