@@ -125,7 +125,7 @@ if __name__ == '__main__':
         # Record model representations as well.
         for layer in range(len(outputs.hidden_states)):
             representations[index, layer] = outputs\
-                .hidden_states[layer][0, range(sample['entity_token_range'])]\
+                .hidden_states[layer][0, range(*sample['entity_token_range'])]\
                 .mean(dim=0)\
                 .cpu()
 
