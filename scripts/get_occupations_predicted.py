@@ -67,12 +67,12 @@ if __name__ == '__main__':
                 for occupation in occupations
             ],
             'entity_tokens':
-                tokenizers.find_token_range(
-                    entry['texts']['prompt']
-                    if args.discourse else entry['entity'],
+                range(*tokenizers.find_token_range(
+                    entry['texts']['prompt'] if args.
+                    discourse else entry['entity'],
                     entry['entity'],
                     tokenizer,
-                    occurrence=1 if args.discourse else 0),
+                    occurrence=1 if args.discourse else 0)),
             **entry,
         }
         for entry in entries
