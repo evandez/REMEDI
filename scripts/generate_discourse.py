@@ -93,8 +93,10 @@ if __name__ == '__main__':
                     'no-prompt': prefix,
                     'prompt': f'{prefix}. {famous_name}\'s occupation is',
                 }
-                tokens = tokenizers.find_token_range(prefix, famous_name,
-                                                     tokenizer)
+                tokens = tokenizers.find_token_range(prefix,
+                                                     famous_name,
+                                                     tokenizer,
+                                                     occurrence=1)
                 samples.append({
                     'entity': famous_name,
                     'occupation': occupation,
@@ -123,13 +125,20 @@ if __name__ == '__main__':
                 'no-prompt': prefix,
                 'prompt': f'{prefix}. {famous_name}\'s occupation is',
             }
+            tokens = tokenizers.find_token_range(prefix,
+                                                 generic_name,
+                                                 tokenizer,
+                                                 occurrence=1)
             samples.append({
+                'entity': generic_name,
+                'occupation': occupation,
                 'condition': {
-                    'entity': 'famous',
+                    'entity': 'generic',
                     'occupation': 'random',
                     'context': context_type,
                 },
                 'texts': texts,
+                'tokens': tokens,
             })
 
     # Save the results.
