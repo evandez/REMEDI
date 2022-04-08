@@ -68,13 +68,13 @@ if __name__ == '__main__':
                 f'{entry["entity"]} is most known for being a {occupation}.'
                 for occupation in occupations
             ],
-            'entity_tokens':
-                range(*tokenizers.find_token_range(
-                    entry['texts']['prompt'] if args.
-                    discourse else entry['entity'],
+            'entity_token_range':
+                tokenizers.find_token_range(
+                    entry['texts']['prompt']
+                    if args.discourse else entry['entity'],
                     entry['entity'],
                     tokenizer,
-                    occurrence=1 if args.discourse else 0)),
+                    occurrence=1 if args.discourse else 0),
             **entry,
         }
         for entry in entries
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         # Record model representations as well.
         for layer in range(len(outputs.hidden_states)):
             representations[index, layer] = outputs\
-                .hidden_states[layer][0, sample['entity_tokens']]\
+                .hidden_states[layer][0, range(sample['entity_token_range'])]\
                 .mean(dim=0)\
                 .cpu()
 
