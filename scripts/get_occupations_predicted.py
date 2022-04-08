@@ -1,4 +1,4 @@
-"""Train a probe to predict occupation."""
+"""Determine LM predicted occupations for famous entities."""
 import argparse
 import json
 import pathlib
