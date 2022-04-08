@@ -49,7 +49,6 @@ if __name__ == '__main__':
     data_dir = args.data_dir or env.data_dir()
     data_dir.mkdir(exist_ok=True, parents=True)
 
-    occupations_file = args.occupations_file
     if args.discourse:
         occupations_file = data_dir / 'occupations.json'
     else:
