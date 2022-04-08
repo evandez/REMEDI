@@ -68,7 +68,7 @@ if __name__ == '__main__':
             ],
             'entity_tokens':
                 tokenizers.find_token_range(
-                    entry['text']['prompt']
+                    entry['texts']['prompt']
                     if args.discourse else entry['entity'],
                     entry['entity'],
                     tokenizer,
