@@ -18,15 +18,16 @@ if __name__ == '__main__':
         help='number of generic m/f names to sample from (default: 100)')
     parser.add_argument(
         '--model-key',
-        default='bart-large',
-        help='model that generated the contexts (default: bart-large)')
+        default='gpt-j-6B',
+        help='model to create probing dataset for (default: gpt-j-6B)')
     parser.add_argument('--data-dir',
                         type=pathlib.Path,
                         help='link data here (default: project data dir)')
     args = parser.parse_args()
 
     data_dir = args.data_dir or env.data_dir()
-    data_dir.mkdir(exist_ok=True, parents=True)
+    model_data_dir = args.data_dir / args.model_key
+    model_data_dir.mkdir(exist_ok=True, parents=True)
 
     occupations_file = data_dir / 'occupations.json'
     print(f'loading occupations from {occupations_file}')
@@ -124,7 +125,7 @@ if __name__ == '__main__':
             })
 
     # Save the results.
-    results_file = data_dir / f'occupations-discourse-{args.model_key}.json'
+    results_file = model_data_dir / 'occupations-discourse.json'
     print(f'saving the results to {results_file}')
     with results_file.open('w') as handle:
         json.dump(samples, handle)
