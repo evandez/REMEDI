@@ -63,6 +63,8 @@ if __name__ == '__main__':
         # For each entity, create a list of statements that the LM can eval.
         {
             'statements': [
+                f'{entry["texts"]["prompt"]} {occupation}.'
+                if args.discourse else
                 f'{entry["entity"]} is most known for being a {occupation}.'
                 for occupation in occupations
             ],
