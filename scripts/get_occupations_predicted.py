@@ -91,27 +91,30 @@ if __name__ == '__main__':
         num_layers = model.config.n_layer
     else:
         num_layers = model.config.num_layers
-    representations = torch.empty(len(entries), num_layers + 1,
+    representations = torch.zeros(len(entries), num_layers + 1,
                                   model.config.hidden_size)
     results = []
     for index, sample in enumerate(tqdm(samples, desc='predict occupations')):
-        inputs = tokenizer(sample['statements'],
-                           return_tensors='pt',
-                           padding='longest').to(device)
-        loader = data.DataLoader(inputs, batch_size=args.batch_size)
-        batched_logits, batched_hidden_states = [], []
-        for batch in loader:
+        loader = data.DataLoader(sample['statements'],
+                                 batch_size=args.batch_size)
+        batched_logits = []
+        for batch_index, batch in enumerate(loader):
+            inputs = tokenizer(batch, return_tensors='pt',
+                               padding='longest').to(device)
             with torch.inference_mode():
-                outputs = model(**batch,
+                outputs = model(**inputs,
                                 output_hidden_states=True,
                                 return_dict=True)
             batched_logits.append(outputs.logits)
-            batched_hidden_states.append(outputs.hidden_states)
+            # Save reps here too, since it's convenient. Just do it once.
+            if batch_index == 0:
+                entity_tokens = range(*sample['entity_token_range'])
+                for layer in range(len(outputs.hidden_states)):
+                    representations[index, layer] = outputs\
+                        .hidden_states[layer][0, entity_tokens]\
+                        .mean(dim=0)\
+                        .cpu()
         logits = torch.cat(batched_logits)
-        hidden_states = [
-            torch.cat(layer_hidden_states)
-            for layer_hidden_states in zip(*batched_hidden_states)
-        ]
 
         # Have to manually compute sequence probs...in 2022? Really?
         ids_and_logits = zip(inputs.input_ids, logits)
@@ -137,13 +140,6 @@ if __name__ == '__main__':
             **sample,
         }
         results.append(result)
-
-        # Record model representations as well.
-        for layer in range(len(hidden_states)):
-            representations[index, layer] = outputs\
-                .hidden_states[layer][0, range(*sample['entity_token_range'])]\
-                .mean(dim=0)\
-                .cpu()
 
     # Report agreement for debugging.
     matching = 0
