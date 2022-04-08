@@ -5,9 +5,10 @@ import pathlib
 import random
 from typing import Mapping, Sequence
 
-from src.utils import env
+from src.utils import env, tokenizers
 
 import names_dataset
+import transformers
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='generate contexts dataset')
@@ -17,8 +18,8 @@ if __name__ == '__main__':
         default=100,
         help='number of generic m/f names to sample from (default: 100)')
     parser.add_argument(
-        '--model-key',
-        default='gpt-j-6B',
+        '--model',
+        default='EleutherAI/gpt-j-6B',
         help='model to create probing dataset for (default: gpt-j-6B)')
     parser.add_argument('--data-dir',
                         type=pathlib.Path,
@@ -26,8 +27,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     data_dir = args.data_dir or env.data_dir()
-    model_data_dir = args.data_dir / args.model_key
+    model_key = args.model.split('/')[-1]
+    model_data_dir = args.data_dir / model_key
     model_data_dir.mkdir(exist_ok=True, parents=True)
+
+    print(f'loading {args.model} tokenizer')
+    tokenizer = transformers.AutoTokenizer.from_pretrained(args.model)
 
     occupations_file = data_dir / 'occupations.json'
     print(f'loading occupations from {occupations_file}')
@@ -88,6 +93,8 @@ if __name__ == '__main__':
                     'no-prompt': prefix,
                     'prompt': f'{prefix}. {famous_name}\'s occupation is',
                 }
+                tokens = tokenizers.find_token_range(prefix, famous_name,
+                                                     tokenizer)
                 samples.append({
                     'entity': famous_name,
                     'occupation': occupation,
@@ -97,6 +104,7 @@ if __name__ == '__main__':
                         'context': context_type,
                     },
                     'texts': texts,
+                    'tokens': tokens,
                 })
 
     # Generate generic examples.
