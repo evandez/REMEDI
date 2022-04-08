@@ -104,10 +104,10 @@ if __name__ == '__main__':
         }
         for context_type in context_types:
             context = random.choice(context_types[context_type])
-            prefix = f'This is a story about {famous_name}{context}'
+            prefix = f'This is a story about {generic_name}{context}'
             texts = {
                 'no-prompt': prefix,
-                'prompt': f'{prefix}. {famous_name}\'s occupation is',
+                'prompt': f'{prefix}. {generic_name}\'s occupation is',
             }
             samples.append({
                 'entity': generic_name,
