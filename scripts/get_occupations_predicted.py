@@ -9,6 +9,7 @@ from src.utils import env, tokenizers
 import torch
 import transformers
 from torch import cuda
+from torch.utils import data
 from tqdm.auto import tqdm
 
 if __name__ == '__main__':
@@ -22,6 +23,10 @@ if __name__ == '__main__':
                         type=int,
                         default=5,
                         help='record top-k predicted occupations (default: 5)')
+    parser.add_argument('--batch-size',
+                        type=int,
+                        default=50,
+                        help='sentence to feed at once (default: 50)')
     parser.add_argument(
         '--random-subset',
         type=int,
@@ -90,16 +95,29 @@ if __name__ == '__main__':
                                   model.config.hidden_size)
     results = []
     for index, sample in enumerate(tqdm(samples, desc='predict occupations')):
-        inputs = tokenizer(sample['statements'],
-                           return_tensors='pt',
-                           padding='longest').to(device)
-        with torch.inference_mode():
-            outputs = model(**inputs,
-                            output_hidden_states=True,
-                            return_dict=True)
+        loader = data.DataLoader(sample['statements'],
+                                 batch_size=args.batch_size)
+        batched_input_ids, batched_logits, batched_hidden_states = [], [], []
+        for batch in loader:
+            inputs = tokenizer(batch['statements'],
+                               return_tensors='pt',
+                               padding='longest').to(device)
+            with torch.inference_mode():
+                outputs = model(**inputs,
+                                output_hidden_states=True,
+                                return_dict=True)
+            batched_input_ids.append(inputs.input_ids)
+            batched_logits.append(outputs.logits)
+            batched_hidden_states.append(outputs.hidden_states)
+        input_ids = torch.cat(batched_input_ids)
+        logits = torch.cat(batched_logits)
+        hidden_states = [
+            torch.cat(layer_hidden_states)
+            for layer_hidden_states in zip(*batched_hidden_states)
+        ]
 
         # Have to manually compute sequence probs...in 2022? Really?
-        ids_and_logits = zip(inputs.input_ids, outputs.logits)
+        ids_and_logits = zip(input_ids, logits)
         scores = []
         for token_ids, logits in ids_and_logits:
             logps = torch.log_softmax(logits, dim=-1)
