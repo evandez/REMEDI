@@ -3,6 +3,7 @@ import argparse
 import json
 import pathlib
 import random
+from typing import List
 
 from src.utils import env, tokenizers
 
@@ -97,7 +98,8 @@ if __name__ == '__main__':
     for index, sample in enumerate(tqdm(samples, desc='predict occupations')):
         loader = data.DataLoader(sample['statements'],
                                  batch_size=args.batch_size)
-        batched_logits = []
+        batched_input_ids: List[torch.Tensor] = []
+        batched_logits: List[torch.Tensor] = []
         for batch_index, batch in enumerate(loader):
             inputs = tokenizer(batch, return_tensors='pt',
                                padding='longest').to(device)
@@ -107,6 +109,7 @@ if __name__ == '__main__':
                                 return_dict=True)
 
             # Have to batch this process to support big boys like GPT-J...
+            batched_input_ids.append(inputs.input_ids)
             batched_logits.append(outputs.logits)
 
             # Save reps here too, since it's convenient. Just do it once.
@@ -117,10 +120,11 @@ if __name__ == '__main__':
                         .hidden_states[layer][0, entity_tokens]\
                         .mean(dim=0)\
                         .cpu()
+        input_ids = torch.cat(batched_input_ids)
         logits = torch.cat(batched_logits)
 
         # Have to manually compute sequence probs...in 2022? Really?
-        ids_and_logits = zip(inputs.input_ids, logits)
+        ids_and_logits = zip(input_ids, logits)
         scores = []
         for token_ids, logits in ids_and_logits:
             logps = torch.log_softmax(logits, dim=-1)
