@@ -4,7 +4,7 @@ import json
 import pathlib
 import random
 
-from src.utils import env
+from src.utils import env, tokenizers
 
 import torch
 import transformers
@@ -14,6 +14,10 @@ from tqdm.auto import tqdm
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='get model-predicted occupations')
+    parser.add_argument(
+        '--discourse',
+        action='store_true',
+        help='use discourse prompts instead of generating prompts')
     parser.add_argument('--k',
                         type=int,
                         default=5,
@@ -29,17 +33,14 @@ if __name__ == '__main__':
         '--data-dir',
         type=pathlib.Path,
         help='read and write data here (default: project data dir)')
-    parser.add_argument(
-        '--occupations-file',
-        type=pathlib.Path,
-        help='json file with entity/occ (default: checks in project data dir)')
     parser.add_argument('--device', help='device to use (default: guessed)')
     args = parser.parse_args()
 
     device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
     print(f'loading {args.model}')
-    tokenizer = transformers.AutoTokenizer.from_pretrained(args.model)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(args.model,
+                                                           use_fast=True)
     tokenizer.pad_token = tokenizer.eos_token
 
     model = transformers.AutoModelForCausalLM.from_pretrained(args.model)
@@ -49,8 +50,10 @@ if __name__ == '__main__':
     data_dir.mkdir(exist_ok=True, parents=True)
 
     occupations_file = args.occupations_file
-    if occupations_file is None:
+    if args.discourse:
         occupations_file = data_dir / 'occupations.json'
+    else:
+        occupations_file = data_dir / 'occupations-discourse.json'
 
     print(f'loading occupations from {occupations_file}')
     with occupations_file.open('r') as handle:
@@ -64,7 +67,13 @@ if __name__ == '__main__':
                 f'{entry["entity"]} is most known for being a {occupation}.'
                 for occupation in occupations
             ],
-            'entity_tokens': range(len(tokenizer(entry['entity']))),
+            'entity_tokens':
+                tokenizers.find_token_range(
+                    entry['text']['prompt']
+                    if args.discourse else entry['entity'],
+                    entry['entity'],
+                    tokenizer,
+                    occurrence=1 if args.discourse else 0),
             **entry,
         }
         for entry in entries
