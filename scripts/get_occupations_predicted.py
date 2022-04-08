@@ -142,11 +142,11 @@ if __name__ == '__main__':
     model_dir.mkdir(exist_ok=True, parents=True)
 
     if args.discourse:
-        predictions_file_name = 'occupations-predicted.json'
-        representations_file_name = 'occupations-reps.pth'
-    else:
         predictions_file_name = 'occupations-discourse-predicted.json'
         representations_file_name = 'occupations-discourse-reps.pth'
+    else:
+        predictions_file_name = 'occupations-predicted.json'
+        representations_file_name = 'occupations-reps.pth'
 
     predictions_file = model_dir / predictions_file_name
     print(f'saving model predictions to {predictions_file}')
