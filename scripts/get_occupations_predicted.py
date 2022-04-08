@@ -116,6 +116,7 @@ if __name__ == '__main__':
         chosens = torch.tensor(scores).topk(k=args.k).indices
 
         # Recore model's prediction.
+        del sample['statements']
         result = {
             'predictions': [occupations[chosen] for chosen in chosens],
             **sample,
