@@ -25,7 +25,7 @@ if __name__ == '__main__':
                         help='record top-k predicted occupations (default: 5)')
     parser.add_argument('--batch-size',
                         type=int,
-                        default=25,
+                        default=50,
                         help='sentences to feed at once (default: 50)')
     parser.add_argument(
         '--random-subset',
@@ -95,20 +95,18 @@ if __name__ == '__main__':
                                   model.config.hidden_size)
     results = []
     for index, sample in enumerate(tqdm(samples, desc='predict occupations')):
-        loader = data.DataLoader(sample['statements'],
-                                 batch_size=args.batch_size)
-        batched_input_ids, batched_logits, batched_hidden_states = [], [], []
+        inputs = tokenizer(sample['statements'],
+                           return_tensors='pt',
+                           padding='longest').to(device)
+        loader = data.DataLoader(inputs, batch_size=args.batch_size)
+        batched_logits, batched_hidden_states = [], []
         for batch in loader:
-            inputs = tokenizer(batch, return_tensors='pt',
-                               padding='longest').to(device)
             with torch.inference_mode():
-                outputs = model(**inputs,
+                outputs = model(**batch,
                                 output_hidden_states=True,
                                 return_dict=True)
-            batched_input_ids.append(inputs.input_ids)
             batched_logits.append(outputs.logits)
             batched_hidden_states.append(outputs.hidden_states)
-        input_ids = torch.cat(batched_input_ids)
         logits = torch.cat(batched_logits)
         hidden_states = [
             torch.cat(layer_hidden_states)
@@ -116,7 +114,7 @@ if __name__ == '__main__':
         ]
 
         # Have to manually compute sequence probs...in 2022? Really?
-        ids_and_logits = zip(input_ids, logits)
+        ids_and_logits = zip(inputs.input_ids, logits)
         scores = []
         for token_ids, logits in ids_and_logits:
             logps = torch.log_softmax(logits, dim=-1)
