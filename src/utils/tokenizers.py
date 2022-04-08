@@ -54,7 +54,6 @@ def find_token_range(
 
     tokens = tokenizer(string, return_offsets_mapping=True, **kwargs)
     offset_mapping = tokens.offset_mapping
-    print((char_start, char_end), offset_mapping)
 
     token_start, token_end = None, None
     for index, (token_char_start, token_char_end) in enumerate(offset_mapping):
