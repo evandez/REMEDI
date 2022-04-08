@@ -116,9 +116,8 @@ if __name__ == '__main__':
 
         # Recore model's prediction.
         result = {
-            'entity': sample['entity'],
-            'occupation': sample['occupation'],
             'predictions': [occupations[chosen] for chosen in chosens],
+            **sample,
         }
         results.append(result)
 
@@ -136,17 +135,23 @@ if __name__ == '__main__':
     agreement = matching / len(results)
     print(f'agreement score: {agreement:.3f}')
 
-    # Save the predictions.
+    # Save the predictions and representations.
     model_key = args.model.split('/')[-1]
     model_dir = data_dir / model_key
     model_dir.mkdir(exist_ok=True, parents=True)
 
-    predictions_file = model_dir / 'occupations-predicted.json'
+    if args.discourse:
+        predictions_file_name = 'occupations-predicted.json'
+        representations_file_name = 'occupations-reps.pth'
+    else:
+        predictions_file_name = 'occupations-discourse-predicted.json'
+        representations_file_name = 'occupations-discourse-reps.pth'
+
+    predictions_file = model_dir / predictions_file_name
     print(f'saving model predictions to {predictions_file}')
     with predictions_file.open('w') as handle:
         json.dump(results, handle)
 
-    # Save the representations.
-    representations_file = model_dir / 'occupations-reps.pth'
+    representations_file = model_dir / representations_file_name
     print(f'saving model reps to {representations_file}')
     torch.save(representations, representations_file)
