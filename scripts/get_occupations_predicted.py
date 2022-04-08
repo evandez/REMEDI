@@ -50,9 +50,9 @@ if __name__ == '__main__':
     data_dir.mkdir(exist_ok=True, parents=True)
 
     if args.discourse:
-        occupations_file = data_dir / 'occupations.json'
-    else:
         occupations_file = data_dir / 'occupations-discourse.json'
+    else:
+        occupations_file = data_dir / 'occupations.json'
 
     print(f'loading occupations from {occupations_file}')
     with occupations_file.open('r') as handle:
