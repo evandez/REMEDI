@@ -10,22 +10,32 @@ import pathlib
 from src import wikidata
 from src.utils import env
 
+BANNED_OCCUPATIONS = {
+    'pensioner',
+}
+
 SUPER_OCCUPATIONS = {
     'actor': {
         'film actor',
         'television actor',
+        'television presenter',
     },
     'athlete': {
         'american football player',
+        'australian rules football player',
         'association football player',
         'athletics competitor',
         'basketball player',
         'boxer',
         'cricketer',
         'ice hockey player',
+        'rugby union player',
+        'rower',
         'sport cyclist',
         'swimmer',
+        'volleyball player',
     },
+    'businessperson': {'merchant',},
     'doctor': {'physician'},
     'educator': {
         'pedagogue',
@@ -38,10 +48,16 @@ SUPER_OCCUPATIONS = {
         'military officer',
         'military personnel',
     },
-    'musician': {'guitarist'},
+    'musician': {
+        'conductor',
+        'guitarist',
+        'singer-songwriter',
+        'opera singer',
+    },
     'politician': {'diplomat'},
     'religious figure': {
         'catholic priest',
+        'pastor',
         'priest',
     },
     'scientist': {'researcher'},
@@ -85,8 +101,11 @@ if __name__ == '__main__':
 
     entries = []
     for occupation_id, people in people_entities_by_occupation.items():
+        occupation = occupation_entities_by_id[occupation_id].get_label()
+        if occupation in BANNED_OCCUPATIONS:
+            continue
+
         for person in people:
-            occupation = occupation_entities_by_id[occupation_id].get_label()
             for key, superset in SUPER_OCCUPATIONS.items():
                 if occupation.lower() in superset:
                     occupation = key
