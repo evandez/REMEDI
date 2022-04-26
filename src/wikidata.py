@@ -2,6 +2,7 @@
 from typing import Any, Mapping, Sequence
 
 from qwikidata import entity, linked_data_interface, sparql
+from retry import retry
 from tqdm.auto import tqdm
 
 
@@ -50,6 +51,7 @@ def get_occupations(
     return tuple(occupations)
 
 
+@retry()
 def get_entities_with_occupation(occupation_id: str,
                                  limit: int = 100) -> Sequence[str]:
     """Get the names of the most famous entities with the occupation.
