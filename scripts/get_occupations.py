@@ -10,6 +10,50 @@ import pathlib
 from src import wikidata
 from src.utils import env
 
+SUPER_OCCUPATIONS = {
+    'actor': {
+        'film actor',
+        'television actor',
+    },
+    'athlete': {
+        'american football player',
+        'association football player',
+        'athletics competitor',
+        'basketball player',
+        'boxer',
+        'cricketer',
+        'ice hockey player',
+        'sport cyclist',
+        'swimmer',
+    },
+    'doctor': {'physician'},
+    'educator': {
+        'pedagogue',
+        'teacher',
+        'university teacher',
+    },
+    'filmmaker': {'film director'},
+    'historian': {'art historian'},
+    'member of the military': {
+        'military officer',
+        'military personnel',
+    },
+    'musician': {'guitarist'},
+    'politician': {'diplomat'},
+    'religious figure': {
+        'catholic priest',
+        'priest',
+    },
+    'scientist': {'researcher'},
+    'sports manager': {'association football manager'},
+    'writer': {
+        'author',
+        'novelist',
+        'poet',
+        'screenwriter',
+    }
+}
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='dl and preprocess (entity, occupation) data')
@@ -39,14 +83,17 @@ if __name__ == '__main__':
     people_entities_by_occupation = wikidata.get_entities_by_occupation(
         occupation_ids, limit=args.limit_entities_per_occupation)
 
-    entries = [
-        {
-            'entity': person,
-            'occupation': occupation_entities_by_id[occupation_id].get_label()
-        }
-        for occupation_id, people in people_entities_by_occupation.items()
-        for person in people
-    ]
+    entries = []
+    for occupation_id, people in people_entities_by_occupation.items():
+        for person in people:
+            occupation = occupation_entities_by_id[occupation_id].get_label()
+            for key, superset in SUPER_OCCUPATIONS.items():
+                if occupation.lower() in superset:
+                    occupation = key
+                    break
+            entry = {'entity': person, 'occupation': occupation}
+            entries.append(entry)
+
     occupations_file = data_dir / 'occupations.json'
     with occupations_file.open('w') as handle:
         json.dump(entries, handle)
