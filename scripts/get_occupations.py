@@ -35,7 +35,7 @@ SUPER_OCCUPATIONS = {
         'swimmer',
         'volleyball player',
     },
-    'businessperson': {'merchant',},
+    'businessperson': {'merchant'},
     'doctor': {'physician'},
     'educator': {
         'pedagogue',
