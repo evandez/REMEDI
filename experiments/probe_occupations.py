@@ -81,6 +81,7 @@ if __name__ == '__main__':
     _, num_layers, hidden_size = representations.shape
 
     # Add majority baselines for convenience.
+    accuracies = []
     for target in args.targets:
         counts: Dict[str, int] = defaultdict(int)
         for entry in entries:
@@ -95,9 +96,14 @@ if __name__ == '__main__':
         print(f'Class ratios for "{target}":')
         for label, fraction in fractions.items():
             print(f'{label}: {fraction:.3f}')
+            accuracies.append({
+                'k': 1,
+                'target': f'predict-{label}',
+                'layer': -1,
+                'accuracy': fraction,
+            })
 
     # Add agreements for convenience.
-    accuracies = []
     for k in args.top_k:
         matching = 0
         for entry in entries:
