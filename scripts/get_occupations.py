@@ -15,9 +15,14 @@ BANNED_OCCUPATIONS = {
     'official',  # Overly vague
     'pensioner',  # Too specific
     'pornographic actor',  # Inappropriate
+    'trade unionist',  # Too specific
 }
 
 SUPER_OCCUPATIONS = {
+    'academic': {
+        'literary scholar',
+        'professor',
+    },
     'actor': {
         'film actor',
         'stage actor',
@@ -30,18 +35,22 @@ SUPER_OCCUPATIONS = {
     'pilot': {'aircraft pilot'},
     'athlete': {
         'alpine skier',
+        'amateur wrestler',
         'american football player',
         'australian rules football player',
         'artistic gymnast',
         'association football player',
         'athletics competitor',
         'badminton player',
+        'baseball player',
         'basketball player',
         'boxer',
         'canoeist',
         'cricketer',
+        'figure skater',
         'field hockey player',
         'golfer',
+        'handball player',
         'ice hockey player',
         'rugby league player',
         'rugby union player',
@@ -61,7 +70,10 @@ SUPER_OCCUPATIONS = {
         'physician',
         'surgeon',
     },
-    'editor': {'contributing editor'},
+    'editor': {
+        'contributing editor',
+        'film editor',
+    },
     'educator': {
         'high school teacher',
         'music pedagogue',
@@ -81,8 +93,11 @@ SUPER_OCCUPATIONS = {
     },
     'journalist': {'opinion journalist'},
     'lawyer': {'barrister'},
-    'linguist': {'esperantist', 'classical philologist'},
-    'professor': {'academic'},
+    'linguist': {
+        'esperantist',
+        'classical philologist',
+        'philologist',
+    },
     'publisher': {'printmaker', 'printer'},
     'member of the military': {
         'military commander',
@@ -124,6 +139,7 @@ SUPER_OCCUPATIONS = {
         'record producer',
         'television producer',
     },
+    'racecar driver': {'racing automobile driver'},
     'referee': {'association football referee'},
     'scientist': {'researcher'},
     'sports manager': {'association football manager', 'basketball coach'},
