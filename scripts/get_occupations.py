@@ -168,7 +168,7 @@ if __name__ == '__main__':
         description='dl and preprocess (entity, occupation) data')
     parser.add_argument('--limit-occupations',
                         type=int,
-                        default=200,
+                        default=100,
                         help='max occupations to query for')
     parser.add_argument('--limit-entities-per-occupation',
                         type=int,
