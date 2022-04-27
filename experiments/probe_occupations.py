@@ -2,6 +2,8 @@
 import argparse
 import json
 import pathlib
+from collections import defaultdict
+from typing import Dict
 
 from src.utils import env, training
 
@@ -70,7 +72,22 @@ if __name__ == '__main__':
     print(f'loading occupations and model predictions from {occupations_file}')
     with occupations_file.open('r') as handle:
         entries = json.load(handle)
-    occupations = sorted({entry['occupation'] for entry in entries})
+
+    # Count examples per occupation to determine majority baseline.
+    counts: Dict[str, int] = defaultdict(int)
+    for entry in entries:
+        occupation = entry['occupation']
+        counts[occupation] += 1
+    fractions = {
+        occupation: count / len(entries)
+        for occupation, count in counts.items()
+    }
+
+    print('Fraction of dataset per occupation:')
+    for occupation, fraction in fractions.items():
+        print(f'{occupation}: {fraction:.3f}')
+
+    occupations = frozenset(counts.keys())
     indexer = {label: index for index, label in enumerate(occupations)}
 
     representations_file = model_data_dir / 'occupations-reps.pth'
