@@ -72,28 +72,29 @@ if __name__ == '__main__':
     print(f'loading occupations and model predictions from {occupations_file}')
     with occupations_file.open('r') as handle:
         entries = json.load(handle)
-
-    # Count examples per occupation to determine majority baseline.
-    counts: Dict[str, int] = defaultdict(int)
-    for entry in entries:
-        occupation = entry['occupation']
-        counts[occupation] += 1
-    fractions = {
-        occupation: count / len(entries)
-        for occupation, count in counts.items()
-    }
-
-    print('Fraction of dataset per occupation:')
-    for occupation, fraction in fractions.items():
-        print(f'{occupation}: {fraction:.3f}')
-
-    occupations = frozenset(counts.keys())
+    occupations = {entry['occupation'] for entry in entries}
     indexer = {label: index for index, label in enumerate(occupations)}
 
     representations_file = model_data_dir / 'occupations-reps.pth'
     print(f'loading model entity representations from {representations_file}')
     representations = torch.load(representations_file)
     _, num_layers, hidden_size = representations.shape
+
+    # Add majority baselines for convenience.
+    for target in args.targets:
+        counts: Dict[str, int] = defaultdict(int)
+        for entry in entries:
+            label = entry[target]
+            if not isinstance(label, str):
+                label = label[0]
+            counts[label] += 1
+        fractions = {
+            label: count / len(entries) for label, count in counts.items()
+        }
+
+        print(f'Class ratios for "{target}":')
+        for label, fraction in fractions.items():
+            print(f'{label}: {fraction:.3f}')
 
     # Add agreements for convenience.
     accuracies = []
