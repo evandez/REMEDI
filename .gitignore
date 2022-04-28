@@ -133,3 +133,4 @@ data/
 results/
 *.json
 *.pth
+*.txt
