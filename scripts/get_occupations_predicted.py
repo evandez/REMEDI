@@ -62,7 +62,7 @@ if __name__ == '__main__':
     if args.discourse:
         occupations_file = data_dir / 'occupations-discourse.json'
     else:
-        occupations_file = data_dir / 'occupations.json'
+        occupations_file = data_dir / 'occupations-cleaned.json'
 
     print(f'loading occupations from {occupations_file}')
     with occupations_file.open('r') as handle:
