@@ -227,6 +227,6 @@ if __name__ == '__main__':
         clean['occupation'] = occupation
         cleaned.append(clean)
 
-    occupations_file = data_dir / 'occupations-cleaned.json'
-    with occupations_file.open('w') as handle:
+    cleaned_occupations_file = data_dir / 'occupations-cleaned.json'
+    with cleaned_occupations_file.open('w') as handle:
         json.dump(cleaned, handle)
