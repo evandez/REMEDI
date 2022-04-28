@@ -67,7 +67,7 @@ if __name__ == '__main__':
     data_dir.mkdir(exist_ok=True, parents=True)
 
     # TODO(evandez): This will eventually load more than just occupation...
-    occupations_file = data_dir / 'occupations.json'
+    occupations_file = data_dir / 'occupations-cleaned.json'
     if not occupations_file.exists():
         raise FileNotFoundError(
             f'occupations data not found, expected at: {occupations_file}')
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     with occupations_file.open('r') as handle:
         entities_and_occupations = json.load(handle)
     occupations = {
-        entity_occupation['occupations']
+        entity_occupation['occupation']
         for entity_occupation in entities_and_occupations
     }
     attributes = {'occupations': occupations}
