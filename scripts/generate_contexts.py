@@ -31,7 +31,7 @@ from torch.utils import data
 from tqdm.auto import tqdm
 
 TEMPLATES = {
-    'occupations': {
+    'occupation': {
         'duty': 'The job of a {occupation} is to {mask}',
         'location': 'A {occupation} works at a {mask}',
         'tool': 'A {occupation} uses a {mask}',
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         entity_occupation['occupation']
         for entity_occupation in entities_and_occupations
     }
-    attributes = {'occupations': occupations}
+    attributes = {'occupation': occupations}
 
     # Proceed as if there were arbitrarily many attributes to process.
     if args.model == 'google/t5-large-ssm':
