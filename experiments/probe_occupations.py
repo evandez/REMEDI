@@ -75,6 +75,10 @@ if __name__ == '__main__':
     occupations = {entry['occupation'] for entry in entries}
     indexer = {label: index for index, label in enumerate(occupations)}
 
+    indexer_file = model_data_dir / 'occupations-indexer.json'
+    with indexer_file.open('w') as handle:
+        json.dump(indexer, handle)
+
     representations_file = model_data_dir / 'occupations-reps.pth'
     print(f'loading model entity representations from {representations_file}')
     representations = torch.load(representations_file)
