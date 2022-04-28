@@ -75,7 +75,7 @@ if __name__ == '__main__':
     occupations = {entry['occupation'] for entry in entries}
     indexer = {label: index for index, label in enumerate(occupations)}
 
-    indexer_file = model_data_dir / 'occupations-indexer.json'
+    indexer_file = model_results_dir / 'occupations-indexer.json'
     with indexer_file.open('w') as handle:
         json.dump(indexer, handle)
 
