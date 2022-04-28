@@ -182,30 +182,51 @@ if __name__ == '__main__':
     data_dir = args.data_dir or env.data_dir()
     data_dir.mkdir(exist_ok=True, parents=True)
 
-    occupation_ids = wikidata.get_occupation_ids(limit=args.limit_occupations)
+    occupations_file = data_dir / 'occupations.json'
+    if not occupations_file.exists():
+        occupation_ids = wikidata.get_occupation_ids(
+            limit=args.limit_occupations)
 
-    occupation_entities = wikidata.get_occupations(occupation_ids)
-    occupation_entities_by_id = {
-        entity.entity_id: entity for entity in occupation_entities
-    }
+        occupation_entities = wikidata.get_occupations(occupation_ids)
+        occupation_entities_by_id = {
+            entity.entity_id: entity for entity in occupation_entities
+        }
 
-    people_entities_by_occupation = wikidata.get_entities_by_occupation(
-        occupation_ids, limit=args.limit_entities_per_occupation)
+        people_entities_by_occupation = wikidata.get_entities_by_occupation(
+            occupation_ids, limit=args.limit_entities_per_occupation)
 
-    entries = []
-    for occupation_id, people in people_entities_by_occupation.items():
-        occupation = occupation_entities_by_id[occupation_id].get_label()
+        entries = [
+            {
+                'entity':
+                    person,
+                'occupation':
+                    occupation_entities_by_id[occupation_id].get_label(),
+            }
+            for occupation_id, people in people_entities_by_occupation.items()
+            for person in people
+        ]
+        with occupations_file.open('w') as handle:
+            json.dump(entries, handle)
+
+    else:
+        with occupations_file.open('r') as handle:
+            entries = json.load(handle)
+
+    # Clean up the occupations, grouping them together.
+    cleaned = []
+    for entry in entries:
+        occupation = entry['occupation']
         if occupation in BANNED_OCCUPATIONS:
             continue
 
-        for person in people:
-            for key, superset in SUPER_OCCUPATIONS.items():
-                if occupation.lower() in superset:
-                    occupation = key
-                    break
-            entry = {'entity': person, 'occupation': occupation}
-            entries.append(entry)
+        for key, superset in SUPER_OCCUPATIONS.items():
+            if occupation.lower() in superset:
+                occupation = key
+                break
+        clean = {**entry}
+        clean['occupation'] = occupation
+        cleaned.append(clean)
 
-    occupations_file = data_dir / 'occupations.json'
+    occupations_file = data_dir / 'occupations-cleaned.json'
     with occupations_file.open('w') as handle:
-        json.dump(entries, handle)
+        json.dump(cleaned, handle)
