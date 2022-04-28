@@ -3,6 +3,7 @@ import argparse
 import json
 import pathlib
 import random
+from itertools import chain
 from typing import List
 
 from src.utils import env, tokenizers
@@ -123,13 +124,11 @@ if __name__ == '__main__':
                         .hidden_states[layer][0, entity_tokens]\
                         .mean(dim=0)\
                         .cpu()
-        input_ids = torch.cat(batched_input_ids)
-        logits = torch.cat(batched_logits)
 
         # Have to manually compute sequence probs...in 2022? Really?
-        ids_and_logits = zip(input_ids, logits)
         scores = []
-        for token_ids, logits in ids_and_logits:
+        for token_ids, logits in zip(chain(*batched_input_ids),
+                                     chain(*batched_logits)):
             logps = torch.log_softmax(logits, dim=-1)
             score = 0.
             for token_position, token_id in enumerate(token_ids[1:]):
