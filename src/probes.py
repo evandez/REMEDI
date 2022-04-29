@@ -13,10 +13,6 @@ from tqdm.auto import tqdm
 ProbingDataset = data.Dataset[Tuple[torch.Tensor, int]]
 
 
-class AccuracyMixin(nn.Module):
-    """Torch module mixin that adds accuracy script."""
-
-
 class FitMixin(nn.Module):
     """Torch module mixin that adds a simple training script."""
 
