@@ -87,7 +87,7 @@ if __name__ == '__main__':
         for (reps,) in tqdm(loader, desc=f'probe layer {layer}'):
             with torch.inference_mode():
                 outputs = probe(reps.to(device))
-                predictions += outputs.topk(k=args.k, dim=-1).tolist()
+                predictions += outputs.topk(k=args.k, dim=-1).indices.tolist()
 
         assert len(entries) == len(predictions), (len(entries),
                                                   len(predictions))
