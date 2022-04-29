@@ -232,7 +232,14 @@ class BilinearProbe(FitMixin):
             inputs = inputs.to(device)
             model.to(device)
         outputs = model(**inputs, return_dict=True, output_hidden_states=True)
-        reps = outputs.hidden_states[layer]\
+
+        if isinstance(model, transformers.BartModel):
+            hidden_states = outputs.encoder_hidden_states
+        else:
+            assert 'hidden_states' in outputs.keys(), outputs.keys()
+            hidden_states = outputs.hidden_states
+
+        reps = hidden_states[layer]\
             .mul(outputs.attention_mask[..., None])\
             .sum(dim=1)\
             .div(outputs.attention_mask.sum(dim=-1).view(-1, 1, 1))
