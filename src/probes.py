@@ -1,8 +1,8 @@
 """Models for probing state in entity representations."""
 from typing import Optional, Tuple, Type, TypeVar, cast
 
-from src.utils.typing import Device, StrSequence
 from src.utils import training
+from src.utils.typing import Device, StrSequence
 
 import torch
 import transformers
