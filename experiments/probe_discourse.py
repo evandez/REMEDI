@@ -59,7 +59,8 @@ if __name__ == '__main__':
     model_results_dir.mkdir(exist_ok=True, parents=True)
 
     # Load in original entries so we can update the json.
-    discourse_file = data_dir / 'occupations-discourse-predicted.json'
+    discourse_file = (data_dir / args.model_key /
+                      'occupations-discourse-predicted.json')
     with discourse_file.open('r') as handle:
         entries = json.load(handle)
     for entry in entries:
