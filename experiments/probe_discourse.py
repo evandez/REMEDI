@@ -84,9 +84,9 @@ if __name__ == '__main__':
         loader = data.DataLoader(data.TensorDataset(reps[:, layer]),
                                  batch_size=args.batch_size)
         predictions = []
-        for batch in tqdm(loader, desc=f'probe layer {layer}'):
+        for (reps,) in tqdm(loader, desc=f'probe layer {layer}'):
             with torch.inference_mode():
-                outputs = probe(batch.to(device))
+                outputs = probe(reps.to(device))
                 predictions += outputs.topk(k=args.k, dim=-1).tolist()
 
         assert len(entries) == len(predictions), (len(entries),
