@@ -77,7 +77,7 @@ if __name__ == '__main__':
     # Compute probe's predictions!
     for layer in range(reps.shape[1]):
         probe_file = (model_probe_results_dir /
-                      f'probe-occupations-layer{layer}.pth')
+                      f'probe-occupation-layer{layer}.pth')
         probe = torch.load(probe_file, map_location=device)
         probe.eval()
 
