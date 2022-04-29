@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     data_dir = args.data_dir or env.data_dir()
 
-    occupations_file = data_dir / 'occupations.json'
+    occupations_file = data_dir / 'occupations-cleaned.json'
     print(f'loading occupations from {occupations_file}')
     with occupations_file.open('r') as handle:
         entries = json.load(handle)
