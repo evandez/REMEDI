@@ -27,7 +27,7 @@ if __name__ == '__main__':
                         help='record top-k predicted occupations (default: 5)')
     parser.add_argument('--batch-size',
                         type=int,
-                        default=50,
+                        default=100,
                         help='sentences to feed at once (default: 50)')
     parser.add_argument(
         '--random-subset',
@@ -53,7 +53,8 @@ if __name__ == '__main__':
                                                            use_fast=True)
     tokenizer.pad_token = tokenizer.eos_token
 
-    model = transformers.AutoModelForCausalLM.from_pretrained(args.model)
+    model = transformers.AutoModelForCausalLM.from_pretrained(args.model,
+                                                              use_cache=True)
     model.eval().to(device)
 
     data_dir = args.data_dir or env.data_dir()
@@ -72,12 +73,10 @@ if __name__ == '__main__':
     samples = [
         # For each entity, create a list of statements that the LM can eval.
         {
-            'statements': [
-                f'{entry["texts"]["prompt"]} {occupation}.'
-                if args.discourse else
-                f'{entry["entity"]} is most known for being a {occupation}.'
-                for occupation in occupations
-            ],
+            'prefix':
+                entry['texts']['prompt'] if args.discourse else
+                f'{entry["entity"]} is most known for being a',
+            'completions': [f'{occupation}.' for occupation in occupations],
             'entity_token_range':
                 tokenizers.find_token_range(
                     entry['texts']['prompt']
@@ -86,8 +85,7 @@ if __name__ == '__main__':
                     tokenizer,
                     occurrence=1 if args.discourse else 0),
             **entry,
-        }
-        for entry in entries
+        } for entry in entries
     ]
     if args.random_subset:
         samples = random.sample(samples, k=args.random_subset)
@@ -100,30 +98,43 @@ if __name__ == '__main__':
                                   model.config.hidden_size)
     results = []
     for index, sample in enumerate(tqdm(samples, desc='predict occupations')):
-        loader = data.DataLoader(sample['statements'],
+        # Compute hidden reps for the prefix, saving the entity reps.
+        inputs = tokenizer(sample['prefix'], return_tensors='pt').to(device)
+        with torch.inference_mode():
+            outputs = model(inputs.input_ids,
+                            return_dict=True,
+                            output_hidden_states=True)
+
+        past_key_values = tuple(
+            tuple(
+                k_or_v.expand(len(occupations), -1, -1, -1)
+                for k_or_v in layer_kv)
+            for layer_kv in outputs.past_key_values)
+
+        entity_tokens = range(*sample['entity_token_range'])
+        for layer in range(len(outputs.hidden_states)):
+            representations[index, layer] = outputs\
+                .hidden_states[layer][0, entity_tokens]\
+                .mean(dim=0)\
+                .cpu()
+
+        # Now try all the completions.
+        loader = data.DataLoader(sample['completions'],
                                  batch_size=args.batch_size)
         batched_input_ids: List[torch.Tensor] = []
         batched_logits: List[torch.Tensor] = []
-        for batch_index, batch in enumerate(loader):
+        for batch in loader:
             inputs = tokenizer(batch, return_tensors='pt',
                                padding='longest').to(device)
             with torch.inference_mode():
-                outputs = model(**inputs,
+                outputs = model(inputs.input_ids,
+                                past_key_values=past_key_values,
                                 output_hidden_states=True,
                                 return_dict=True)
 
             # Have to batch this process to support big boys like GPT-J...
             batched_input_ids.append(inputs.input_ids)
             batched_logits.append(outputs.logits)
-
-            # Save reps here too, since it's convenient. Just do it once.
-            if batch_index == 0:
-                entity_tokens = range(*sample['entity_token_range'])
-                for layer in range(len(outputs.hidden_states)):
-                    representations[index, layer] = outputs\
-                        .hidden_states[layer][0, entity_tokens]\
-                        .mean(dim=0)\
-                        .cpu()
 
         # Have to manually compute sequence probs...in 2022? Really?
         scores = []
@@ -143,7 +154,8 @@ if __name__ == '__main__':
         chosens = torch.tensor(scores).topk(k=args.k).indices
 
         # Recore model's prediction.
-        del sample['statements']
+        del sample['prefix']
+        del sample['completions']
         result = {
             'predictions': [occupations[chosen] for chosen in chosens],
             **sample,
