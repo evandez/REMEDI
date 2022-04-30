@@ -106,7 +106,7 @@ if __name__ == '__main__':
             context = random.choice(context_types[context_type])
             prefix = f'This is a story about {generic_name}{context}'
             texts = {
-                'no-prompt': prefix,
+                'no-prompt': f'{prefix}.',
                 'prompt': f'{prefix}. {generic_name}\'s occupation is',
             }
             samples.append({
