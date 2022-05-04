@@ -20,6 +20,9 @@ if __name__ == '__main__':
         nargs='+',
         default=('occupation', 'predictions'),
         help='target labels to train probes for (default: all)')
+    parser.add_argument('--linear',
+                        action='store_true',
+                        help='use linear probe')
     parser.add_argument('--lr',
                         type=float,
                         default=1e-3,
@@ -126,11 +129,16 @@ if __name__ == '__main__':
         for layer in reversed(range(representations.shape[1])):
             print(f'---- probe "{target}" in layer {layer} ----')
 
-            probe = nn.Sequential(
-                nn.Linear(hidden_size, hidden_size),
-                nn.LeakyReLU(),
-                nn.Linear(hidden_size, len(occupations)),
-            ).to(device)
+            probe: nn.Module
+            if args.linear:
+                probe = nn.Linear(hidden_size, len(occupations))
+            else:
+                probe = nn.Sequential(
+                    nn.Linear(hidden_size, hidden_size),
+                    nn.LeakyReLU(),
+                    nn.Linear(hidden_size, len(occupations)),
+                ).to(device)
+
             criterion = nn.CrossEntropyLoss()
             optimizer = optim.AdamW(probe.parameters(), lr=args.lr)
             stopper = training.EarlyStopping(patience=args.patience)
