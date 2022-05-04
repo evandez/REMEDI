@@ -33,7 +33,7 @@ if __name__ == '__main__':
                         help='probe batch size (default: 256)')
     parser.add_argument('--epochs',
                         type=int,
-                        default=25,
+                        default=100,
                         help='probe training epochs (default: 100)')
     parser.add_argument('--patience',
                         type=int,
