@@ -133,11 +133,10 @@ if __name__ == '__main__':
             if args.linear:
                 probe = nn.Linear(hidden_size, len(occupations))
             else:
-                probe = nn.Sequential(
-                    nn.Linear(hidden_size, hidden_size),
-                    nn.LeakyReLU(),
-                    nn.Linear(hidden_size, len(occupations)),
-                ).to(device)
+                probe = nn.Sequential(nn.Linear(hidden_size, hidden_size),
+                                      nn.LeakyReLU(),
+                                      nn.Linear(hidden_size, len(occupations)))
+            probe = probe.to(device)
 
             criterion = nn.CrossEntropyLoss()
             optimizer = optim.AdamW(probe.parameters(), lr=args.lr)
