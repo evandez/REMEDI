@@ -1,4 +1,6 @@
+datasets
 qwikidata
+requests
 spacy
 tqdm
 transformers
@@ -9,3 +11,4 @@ black
 isort
 mypy
 pytest
+types-requests
