@@ -39,8 +39,8 @@ def find_token_range(
     Returns:
         Tuple[int, int]: The start (inclusive) and end (exclusive) token idx.
     """
-    if 'return_offsets_mapping' in kwargs:
-        raise ValueError('cannot set return_offsets_mapping')
+    if "return_offsets_mapping" in kwargs:
+        raise ValueError("cannot set return_offsets_mapping")
     if substring not in string:
         raise ValueError(f'"{substring}" not found in "{string}"')
     char_start = string.index(substring)
@@ -48,8 +48,10 @@ def find_token_range(
         try:
             char_start = string.index(substring, char_start + 1)
         except ValueError as error:
-            raise ValueError(f'could not find {occurrence} occurrences '
-                             f'of "{substring} in "{string}"') from error
+            raise ValueError(
+                f"could not find {occurrence} occurrences "
+                f'of "{substring} in "{string}"'
+            ) from error
     char_end = char_start + len(substring)
 
     tokens = tokenizer(string, return_offsets_mapping=True, **kwargs)

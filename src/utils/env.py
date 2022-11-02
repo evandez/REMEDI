@@ -4,13 +4,13 @@ import pathlib
 
 from src.utils.typing import PathLike
 
-ENV_DATA_DIR = 'CM_DATA_DIR'
-ENV_MODELS_DIR = 'CM_MODELS_DIR'
-ENV_RESULTS_DIR = 'CM_RESULTS_DIR'
+ENV_DATA_DIR = "CM_DATA_DIR"
+ENV_MODELS_DIR = "CM_MODELS_DIR"
+ENV_RESULTS_DIR = "CM_RESULTS_DIR"
 
-DEFAULT_DATA_DIR = 'data'
-DEFAULT_MODELS_DIR = 'models'
-DEFAULT_RESULTS_DIR = 'results'
+DEFAULT_DATA_DIR = "data"
+DEFAULT_MODELS_DIR = "models"
+DEFAULT_RESULTS_DIR = "results"
 
 
 def maybe_relative_to_repo(path: PathLike) -> pathlib.Path:

@@ -21,11 +21,11 @@ class FitMixin(nn.Module):
         dataset: ProbingDataset,
         max_epochs: int = 100,
         batch_size: int = 256,
-        hold_out: float = .1,
+        hold_out: float = 0.1,
         lr: float = 1e-3,
         patience: int = 10,
         device: Optional[Device] = None,
-        display_progress_as: str = 'train probe',
+        display_progress_as: str = "train probe",
     ) -> Tuple[float, ...]:
         """Train the probe on the given dataset.
 
@@ -53,9 +53,7 @@ class FitMixin(nn.Module):
 
         train, val = training.random_split(dataset, hold_out=hold_out)
 
-        train_loader = data.DataLoader(train,
-                                       batch_size=batch_size,
-                                       shuffle=True)
+        train_loader = data.DataLoader(train, batch_size=batch_size, shuffle=True)
         val_loader = data.DataLoader(val, batch_size=batch_size)
 
         criterion = nn.CrossEntropyLoss()
@@ -76,7 +74,7 @@ class FitMixin(nn.Module):
                 optimizer.step()
                 optimizer.zero_grad()
 
-            loss = 0.
+            loss = 0.0
             self.eval()
             for reps, targets in val_loader:
                 if device is not None:
@@ -87,7 +85,7 @@ class FitMixin(nn.Module):
                 loss += criterion(predictions, targets).item() * len(reps)
             loss /= len(val)
 
-            progress_bar.set_description(f'{display_progress_as} ({loss:.3f})')
+            progress_bar.set_description(f"{display_progress_as} ({loss:.3f})")
 
             if stopper(loss):
                 break
@@ -97,12 +95,13 @@ class FitMixin(nn.Module):
         self.load_state_dict(best_state_dict)
 
         accuracies = []
-        for key, subset in (('train', train), ('val', val)):
+        for key, subset in (("train", train), ("val", val)):
             accuracy = self.accuracy(
                 subset,
                 batch_size=batch_size,
                 device=device,
-                display_progress_as=f'compute {key} accuracy')
+                display_progress_as=f"compute {key} accuracy",
+            )
             accuracies.append(accuracy)
 
         return tuple(accuracies)
@@ -113,7 +112,7 @@ class FitMixin(nn.Module):
         dataset: ProbingDataset,
         batch_size: int = 256,
         device: Optional[Device] = None,
-        display_progress_as: str = 'compute probe accuracy',
+        display_progress_as: str = "compute probe accuracy",
     ) -> float:
         """Compute accuracy of probe on dataset.
 
@@ -166,7 +165,7 @@ class MlpProbe(nn.Sequential, FitMixin):
         self.num_classes = num_classes
 
 
-BilinearProbeT = TypeVar('BilinearProbeT', bound='BilinearProbe')
+BilinearProbeT = TypeVar("BilinearProbeT", bound="BilinearProbe")
 
 
 class BilinearProbe(FitMixin):
@@ -182,7 +181,7 @@ class BilinearProbe(FitMixin):
         """
         super().__init__()
         self.input_size = input_size
-        self.register_buffer('classes', classes)
+        self.register_buffer("classes", classes)
         self.bilinear = nn.Bilinear(input_size, classes.shape[-1], 1)
 
     def forward(self, reps: torch.Tensor) -> torch.Tensor:
@@ -227,7 +226,7 @@ class BilinearProbe(FitMixin):
             BilinearProbeT: The probe.
 
         """
-        inputs = tokenizer(classes, padding='longest', return_tensors='pt')
+        inputs = tokenizer(classes, padding="longest", return_tensors="pt")
         if device is not None:
             inputs = inputs.to(device)
             model.to(device)
@@ -236,12 +235,14 @@ class BilinearProbe(FitMixin):
         if isinstance(model, transformers.BartModel):
             hidden_states = outputs.encoder_hidden_states
         else:
-            assert 'hidden_states' in outputs.keys(), outputs.keys()
+            assert "hidden_states" in outputs.keys(), outputs.keys()
             hidden_states = outputs.hidden_states
 
-        reps = hidden_states[layer]\
-            .mul(outputs.attention_mask[..., None])\
-            .sum(dim=1)\
+        reps = (
+            hidden_states[layer]
+            .mul(outputs.attention_mask[..., None])
+            .sum(dim=1)
             .div(outputs.attention_mask.sum(dim=-1).view(-1, 1, 1))
+        )
         input_size = reps.shape[-1]
         return cls(input_size, reps)
