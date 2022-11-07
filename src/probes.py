@@ -1,7 +1,7 @@
 """Models for probing state in entity representations."""
 from typing import Optional, Tuple, Type, TypeVar, cast
 
-from src.utils import training
+from src.utils import training_utils
 from src.utils.typing import Device, StrSequence
 
 import torch
@@ -51,14 +51,14 @@ class FitMixin(nn.Module):
         if device is not None:
             self.to(device)
 
-        train, val = training.random_split(dataset, hold_out=hold_out)
+        train, val = training_utils.random_split(dataset, hold_out=hold_out)
 
         train_loader = data.DataLoader(train, batch_size=batch_size, shuffle=True)
         val_loader = data.DataLoader(val, batch_size=batch_size)
 
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.AdamW(self.parameters(), lr=lr)
-        stopper = training.EarlyStopping(patience=patience)
+        stopper = training_utils.EarlyStopping(patience=patience)
 
         progress_bar = tqdm(range(max_epochs), desc=display_progress_as)
         best_state_dict = self.state_dict()

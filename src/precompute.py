@@ -11,7 +11,7 @@ PrecomputedHiddens = dict[int, torch.Tensor]
 
 
 @torch.inference_mode()
-def compute_hiddens(
+def hiddens_for_batch(
     mt: model_utils.ModelAndTokenizer,
     batch: StrSequence,
     layers: Optional[Sequence[int]] = None,
@@ -38,7 +38,7 @@ def compute_hiddens(
     return hiddens
 
 
-def precompute_hiddens(
+def hiddens_for_dataset(
     mt: model_utils.ModelAndTokenizer,
     dataset: Dataset,
     columns: StrSequence = ("context",),
@@ -79,7 +79,7 @@ def precompute_hiddens(
         lambda batch: {
             "hiddens": {
                 column: {
-                    compute_hiddens(
+                    hiddens_for_batch(
                         mt, batch[column], layer_paths=layer_paths, device=device
                     )
                 }
