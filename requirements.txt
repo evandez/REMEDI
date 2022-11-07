@@ -1,5 +1,7 @@
 git+https://github.com/davidbau/baukit
 datasets
+jupyter
+jupyter_http_over_ws
 qwikidata
 requests
 names-dataset
