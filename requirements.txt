@@ -2,6 +2,7 @@ git+https://github.com/davidbau/baukit
 datasets
 qwikidata
 requests
+names-dataset
 spacy
 tqdm
 transformers
