@@ -3,9 +3,10 @@ import json
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
-import datasets
 from src.utils import env, io_utils
 from src.utils.typing import PathLike
+
+import datasets
 
 COUNTERFACT_URL = "https://rome.baulab.info/data/dsets/counterfact.json"
 
