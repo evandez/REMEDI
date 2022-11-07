@@ -12,3 +12,4 @@ isort
 mypy
 pytest
 types-requests
+types-retry
