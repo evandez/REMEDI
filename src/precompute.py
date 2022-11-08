@@ -66,7 +66,7 @@ def hiddens_from_dataset(
     layer_paths: Optional[StrSequence] = None,
     device: Optional[Device] = None,
     batch_size: int = 1,
-    store_on_device: bool = False,
+    # store_on_device: bool = False,
 ) -> Dataset:
     """Precompute hidden representations for all samples in the dataset.
 
@@ -102,8 +102,9 @@ def hiddens_from_dataset(
             )
             for column in columns
         }
-        if not store_on_device:
-            hiddens = model_utils.map_location(hiddens, "cpu")
+        # TODO(evandez): Maybe delete.
+        # if not store_on_device:
+        #     hiddens = model_utils.map_location(hiddens, "cpu")
         return {"precomputed": hiddens}
 
     # Make a nice description.
