@@ -45,6 +45,8 @@ def hiddens_from_batch(
 ) -> dict:
     """Compute hidden representations for the batch."""
     layers_to_layer_path = _resolve_layers(mt, layers, layer_paths)
+    layer_paths = layers_to_layer_path.items()
+
     mt.model.to(device)
     inputs = mt.tokenizer(
         batch, padding="longest", truncation=True, return_tensors="pt"
