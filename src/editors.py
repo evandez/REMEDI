@@ -1,5 +1,5 @@
 """Editing models."""
-from typing import cast, Optional
+from typing import Optional, cast
 
 from src import precompute
 from src.utils import model_utils, training_utils

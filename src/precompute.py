@@ -12,7 +12,7 @@ def _unwrap_tokenizer(
     tokenizer: model_utils.ModelAndTokenizer | Tokenizer,
 ) -> Tokenizer:
     """Unwrap the tokenizer."""
-    if isinstance(model_utils.ModelAndTokenizer):
+    if isinstance(tokenizer, model_utils.ModelAndTokenizer):
         return tokenizer.tokenizer
     return tokenizer
 
@@ -169,6 +169,6 @@ def editor_inputs_from_dataset(
     )
     dataset = dataset.map(
         lambda sample: {"precomputed": token_ids_from_sample(mt, sample)},
-        desc="compute target word tokens"
+        desc="compute target word tokens",
     )
     return dataset
