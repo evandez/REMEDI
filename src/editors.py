@@ -96,6 +96,21 @@ class Editor(nn.Module):
         patience: int = 4,
         device: Optional[Device] = None,
     ) -> None:
+        """Train this editor.
+
+        Args:
+            mt: The model and tokenizer.
+            dataset: Any context mediation dataset.
+            layer: Layer to perform edits at.
+            max_epochs: Max epochs to train for.
+            editor_batch_size: Batch size for training editor.
+            model_batch_size: Batch size for precomputing model states.
+            hold_out: Hold out this fraction of data for validation.
+            lr: Learning rate. Defaults to 1e-2.
+            patience: Stop after val loss does not improve for this many epochs.
+            device: Run editor and model on this device.
+
+        """
         dataset = precompute.editor_inputs_from_dataset(
             mt,
             dataset,
