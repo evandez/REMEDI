@@ -21,15 +21,18 @@ def _resolve_layers(
     mt: model_utils.ModelAndTokenizer,
     layers: Optional[Sequence[int]],
     layer_paths: Optional[StrSequence],
-) -> tuple[Sequence[int], StrSequence]:
+) -> dict[int, str]:
     """Resolve layers and layer paths."""
     if layers is not None and layer_paths is not None:
         raise ValueError("cannot set both `layers` and `layer_paths`")
-    if layers is None:
-        layers = model_utils.determine_layers(mt)
+
+    # If no layers specified or only layer numbers, get layer paths.
     if layer_paths is None:
-        layer_paths = model_utils.determine_layer_paths(mt, layers=layers)
-    return layers, layer_paths
+        return model_utils.determine_layer_paths(mt, layers=layers)
+
+    # Otherwise, need to determine layer number from layer path.
+    l_to_lp = model_utils.determine_layer_paths(mt)
+    return {l: lp for l, lp in l_to_lp.items() if lp in layer_paths}
 
 
 @torch.inference_mode()
@@ -41,7 +44,7 @@ def hiddens_from_batch(
     device: Optional[Device] = None,
 ) -> dict:
     """Compute hidden representations for the batch."""
-    layers, layer_paths = _resolve_layers(mt, layers, layer_paths)
+    layers_to_layer_path = _resolve_layers(mt, layers, layer_paths)
     mt.model.to(device)
     inputs = mt.tokenizer(
         batch, padding="longest", truncation=True, return_tensors="pt"
@@ -50,7 +53,7 @@ def hiddens_from_batch(
         mt.model(**inputs)
     hiddens = {
         str(layer): ret[layer_path].output[0].cpu()
-        for layer, layer_path in zip(layers, layer_paths)
+        for layer, layer_path in layers_to_layer_path.items()
     }
     return {"hiddens": hiddens, **inputs}
 
@@ -89,7 +92,7 @@ def hiddens_from_dataset(
             `{"precomputed": {"column_name": {"hiddens": ...}}}`.
 
     """
-    layers, layer_paths = _resolve_layers(mt, layers, layer_paths)
+    layers_to_layer_path = _resolve_layers(mt, layers, layer_paths)
 
     def _device_mapped_hiddens_from_batch(batch: dict[str, StrSequence]) -> dict:
         """Wraps `hiddens_from_batch` and handles moving data to correct device."""
@@ -104,7 +107,7 @@ def hiddens_from_dataset(
         return {"precomputed": hiddens}
 
     # Make a nice description.
-    layers_listed = ", ".join(str(l) for l in layers)
+    layers_listed = ", ".join(str(l) for l in layers_to_layer_path)
     columns_listed = ", ".join(columns)
     desc = f"precompute l=[{layers_listed}] c=[{columns_listed}]"
 

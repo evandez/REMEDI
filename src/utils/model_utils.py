@@ -62,7 +62,7 @@ def determine_layers(model: ModelAndTokenizer | Model) -> tuple[int, ...]:
 
 def determine_layer_paths(
     model: ModelAndTokenizer | Model, layers: Optional[Sequence[int]] = None
-) -> tuple[str, ...]:
+) -> dict[int, str]:
     """Determine the absolute paths to the given layers in the model.
 
     Args:
@@ -70,14 +70,14 @@ def determine_layer_paths(
         layers: The specific layer (numbers) to look at. Defaults to all of them.
 
     Returns:
-        The paths to each layer.
+        Mapping from layer number to layer path.
 
     """
     model = _unwrap_model(model)
     if layers is None:
         layers = determine_layers(model)
     if isinstance(model, transformers.GPT2LMHeadModel):
-        return tuple(f"transformer.h.{layer}" for layer in layers)
+        return {layer: f"transformer.h.{layer}" for layer in layers}
     else:
         raise ValueError(f"unknown model type: {model.__class__.__name__}")
 
