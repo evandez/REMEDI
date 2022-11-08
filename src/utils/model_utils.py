@@ -4,7 +4,8 @@ This module is designed to house all the annoying branching logic
 that comes with supporting analysis of many slightly different model
 implementations.
 """
-from typing import Any, NamedTuple, Optional, Sequence
+from dataclasses import dataclass
+from typing import Any, Optional, Sequence
 
 from src.utils.typing import Device, Model, Tokenizer
 
@@ -14,11 +15,16 @@ import transformers
 SUPPORTED_MODELS = ("gpt2", "gpt2-xl")
 
 
-class ModelAndTokenizer(NamedTuple):
+@dataclass(frozen=True)
+class ModelAndTokenizer:
     """A pretrained model and its tokenizer."""
 
     model: Model
     tokenizer: Tokenizer
+
+    def to_(self, device: Optional[Device]) -> None:
+        """Send model to the device."""
+        self.model.to(device)
 
 
 def load_model(name: str, device: Optional[Device] = None) -> ModelAndTokenizer:
