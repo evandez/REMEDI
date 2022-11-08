@@ -112,7 +112,7 @@ def hiddens_from_dataset(
         _device_mapped_hiddens_from_batch,
         batch_size=batch_size,
         desc=desc,
-    )
+    ).flatten()
 
 
 def token_ranges_from_sample(
@@ -163,12 +163,12 @@ def editor_inputs_from_dataset(
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
     dataset = hiddens_from_dataset(mt, dataset, ["context"], **kwargs)
-    dataset = dataset.map(
-        lambda sample: {"precomputed": token_ranges_from_sample(mt, sample)},
-        desc="precompute token ranges",
-    )
-    dataset = dataset.map(
-        lambda sample: {"precomputed": token_ids_from_sample(mt, sample)},
-        desc="precompute target word tokens",
-    )
+    for name, fn in (
+        ("token ranges", token_ranges_from_sample),
+        ("target word tokens", token_ids_from_sample),
+    ):
+        dataset = dataset.map(
+            lambda sample: {"precomputed": fn(mt, sample)}, desc=f"precompute {name}"
+        )
+        dataset = dataset.flatten()
     return dataset
