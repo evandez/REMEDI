@@ -68,7 +68,6 @@ def hiddens_from_dataset(
     layer_paths: Optional[StrSequence] = None,
     device: Optional[Device] = None,
     batch_size: int = 64,
-    # store_on_device: bool = False,
 ) -> Dataset:
     """Precompute hidden representations for all samples in the dataset.
 
@@ -84,10 +83,6 @@ def hiddens_from_dataset(
             Note the return dataset will maintain all necessary padding tokens, meaning
             if you plan to batch if again, you will have to use the same batch size
             and not shuffle it for PyTorch data loaders to work properly.
-        store_on_device: If set, keep precomputed data on device. This is ideal for
-            very small datasets (where hidden reps for the whole dataset can fit on
-            one GPU), but otherwise should be left off, in which case data is always
-            moved to CPU.
 
     Returns:
         Original dataset, but with additional fields of the form
@@ -104,9 +99,6 @@ def hiddens_from_dataset(
             )
             for column in columns
         }
-        # TODO(evandez): Maybe delete.
-        # if not store_on_device:
-        #     hiddens = model_utils.map_location(hiddens, "cpu")
         return {"precomputed": hiddens}
 
     # Make a nice description.
@@ -116,6 +108,7 @@ def hiddens_from_dataset(
 
     return dataset.map(
         _device_mapped_hiddens_from_batch,
+        batched=True,
         batch_size=batch_size,
         desc=desc,
     ).flatten()
@@ -168,7 +161,7 @@ def editor_inputs_from_dataset(
     mt: model_utils.ModelAndTokenizer,
     dataset: Dataset,
     precompute_hiddens_batch_size: int = 64,
-    precompute_tokens_batch_size: int = 512,
+    precompute_tokens_batch_size: int = 1024,
     **kwargs: Any,
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
@@ -181,6 +174,7 @@ def editor_inputs_from_dataset(
     ):
         dataset = dataset.map(
             lambda sample: {"precomputed": fn(mt, sample)},
+            batched=True,
             batch_size=precompute_tokens_batch_size,
             desc=f"precompute {name}",
         )
