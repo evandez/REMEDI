@@ -1,4 +1,5 @@
 """Editing models."""
+from dataclasses import dataclass
 from typing import Optional, cast
 
 from src import precompute
@@ -75,6 +76,15 @@ def _editing_loss(
     return loss
 
 
+@dataclass(frozen=True)
+class FitRun:
+    """Results from running `Editor.fit`."""
+
+    dataset: Dataset
+    dataset_train: torch.utils.data.Subset
+    dataset_val: torch.utils.data.Subset
+
+
 class Editor(nn.Module):
     """A simple linear editing model."""
 
@@ -95,7 +105,7 @@ class Editor(nn.Module):
         lr: float = 1e-2,
         patience: int = 4,
         device: Optional[Device] = None,
-    ) -> None:
+    ) -> FitRun:
         """Train this editor.
 
         Args:
@@ -184,6 +194,7 @@ class Editor(nn.Module):
                     best = self.state_dict()
 
         self.load_state_dict(best)
+        return FitRun(dataset=dataset, dataset_train=train, dataset_val=val)
 
 
 class LinearEditor(Editor):
