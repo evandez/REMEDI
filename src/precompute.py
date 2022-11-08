@@ -8,6 +8,15 @@ import torch
 from baukit import nethook
 
 
+def _unwrap_tokenizer(
+    tokenizer: model_utils.ModelAndTokenizer | Tokenizer,
+) -> Tokenizer:
+    """Unwrap the tokenizer."""
+    if isinstance(model_utils.ModelAndTokenizer):
+        return tokenizer.tokenizer
+    return tokenizer
+
+
 def _resolve_layers(
     mt: model_utils.ModelAndTokenizer,
     layers: Optional[Sequence[int]],
@@ -117,8 +126,7 @@ def token_ranges_from_sample(
     - entity in context
     - attribute in context
     """
-    if isinstance(tokenizer, model_utils.ModelAndTokenizer):
-        tokenizer = tokenizer.tokenizer
+    tokenizer = _unwrap_tokenizer(tokenizer)
     entity = sample["entity"]
     prompt = sample["prompt"]
     context = sample["context"]
@@ -136,6 +144,20 @@ def token_ranges_from_sample(
     }
 
 
+def token_ids_from_sample(
+    tokenizer: model_utils.ModelAndTokenizer | Tokenizer,
+    sample: dataset_utils.ContextMediationSample,
+) -> dict[str, int]:
+    tokenizer = _unwrap_tokenizer(tokenizer)
+    target_mediated = sample["target_mediated"]
+    target_unmediated = sample["target_unmediated"]
+    # TODO(evan): Detect automatically if the spacing thing is needed.
+    return {
+        "target_mediated_id": tokenizer(" " + target_mediated).input_ids[0],
+        "target_unmediated_id": tokenizer(" " + target_unmediated).input_ids[0],
+    }
+
+
 def editor_inputs_from_dataset(
     mt: model_utils.ModelAndTokenizer, dataset: Dataset, **kwargs: Any
 ) -> Dataset:
@@ -144,5 +166,9 @@ def editor_inputs_from_dataset(
     dataset = dataset.map(
         lambda sample: {"precomputed": token_ranges_from_sample(mt, sample)},
         desc="compute token ranges",
+    )
+    dataset = dataset.map(
+        lambda sample: {"precomputed": token_ids_from_sample(mt, sample)},
+        desc="compute target word tokens"
     )
     return dataset
