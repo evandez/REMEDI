@@ -49,18 +49,18 @@ class EarlyStopping:
         return self.num_bad == 0
 
 
-def random_split(
-    dataset: data.Dataset, hold_out: float = 0.1
-) -> Tuple[data.Subset, data.Subset]:
+TrainValSplit = tuple[data.Subset, data.Subset]
+
+
+def random_split(dataset: data.Dataset, hold_out: float = 0.1) -> TrainValSplit:
     """Randomly split the dataset into a train and val set.
 
     Args:
-        dataset (data.Dataset): The full dataset.
-        hold_out (float, optional): Fraction of data to hold out for the
-            val set. Defaults to .1.
+        dataset: The full dataset.
+        hold_out: Fraction of data to hold out for the val set. Defaults to .1.
 
     Returns:
-        Tuple[data.Subset, data.Subset]: The train and val sets.
+        The train and val sets.
 
     """
     if hold_out <= 0 or hold_out >= 1:
@@ -82,18 +82,15 @@ def random_split(
     return train, val
 
 
-def fixed_split(
-    dataset: data.Dataset, indices: Sequence[int]
-) -> Tuple[data.Subset, data.Subset]:
+def fixed_split(dataset: data.Dataset, indices: Sequence[int]) -> TrainValSplit:
     """Split dataset on the given indices.
 
     Args:
-        dataset (data.Dataset): The dataset to split.
-        indices (Sequence[int]): Indices comprising the right split.
+        dataset: The dataset to split.
+        indices: Indices comprising the right split.
 
     Returns:
-        Tuple[data.Subset, data.Subseet]: The subset *not* for the indices,
-            followed by the subset *for* the indices.
+        The subset *not* for the indices, followed by the subset *for* the indices.
 
     """
     size = len(cast(Sized, dataset))
