@@ -114,11 +114,14 @@ def determine_hidden_size(model: ModelAndTokenizer | Model) -> int:
 
 def map_location(orig: Any, device: Device | None) -> Any:
     """Map all tensors in the given value to the device.
+
     Args:
         orig: Any sequence of or mapping to tensors, or just a tensor.
         device: Device to send to.
+
     Returns:
         Same value, but with all tensors moved to the device.
+
     """
     if device is None:
         return orig
