@@ -129,7 +129,7 @@ class Editor(nn.Module):
                 mt,
                 dataset,
                 layers=[layer],
-                batch_size=model_batch_size,
+                precompute_hiddens_batch_size=model_batch_size,
                 device=device,
             )
 
