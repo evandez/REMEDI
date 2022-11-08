@@ -67,7 +67,7 @@ def hiddens_from_dataset(
     layers: Optional[Sequence[int]] = None,
     layer_paths: Optional[StrSequence] = None,
     device: Optional[Device] = None,
-    batch_size: int = 1,
+    batch_size: int = 64,
     # store_on_device: bool = False,
 ) -> Dataset:
     """Precompute hidden representations for all samples in the dataset.
@@ -80,7 +80,7 @@ def hiddens_from_dataset(
         layer_paths: Layer paths to compute hiddens for. Cannot be set with `layers`.
             Defaults to all layers.
         device: Send model and inputs to this device. Defaults to cpu.
-        batch_size: Number of inputs to feed model at once. Defaults to 1.
+        batch_size: Number of inputs to feed model at once. Defaults to 64.
             Note the return dataset will maintain all necessary padding tokens, meaning
             if you plan to batch if again, you will have to use the same batch size
             and not shuffle it for PyTorch data loaders to work properly.
@@ -165,16 +165,24 @@ def token_ids_from_sample(
 
 
 def editor_inputs_from_dataset(
-    mt: model_utils.ModelAndTokenizer, dataset: Dataset, **kwargs: Any
+    mt: model_utils.ModelAndTokenizer,
+    dataset: Dataset,
+    precompute_hiddens_batch_size: int = 64,
+    precompute_tokens_batch_size: int = 512,
+    **kwargs: Any,
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
-    dataset = hiddens_from_dataset(mt, dataset, ["context"], **kwargs)
+    dataset = hiddens_from_dataset(
+        mt, dataset, ["context"], batch_size=precompute_hiddens_batch_size, **kwargs
+    )
     for name, fn in (
         ("token ranges", token_ranges_from_sample),
         ("target word tokens", token_ids_from_sample),
     ):
         dataset = dataset.map(
-            lambda sample: {"precomputed": fn(mt, sample)}, desc=f"precompute {name}"
+            lambda sample: {"precomputed": fn(mt, sample)},
+            batch_size=precompute_tokens_batch_size,
+            desc=f"precompute {name}",
         )
         dataset = dataset.flatten()
     return dataset
