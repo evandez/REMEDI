@@ -52,7 +52,7 @@ def hiddens_from_batch(
             layer: ret.output[layer_path][0].cpu()
             for layer, layer_path in zip(layers, layer_paths)
         }
-    return {"hiddens": hiddens, **inputs}
+        return {"hiddens": hiddens, **inputs}
 
 
 def hiddens_from_dataset(
