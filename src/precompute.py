@@ -106,7 +106,7 @@ def hiddens_from_dataset(
     # Make a nice description.
     layers_listed = ", ".join(str(l) for l in layers)
     columns_listed = ", ".join(columns)
-    desc = f"compute l=[{layers_listed}] c=[{columns_listed}]"
+    desc = f"precompute l=[{layers_listed}] c=[{columns_listed}]"
 
     return dataset.map(
         _device_mapped_hiddens_from_batch,
@@ -165,10 +165,10 @@ def editor_inputs_from_dataset(
     dataset = hiddens_from_dataset(mt, dataset, ["context"], **kwargs)
     dataset = dataset.map(
         lambda sample: {"precomputed": token_ranges_from_sample(mt, sample)},
-        desc="compute token ranges",
+        desc="precompute token ranges",
     )
     dataset = dataset.map(
         lambda sample: {"precomputed": token_ids_from_sample(mt, sample)},
-        desc="compute target word tokens",
+        desc="precompute target word tokens",
     )
     return dataset
