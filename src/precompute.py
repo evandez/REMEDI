@@ -48,11 +48,11 @@ def hiddens_from_batch(
     ).to(device)
     with nethook.TraceDict(mt.model, layers=layer_paths, stop=True) as ret:
         mt.model(**inputs)
-        hiddens = {
-            layer: ret.output[layer_path][0].cpu()
-            for layer, layer_path in zip(layers, layer_paths)
-        }
-        return {"hiddens": hiddens, **inputs}
+    hiddens = {
+        layer: ret[layer_path].output[0].cpu()
+        for layer, layer_path in zip(layers, layer_paths)
+    }
+    return {"hiddens": hiddens, **inputs}
 
 
 def hiddens_from_dataset(

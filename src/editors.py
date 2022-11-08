@@ -105,6 +105,7 @@ class Editor(nn.Module):
         lr: float = 1e-2,
         patience: int = 4,
         device: Optional[Device] = None,
+        assume_inputs_precomputed: bool = False,
     ) -> FitRun:
         """Train this editor.
 
@@ -119,15 +120,18 @@ class Editor(nn.Module):
             lr: Learning rate. Defaults to 1e-2.
             patience: Stop after val loss does not improve for this many epochs.
             device: Run editor and model on this device.
+            assume_inputs_precomputed: If set, assume dataset already has
+                precomputed inputs for the editor.
 
         """
-        dataset = precompute.editor_inputs_from_dataset(
-            mt,
-            dataset,
-            layers=[layer],
-            batch_size=model_batch_size,
-            device=device,
-        ).flatten()
+        if not assume_inputs_precomputed:
+            dataset = precompute.editor_inputs_from_dataset(
+                mt,
+                dataset,
+                layers=[layer],
+                batch_size=model_batch_size,
+                device=device,
+            )
 
         mt.model.to(device)
         self.to(device)
