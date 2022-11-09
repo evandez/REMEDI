@@ -32,6 +32,7 @@ def _editing_loss(
     prompt = batch["prompt"]
     entity_ij = batch["prompt.token_range.entity"]
     hiddens_attr = batch[f"context.hiddens.{layer}.attribute"].to(device)
+    mediated_token_ids = batch["target_mediated.token_ids"]
 
     inputs = mt.tokenizer(
         prompt, return_tensors="pt", padding="longest", truncation=True
@@ -59,7 +60,7 @@ def _editing_loss(
     # Compute simple loss: the probability of the target token post-edit.
     loss = torch.tensor(0.0, device=device)
     indices = inputs.attention_mask.sum(dim=-1) - 1
-    for bi, (si, mti) in enumerate(zip(indices.tolist(), batch["mediated_token_id"])):
+    for bi, (si, mti) in enumerate(zip(indices.tolist(), mediated_token_ids.tolist())):
         logp_mediated = logps_edit[bi, si, mti]
         loss += -logp_mediated
     batch_size = indices.shape[0]
