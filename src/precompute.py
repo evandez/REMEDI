@@ -185,16 +185,16 @@ def editor_inputs_from_dataset(
     dataset = hiddens_from_dataset(
         mt, dataset, ["context"], batch_size=batch_size, **kwargs
     )
-    # TODO(evandez): Wasteful that the below happens on the CPU.
-    dataset = dataset.map(
-        attribute_hidden_from_sample,
-        desc="precompute attr hiddens",
-    )
     dataset = dataset.map(
         partial(token_ranges_from_sample, mt), desc="precompute token ranges"
     )
     dataset = dataset.map(
         partial(token_ids_from_sample, mt),
         desc="precompute token ids",
+    )
+    # TODO(evandez): Wasteful that the below happens on the CPU.
+    dataset = dataset.map(
+        attribute_hidden_from_sample,
+        desc="precompute attr hiddens",
     )
     return dataset
