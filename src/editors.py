@@ -31,7 +31,7 @@ def _editing_loss(
 
     prompt = batch["prompt"]
     entity_ij = batch["prompt.token_range.entity"]
-    hiddens_attr = batch[f"context.hiddens.{layer}.attribute"]
+    hiddens_attr = batch[f"context.hiddens.{layer}.attribute"].to(device)
 
     inputs = mt.tokenizer(
         prompt, return_tensors="pt", padding="longest", truncation=True
