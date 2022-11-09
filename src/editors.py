@@ -152,10 +152,12 @@ class Editor(nn.Module):
             kl = nn.KLDivLoss(reduction="batchmean", log_target=True).to(device)
 
             best = self.state_dict()
-            progress_bar = tqdm(range(max_epochs), desc="train editor")
-            for epoch in progress_bar:
+            for epoch in range(max_epochs + 1):
+                desc = f"epoch {epoch}/{max_epochs}"
+
                 self.train()
                 train_loss = 0.0
+                train_progress_bar = tqdm(train_loader)
                 for batch in train_loader:
                     loss = _editing_loss(
                         mt=mt,
@@ -170,24 +172,29 @@ class Editor(nn.Module):
                         optimizer.step()
                         optimizer.zero_grad()
                     train_loss += loss.item()
+                    train_progress_bar.set_description(
+                        f"{desc} train={loss.item():.2f}"
+                    )
                 train_loss /= len(train_loader)
 
                 self.eval()
                 val_loss = 0.0
+                val_progress_bar = tqdm(val_loader)
                 for batch in val_loader:
-                    val_loss += _editing_loss(
+                    loss += _editing_loss(
                         mt=mt,
                         layer=layer,
                         editor=self,
                         batch=batch,
                         kl=kl,
                         device=device,
-                    ).item()
+                    )
+                    val_loss += loss.item()
+                    val_progress_bar.set_description(
+                        f"{desc} val={loss.item():.3f} best={stopper.best:.2f}"
+                    )
                 val_loss /= len(val_loader)
 
-                progress_bar.set_description(
-                    f"train {train_loss:.3f} / val {val_loss:.3f}"
-                )
                 if stopper(val_loss):
                     break
                 elif stopper.improved:
