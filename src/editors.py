@@ -32,7 +32,7 @@ def _editing_loss(
     entity_i, entity_j = batch["prompt.token_range.entity"]
     attr_i, attr_j = batch["context.token_range.attribute"]
     hiddens_context = batch[f"context.hiddens.{layer}"].to(device)
-    hiddens_attr_avg = hiddens_context[:, attr_i:attr_j].mean(dim=1)
+    hiddens_attr_avg = hiddens_context[None, attr_i:attr_j].mean(dim=1)
 
     inputs = mt.tokenizer(
         prompt, return_tensors="pt", padding="longest", truncate=True
