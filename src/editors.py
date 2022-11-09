@@ -27,8 +27,7 @@ def _editing_loss(
 
     See `src.precompute.editor_inputs_from_dataset` for expected format of `batch`.
     """
-    layer_to_layer_paths = model_utils.determine_layer_paths(mt, layers=[layer])
-    layer_path = layer_to_layer_paths[layer]
+    [layer_path] = model_utils.determine_layer_paths(mt, layers=[layer])
 
     prompt = batch["prompt"]
     entity_ij = batch["prompt.token_range.entity"]

@@ -5,7 +5,7 @@ that comes with supporting analysis of many slightly different model
 implementations.
 """
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Literal, Optional, Sequence, overload
 
 from src.utils.typing import Device, Model, Tokenizer
 
@@ -60,50 +60,57 @@ def determine_layers(model: ModelAndTokenizer | Model) -> tuple[int, ...]:
         raise ValueError(f"unknown model type: {model.__class__.__name__}")
 
 
+@overload
 def determine_layer_paths(
-    model: ModelAndTokenizer | Model, layers: Optional[Sequence[int]] = None
+    model: ModelAndTokenizer | Model,
+    layers: Optional[Sequence[int]] = ...,
+    *,
+    return_dict: Literal[False] = ...,
+) -> Sequence[str]:
+    """Determine layer path for each layer."""
+    ...
+
+
+@overload
+def determine_layer_paths(
+    model: ModelAndTokenizer | Model,
+    layers: Optional[Sequence[int]] = ...,
+    *,
+    return_dict: Literal[True],
 ) -> dict[int, str]:
+    """Determine mapping from layer to layer path."""
+    ...
+
+
+def determine_layer_paths(
+    model: ModelAndTokenizer | Model,
+    layers: Optional[Sequence[int]] = None,
+    *,
+    return_dict: bool = False,
+) -> Sequence[str] | dict[int, str]:
     """Determine the absolute paths to the given layers in the model.
 
     Args:
         model: The model.
         layers: The specific layer (numbers) to look at. Defaults to all of them.
+        return_dict: If True, return mapping from layer to layer path,
+            otherwise just return list of layer paths in same order as `layers`.
 
     Returns:
         Mapping from layer number to layer path.
 
     """
     model = _unwrap_model(model)
+
     if layers is None:
         layers = determine_layers(model)
+
     if isinstance(model, transformers.GPT2LMHeadModel):
-        return {layer: f"transformer.h.{layer}" for layer in layers}
+        layer_paths = {layer: f"transformer.h.{layer}" for layer in layers}
     else:
         raise ValueError(f"unknown model type: {model.__class__.__name__}")
 
-
-def determine_mlp_fan_out_layer_paths(
-    model: ModelAndTokenizer | Model, layers: Optional[Sequence[int]] = None
-) -> tuple[str, ...]:
-    """Determine MLP fan out layer paths."""
-    model = _unwrap_model(model)
-    layer_paths = determine_layer_paths(model, layers=layers)
-    if isinstance(model, transformers.GPT2LMHeadModel):
-        return tuple(f"{layer_path}.mlp.c_fc" for layer_path in layer_paths)
-    else:
-        raise ValueError(f"unknown model type: {model.__class__.__name__}")
-
-
-def determine_mlp_fan_in_layer_paths(
-    model: ModelAndTokenizer | Model, layers: Optional[Sequence[int]] = None
-) -> tuple[str, ...]:
-    """Determine MLP fan in layer paths."""
-    model = _unwrap_model(model)
-    layer_paths = determine_layer_paths(model, layers=layers)
-    if isinstance(model, transformers.GPT2LMHeadModel):
-        return tuple(f"{layer_path}.mlp.c_proj" for layer_path in layer_paths)
-    else:
-        raise ValueError(f"unknown model type: {model.__class__.__name__}")
+    return layer_paths if return_dict else tuple(layer_paths[la] for la in layers)
 
 
 def determine_hidden_size(model: ModelAndTokenizer | Model) -> int:
