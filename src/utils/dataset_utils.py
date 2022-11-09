@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from src.utils import env, io_utils
-from src.utils.typing import Dataset, PathLike
+from src.utils.typing import Dataset, PathLike, Optional
 
 import datasets
 
@@ -78,9 +78,10 @@ def _load_counterfact(
         io_utils.download_file(url, file, overwrite=True)
         _reformat_counterfact_file(file)
 
-    kwargs.setdefault("split", "train")
     dataset = datasets.load_dataset("json", data_files=str(file), **kwargs)
-    assert isinstance(dataset, Dataset)
+    assert isinstance(
+        dataset, datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
+    ), type(dataset)
 
     dataset = dataset.map(_reformat_counterfact_sample, desc="reformat counterfact")
     return dataset
@@ -92,3 +93,16 @@ def load_dataset(name: str, **kwargs: Any) -> Dataset:
         return _load_counterfact(**kwargs)
     else:
         raise ValueError(f"unknown dataset: {name}")
+
+
+def maybe_train_test_split(
+    dataset: Dataset, **kwargs: Any
+) -> datasets.dataset_dict.DatasetDict:
+    """Split the dataset into train/test if necessary."""
+    if not isinstance(dataset, datasets.dataset_dict.DatasetDict):
+        return dataset.train_test_split(**kwargs)
+    elif all(key in dataset for key in ("train", "test")):
+        return dataset
+    elif "train" not in dataset.keys():
+        raise ValueError("dataset has no train split?")
+    return dataset["train"].train_test_split(**kwargs)

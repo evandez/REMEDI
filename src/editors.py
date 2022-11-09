@@ -3,9 +3,10 @@ from dataclasses import dataclass
 from typing import Optional, cast
 
 from src import precompute
-from src.utils import model_utils, training_utils
+from src.utils import dataset_utils, model_utils, training_utils
 from src.utils.typing import Dataset, Device
 
+import datasets
 import torch
 import torch.utils.data
 from baukit import nethook
@@ -81,8 +82,6 @@ class FitRun:
     """Results from running `Editor.fit`."""
 
     dataset: Dataset
-    dataset_train: torch.utils.data.Subset
-    dataset_val: torch.utils.data.Subset
 
 
 class Editor(nn.Module):
@@ -111,7 +110,8 @@ class Editor(nn.Module):
 
         Args:
             mt: The model and tokenizer.
-            dataset: Any context mediation dataset.
+            dataset: Any context mediation dataset. If a DatasetDict, must have train
+                and val splits.
             layer: Layer to perform edits at.
             max_epochs: Max epochs to train for.
             editor_batch_size: Batch size for training editor.
@@ -124,6 +124,7 @@ class Editor(nn.Module):
                 precomputed inputs for the editor.
 
         """
+        dataset = dataset_utils.maybe_train_test_split(dataset, hold_out=hold_out)
         if not assume_inputs_precomputed:
             dataset = precompute.editor_inputs_from_dataset(
                 mt,
@@ -144,11 +145,10 @@ class Editor(nn.Module):
         stopper = training_utils.EarlyStopping(patience=patience)
 
         with dataset.formatted_as("torch"):
-            train, val = training_utils.random_split(
-                cast(torch.utils.data.Dataset, dataset), hold_out=hold_out
-            )
+            train = cast(torch.utils.data.Dataset, dataset["train"])
+            val = cast(torch.utils.data.Dataset, dataset["test"])
             train_loader = torch.utils.data.DataLoader(
-                train, batch_size=editor_batch_size, shuffle=True
+                train, batch_size=editor_batch_size
             )
             val_loader = torch.utils.data.DataLoader(val, batch_size=editor_batch_size)
 
@@ -198,7 +198,7 @@ class Editor(nn.Module):
                     best = self.state_dict()
 
         self.load_state_dict(best)
-        return FitRun(dataset=dataset, dataset_train=train, dataset_val=val)
+        return FitRun(dataset=dataset)
 
 
 class LinearEditor(Editor):

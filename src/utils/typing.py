@@ -13,7 +13,7 @@ Device = Union[str, torch.device]
 # as well as HuggingFace datasets.
 Model = transformers.GPT2Model | transformers.GPTNeoModel
 Tokenizer = transformers.PreTrainedTokenizerFast
-Dataset = datasets.arrow_dataset.Dataset
+Dataset = datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
 
 # All strings are also Sequence[str], so we have to distinguish that we
 # mean lists or tuples of strings, or sets of strings, not other strings.
