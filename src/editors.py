@@ -158,7 +158,7 @@ class Editor(nn.Module):
                 self.train()
                 train_loss = 0.0
                 train_progress_bar = tqdm(train_loader)
-                for batch in train_loader:
+                for batch in train_progress_bar:
                     loss = _editing_loss(
                         mt=mt,
                         layer=layer,
@@ -180,7 +180,7 @@ class Editor(nn.Module):
                 self.eval()
                 val_loss = 0.0
                 val_progress_bar = tqdm(val_loader)
-                for batch in val_loader:
+                for batch in val_progress_bar:
                     loss += _editing_loss(
                         mt=mt,
                         layer=layer,
