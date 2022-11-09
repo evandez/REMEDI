@@ -156,7 +156,7 @@ def token_ids_from_sample(
     tokenizer = _unwrap_tokenizer(tokenizer)
     token_ids = {}
     for key in ("target_mediated", "target_unmediated"):
-        word = sample[key]
+        word = sample.get(key)
         token_ids[f"{key}.token_id"] = tokenizer.encode(word)[0]
     return token_ids
 
@@ -169,6 +169,7 @@ def attribute_hidden_from_sample(
     attribute_hiddens = {}
     for key, value in sample.items():
         if key.startswith("context.hiddens"):
+            value = torch.tensor(value)
             attribute_hiddens_key = ".".join(key.split(".")[:3]) + ".attribute"
             attribute_hiddens[attribute_hiddens_key] = value[i:j].mean(dim=0)
     return attribute_hiddens
@@ -184,7 +185,11 @@ def editor_inputs_from_dataset(
     dataset = hiddens_from_dataset(
         mt, dataset, ["context"], batch_size=batch_size, **kwargs
     )
-    dataset = dataset.map(attribute_hidden_from_sample, desc="precompute attr hiddens")
+    # TODO(evandez): Wasteful that the below happens on the CPU.
+    dataset = dataset.map(
+        attribute_hidden_from_sample,
+        desc="precompute attr hiddens",
+    )
     dataset = dataset.map(
         partial(token_ranges_from_sample, mt), desc="precompute token ranges"
     )
