@@ -100,23 +100,24 @@ def hiddens_from_dataset(
 
     """
     layers_to_layer_path = _resolve_layers(mt, layers, layer_paths)
+    layers_listed = ", ".join(str(l) for l in layers_to_layer_path)
+    columns_listed = ", ".join(columns)
+    desc = f"precompute l=[{layers_listed}] c=[{columns_listed}]"
 
     def _device_mapped_hiddens_from_batch(batch: dict[str, StrSequence]) -> dict:
         """Wraps `hiddens_from_batch` and handles moving data to correct device."""
         precomputed = {}
         for column in columns:
             hiddens = hiddens_from_batch(
-                mt, batch[column], layer_paths=layer_paths, device=device
+                mt,
+                batch[column],
+                layer_paths=tuple(layers_to_layer_path.values()),
+                device=device,
             )
             precomputed.update(
                 {f"{column}.{key}": value for key, value in hiddens.items()}
             )
         return precomputed
-
-    # Make a nice description.
-    layers_listed = ", ".join(str(l) for l in layers_to_layer_path)
-    columns_listed = ", ".join(columns)
-    desc = f"precompute l=[{layers_listed}] c=[{columns_listed}]"
 
     return dataset.map(
         _device_mapped_hiddens_from_batch,
