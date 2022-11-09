@@ -98,8 +98,7 @@ class Editor(nn.Module):
         dataset: Dataset,
         layer: int,
         max_epochs: int = 10,
-        editor_batch_size: int = 256,
-        model_batch_size: int = 1,
+        batch_size: int = 64,
         hold_out: float = 0.1,
         lr: float = 1e-2,
         patience: int = 4,
@@ -114,8 +113,8 @@ class Editor(nn.Module):
                 and val splits.
             layer: Layer to perform edits at.
             max_epochs: Max epochs to train for.
-            editor_batch_size: Batch size for training editor.
-            model_batch_size: Batch size for precomputing model states.
+            batch_size: Batch size for training editor. Note this is constrained mostly
+                by how many sentences the model can process at once!
             hold_out: Hold out this fraction of data for validation.
             lr: Learning rate. Defaults to 1e-2.
             patience: Stop after val loss does not improve for this many epochs.
@@ -130,7 +129,7 @@ class Editor(nn.Module):
                 mt,
                 dataset,
                 layers=[layer],
-                precompute_hiddens_batch_size=model_batch_size,
+                precompute_hiddens_batch_size=batch_size,
                 device=device,
             )
 
@@ -147,10 +146,8 @@ class Editor(nn.Module):
         with dataset.formatted_as("torch"):
             train = cast(torch.utils.data.Dataset, dataset["train"])
             val = cast(torch.utils.data.Dataset, dataset["test"])
-            train_loader = torch.utils.data.DataLoader(
-                train, batch_size=editor_batch_size
-            )
-            val_loader = torch.utils.data.DataLoader(val, batch_size=editor_batch_size)
+            train_loader = torch.utils.data.DataLoader(train, batch_size=batch_size)
+            val_loader = torch.utils.data.DataLoader(val, batch_size=batch_size)
 
             # TODO(evandez): More flexible loss function.
             kl = nn.KLDivLoss(reduction="batchmean", log_target=True).to(device)
