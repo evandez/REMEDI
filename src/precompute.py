@@ -89,7 +89,7 @@ def editor_inputs_from_batch(
         return_tensors="pt",
         return_offsets_mapping=True,
     ).to(device)
-    inputs_contexts_offset_mapping = inputs_contexts.pop("offsets_mapping")
+    inputs_contexts_offset_mapping = inputs_contexts.pop("offset_mapping")
 
     inputs_prompts = mt.tokenizer(
         prompts,
@@ -111,7 +111,7 @@ def editor_inputs_from_batch(
 
     # Precomptue token ranges.
     precomputed["prompt.token_range.entity"] = _token_ranges(
-        prompts, entities, inputs_prompts.offsets_mapping
+        prompts, entities, inputs_prompts.offset_mapping
     )
     precomputed["context.token_range.entity"] = _token_ranges(
         contexts, entities, inputs_contexts_offset_mapping
