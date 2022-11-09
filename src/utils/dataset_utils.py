@@ -1,10 +1,10 @@
 """Datasets for evaluating context mediation in LMs."""
 import json
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict
 
 from src.utils import env, io_utils
-from src.utils.typing import PathLike
+from src.utils.typing import Dataset, PathLike
 
 import datasets
 
@@ -71,29 +71,24 @@ def _load_counterfact(
     url: str = COUNTERFACT_URL,
     overwrite: bool = False,
     **kwargs: Any,
-) -> datasets.dataset_dict.DatasetDict:
+) -> Dataset:
     """Download and format the counterfact dataset."""
     file = _determine_file(file, url)
     if not file.exists() or overwrite:
         io_utils.download_file(url, file, overwrite=True)
         _reformat_counterfact_file(file)
 
+    kwargs.setdefault("split", "train")
     dataset = datasets.load_dataset("json", data_files=str(file), **kwargs)
-    assert isinstance(dataset, datasets.dataset_dict.DatasetDict), type(dataset)
+    assert isinstance(dataset, Dataset)
 
     dataset = dataset.map(_reformat_counterfact_sample, desc="reformat counterfact")
+    return dataset
 
-    return cast(datasets.dataset_dict.DatasetDict, dataset)
 
-
-def load_dataset(name: str, **kwargs: Any) -> datasets.dataset_dict.DatasetDict:
+def load_dataset(name: str, **kwargs: Any) -> Dataset:
     """Load the dataset by name."""
     if name == "counterfact":
         return _load_counterfact(**kwargs)
     else:
         raise ValueError(f"unknown dataset: {name}")
-
-
-if __name__ == "__main__":
-    d = load_dataset("counterfact")
-    print(d["train"][0])
