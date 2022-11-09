@@ -22,18 +22,18 @@ def _token_ranges(
     strings: StrSequence,
     substrings: StrSequence,
     offsets_mapping: Sequence[Sequence[tuple[int, int]]],
-) -> torch.Tensor:
+) -> list[list[int]]:
     """Compute token ranges."""
-    return torch.tensor(
-        [
+    return [
+        list(
             tokenizer_utils.find_token_range(
                 string, substring, offset_mapping=offset_mapping
             )
-            for string, substring, offset_mapping in zip(
-                strings, substrings, offsets_mapping
-            )
-        ]
-    )
+        )
+        for string, substring, offset_mapping in zip(
+            strings, substrings, offsets_mapping
+        )
+    ]
 
 
 def _first_token_ids(
@@ -41,9 +41,9 @@ def _first_token_ids(
 ) -> list[int]:
     """Return first token ID for each word."""
     tokenizer = _unwrap_tokenizer(mt)
-    token_ids = tokenizer.batch_encode_plus(words)
     # TODO(evandez): Centralize this spacing nonsense.
-    return [" " + ti[0] for ti in token_ids["input_ids"]]
+    token_ids = tokenizer([" " + word for word in words])
+    return [ti[0] for ti in token_ids.input_ids]
 
 
 def _average_hiddens(hiddens: torch.Tensor, ranges: torch.Tensor) -> torch.Tensor:
