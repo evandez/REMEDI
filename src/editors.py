@@ -34,7 +34,7 @@ def _editing_loss(
     hiddens_attr = batch[f"context.hiddens.{layer}.attribute"]
 
     inputs = mt.tokenizer(
-        prompt, return_tensors="pt", padding="longest", truncate=True
+        prompt, return_tensors="pt", padding="longest", truncation=True
     ).to(device)
 
     # If necessary, determine original next token distribution.
