@@ -171,7 +171,7 @@ def editor_inputs_from_dataset(
     mt: model_utils.ModelAndTokenizer,
     dataset: Dataset,
     precompute_hiddens_batch_size: int = 64,
-    precompute_token_ids_batch_size: int = 1024,
+    precompute_token_ids_batch_size: int = 512,
     **kwargs: Any,
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
