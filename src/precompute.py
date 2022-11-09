@@ -1,4 +1,5 @@
 """Logic for getting and mucking with model hidden representations."""
+from functools import partial
 from typing import Any, Optional, Sequence
 
 from src.utils import dataset_utils, model_utils, tokenizer_utils
@@ -33,6 +34,14 @@ def _resolve_layers(
     # Otherwise, need to determine layer number from layer path.
     l_to_lp = model_utils.determine_layer_paths(mt)
     return {l: lp for l, lp in l_to_lp.items() if lp in layer_paths}
+
+
+def _get_first_token_ids(
+    tokenizer: model_utils.ModelAndTokenizer | Tokenizer, batch: StrSequence
+) -> Sequence[int]:
+    """Get IDs of first token in batch."""
+    tokenizer = _unwrap_tokenizer(tokenizer)
+    return tokenizer(batch, padding=True, return_tensors="pt").input_ids[:, 0].tolist()
 
 
 @torch.inference_mode()
@@ -146,40 +155,35 @@ def token_ranges_from_sample(
     }
 
 
-def token_ids_from_sample(
+def token_ids_from_batch(
     tokenizer: model_utils.ModelAndTokenizer | Tokenizer,
-    sample: dataset_utils.ContextMediationSample,
-) -> dict[str, int]:
-    tokenizer = _unwrap_tokenizer(tokenizer)
-    target_mediated = sample["target_mediated"]
-    target_unmediated = sample["target_unmediated"]
-    # TODO(evan): Detect automatically if the spacing thing is needed.
-    return {
-        "target_mediated.token_id": tokenizer(" " + target_mediated).input_ids[0],
-        "target_unmediated.token_id": tokenizer(" " + target_unmediated).input_ids[0],
-    }
+    sample: dict[str, StrSequence],
+) -> dict[str, Sequence[int]]:
+    token_ids = {}
+    for key in ("target_mediated", "target_unmediated"):
+        words = [" " + word for word in sample[key]]
+        token_ids[f"{key}.token_id"] = _get_first_token_ids(tokenizer, words)
+    return token_ids
 
 
 def editor_inputs_from_dataset(
     mt: model_utils.ModelAndTokenizer,
     dataset: Dataset,
     precompute_hiddens_batch_size: int = 64,
-    precompute_tokens_batch_size: int = 1024,
+    precompute_token_ids_batch_size: int = 1024,
     **kwargs: Any,
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
     dataset = hiddens_from_dataset(
         mt, dataset, ["context"], batch_size=precompute_hiddens_batch_size, **kwargs
     )
-    for name, fn in (
-        ("token ranges", token_ranges_from_sample),
-        ("target word tokens", token_ids_from_sample),
-    ):
-        dataset = dataset.map(
-            lambda sample: fn(mt, sample),
-            batched=True,
-            batch_size=precompute_tokens_batch_size,
-            desc=f"precompute {name}",
-        )
-        dataset = dataset.flatten()
+    dataset = dataset.map(
+        partial(token_ranges_from_sample, mt), desc="precompute token ranges"
+    )
+    dataset = dataset.map(
+        partial(token_ids_from_batch, mt),
+        batched=True,
+        batch_size=precompute_token_ids_batch_size,
+        desc="precompute token ids",
+    )
     return dataset
