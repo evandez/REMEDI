@@ -2,7 +2,7 @@
 from functools import partial
 from typing import Optional, Sequence
 
-from src.utils import model_utils, tokenizer_utils
+from src.utils import dataset_utils, model_utils, tokenizer_utils
 from src.utils.typing import Dataset, Device, StrSequence, Tokenizer
 
 import torch
@@ -66,7 +66,7 @@ def _average_hiddens(hiddens: torch.Tensor, ranges: list[list[int]]) -> torch.Te
 
 def editor_inputs_from_batch(
     mt: model_utils.ModelAndTokenizer,
-    batch: dict[str, StrSequence],
+    batch: dataset_utils.ContextMediationBatch,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
 ) -> dict:

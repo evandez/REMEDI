@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from src.utils import env, io_utils
-from src.utils.typing import Dataset, PathLike
+from src.utils.typing import Dataset, PathLike, StrSequence
 
 import datasets
 
@@ -20,6 +20,17 @@ class ContextMediationSample(TypedDict):
     prompt: str  # "Barack Obama received a degree in"
     target_mediated: str  # "computer science"
     target_unmediated: str  # "law"
+
+
+class ContextMediationBatch(TypedDict):
+    """Batch of context mediation samples."""
+
+    entity: StrSequence
+    attribute: StrSequence
+    context: StrSequence
+    prompt: StrSequence
+    target_mediated: StrSequence
+    target_unmediated: StrSequence
 
 
 def _determine_file(file: PathLike | None, url: str) -> Path:
