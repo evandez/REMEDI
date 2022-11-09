@@ -42,7 +42,8 @@ def _first_token_ids(
     """Return first token ID for each word."""
     tokenizer = _unwrap_tokenizer(mt)
     token_ids = tokenizer.batch_encode_plus(words)
-    return [ti[0] for ti in token_ids]
+    # TODO(evandez): Centralize this spacing nonsense.
+    return [" " + ti[0] for ti in token_ids["input_ids"]]
 
 
 def _average_hiddens(hiddens: torch.Tensor, ranges: torch.Tensor) -> torch.Tensor:
