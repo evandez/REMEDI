@@ -3,7 +3,7 @@ from functools import partial
 from typing import Any, Optional, Sequence
 
 from src.utils import dataset_utils, model_utils, tokenizer_utils
-from src.utils.typing import Dataset, Device, StrSequence, Tokenizer
+from src.utils.typing import ArrayLike, Dataset, Device, StrSequence, Tokenizer
 
 import torch
 from baukit import nethook
@@ -34,14 +34,6 @@ def _resolve_layers(
     # Otherwise, need to determine layer number from layer path.
     l_to_lp = model_utils.determine_layer_paths(mt)
     return {l: lp for l, lp in l_to_lp.items() if lp in layer_paths}
-
-
-def _get_first_token_ids(
-    tokenizer: model_utils.ModelAndTokenizer | Tokenizer, batch: StrSequence
-) -> Sequence[int]:
-    """Get IDs of first token in batch."""
-    tokenizer = _unwrap_tokenizer(tokenizer)
-    return tokenizer(batch, padding=True, return_tensors="pt").input_ids[:, 0].tolist()
 
 
 @torch.inference_mode()
@@ -102,10 +94,10 @@ def hiddens_from_dataset(
     layers_to_layer_path = _resolve_layers(mt, layers, layer_paths)
     layers_listed = ", ".join(str(l) for l in layers_to_layer_path)
     columns_listed = ", ".join(columns)
-    desc = f"precompute l=[{layers_listed}] c=[{columns_listed}]"
+    desc = f"precompute hiddens l=[{layers_listed}] c=[{columns_listed}]"
 
-    def _device_mapped_hiddens_from_batch(batch: dict[str, StrSequence]) -> dict:
-        """Wraps `hiddens_from_batch` and handles moving data to correct device."""
+    def _hiddens_from_batch(batch: dict[str, StrSequence]) -> dict:
+        """Wraps `hiddens_from_batch` and handles setting keys properly."""
         precomputed = {}
         for column in columns:
             hiddens = hiddens_from_batch(
@@ -120,7 +112,7 @@ def hiddens_from_dataset(
         return precomputed
 
     return dataset.map(
-        _device_mapped_hiddens_from_batch,
+        _hiddens_from_batch,
         batched=True,
         batch_size=batch_size,
         desc=desc,
@@ -156,35 +148,48 @@ def token_ranges_from_sample(
     }
 
 
-def token_ids_from_batch(
+def token_ids_from_sample(
     tokenizer: model_utils.ModelAndTokenizer | Tokenizer,
-    sample: dict[str, StrSequence],
+    sample: dataset_utils.ContextMediationSample,
 ) -> dict[str, Sequence[int]]:
+    """Compute token IDs for target wordsfrom the given batch."""
+    tokenizer = _unwrap_tokenizer(tokenizer)
     token_ids = {}
     for key in ("target_mediated", "target_unmediated"):
-        words = [" " + word for word in sample[key]]
-        token_ids[f"{key}.token_id"] = _get_first_token_ids(tokenizer, words)
+        word = sample[key]
+        token_ids[f"{key}.token_id"] = tokenizer.encode(word)[0]
     return token_ids
+
+
+def attribute_hidden_from_sample(
+    sample: dict[str, ArrayLike]
+) -> dict[str, torch.Tensor]:
+    """Compute average attribute representation in context."""
+    i, j = sample["context.token_range.attribute"]
+    attribute_hiddens = {}
+    for key, value in sample.items():
+        if key.startswith("context.hiddens"):
+            attribute_hiddens_key = ".".join(key.split(".")[:3]) + ".attribute"
+            attribute_hiddens[attribute_hiddens_key] = value[i:j].mean(dim=0)
+    return attribute_hiddens
 
 
 def editor_inputs_from_dataset(
     mt: model_utils.ModelAndTokenizer,
     dataset: Dataset,
-    precompute_hiddens_batch_size: int = 64,
-    precompute_token_ids_batch_size: int = 512,
+    batch_size: int = 64,
     **kwargs: Any,
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
     dataset = hiddens_from_dataset(
-        mt, dataset, ["context"], batch_size=precompute_hiddens_batch_size, **kwargs
+        mt, dataset, ["context"], batch_size=batch_size, **kwargs
     )
+    dataset = dataset.map(attribute_hidden_from_sample, desc="precompute attr hiddens")
     dataset = dataset.map(
         partial(token_ranges_from_sample, mt), desc="precompute token ranges"
     )
     dataset = dataset.map(
-        partial(token_ids_from_batch, mt),
-        batched=True,
-        batch_size=precompute_token_ids_batch_size,
+        partial(token_ids_from_sample, mt),
         desc="precompute token ids",
     )
     return dataset

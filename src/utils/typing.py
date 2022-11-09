@@ -3,9 +3,11 @@ import pathlib
 from typing import AbstractSet, List, Mapping, Tuple, Union
 
 import datasets
+import numpy
 import torch
 import transformers
 
+ArrayLike = list | tuple | numpy.ndarray | torch.Tensor
 PathLike = Union[str, pathlib.Path]
 Device = Union[str, torch.device]
 

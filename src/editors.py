@@ -30,10 +30,8 @@ def _editing_loss(
     """
     [layer_path] = model_utils.determine_layer_paths(mt, layers=[layer])
     prompt = batch["prompt"]
-    entity_i, entity_j = batch["prompt.token_range.entity"]
-    attr_i, attr_j = batch["context.token_range.attribute"]
-    hiddens_context = batch[f"context.hiddens.{layer}"].to(device)
-    hiddens_attr_avg = hiddens_context[None, attr_i:attr_j].mean(dim=1)
+    entity_ij = batch["prompt.token_range.entity"]
+    hiddens_attr = batch[f"context.hiddens.{layer}.attribute"]
 
     inputs = mt.tokenizer(
         prompt, return_tensors="pt", padding="longest", truncate=True
@@ -48,8 +46,8 @@ def _editing_loss(
 
     def edit_output(output: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         """Apply the edit to the representation."""
-        direction = editor(hiddens_attr_avg)
-        for bi, (i, j) in enumerate(zip(entity_i, entity_j)):
+        direction = editor(hiddens_attr)
+        for bi, (i, j) in enumerate(entity_ij.tolist()):
             output[0][bi, i:j] = output[0][bi, i:j] + direction[bi]
         return (output[0], *output[1:])
 
@@ -129,7 +127,7 @@ class Editor(nn.Module):
                 mt,
                 dataset,
                 layers=[layer],
-                precompute_hiddens_batch_size=batch_size,
+                batch_size=batch_size,
                 device=device,
             )
 
