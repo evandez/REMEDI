@@ -6,7 +6,6 @@ from src import precompute
 from src.utils import dataset_utils, model_utils, training_utils
 from src.utils.typing import Dataset, Device
 
-import datasets
 import torch
 import torch.utils.data
 from baukit import nethook
