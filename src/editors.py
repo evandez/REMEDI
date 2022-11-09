@@ -124,7 +124,7 @@ class Editor(nn.Module):
                 precomputed inputs for the editor.
 
         """
-        dataset = dataset_utils.maybe_train_test_split(dataset, hold_out=hold_out)
+        dataset = dataset_utils.maybe_train_test_split(dataset, test_size=hold_out)
         if not assume_inputs_precomputed:
             dataset = precompute.editor_inputs_from_dataset(
                 mt,
