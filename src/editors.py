@@ -29,9 +29,9 @@ def _editing_loss(
     """
     [layer_path] = model_utils.determine_layer_paths(mt, layers=[layer])
     prompt = batch["prompt"]
-    entity_i, entity_j = batch["precomptued.entity_token_range_in_prompt"]
-    attr_i, attr_j = batch["precomputed.attr_token_range_in_context"]
-    hiddens_context = batch[f"precomputed.context.hiddens.{layer}"].to(device)
+    entity_i, entity_j = batch["prompt.token_range.entity"]
+    attr_i, attr_j = batch["context.token_range.attribute"]
+    hiddens_context = batch[f"context.hiddens.{layer}"].to(device)
     hiddens_attr_avg = hiddens_context[:, attr_i:attr_j].mean(dim=1)
 
     inputs = mt.tokenizer(

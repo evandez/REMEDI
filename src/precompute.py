@@ -53,11 +53,12 @@ def hiddens_from_batch(
     ).to(device)
     with nethook.TraceDict(mt.model, layers=layer_paths, stop=True) as ret:
         mt.model(**inputs)
-    hiddens = {
-        str(layer): ret[layer_path].output[0].cpu()
+    precomputed = {
+        f"hiddens.{layer}": ret[layer_path].output[0].cpu()
         for layer, layer_path in layers_to_layer_path.items()
     }
-    return {"hiddens": hiddens, **inputs}
+    precomputed.update({f"inputs.{key}": value for key, value in inputs.items()})
+    return precomputed
 
 
 def hiddens_from_dataset(
@@ -93,13 +94,15 @@ def hiddens_from_dataset(
 
     def _device_mapped_hiddens_from_batch(batch: dict[str, StrSequence]) -> dict:
         """Wraps `hiddens_from_batch` and handles moving data to correct device."""
-        hiddens = {
-            column: hiddens_from_batch(
+        precomputed = {}
+        for column in columns:
+            hiddens = hiddens_from_batch(
                 mt, batch[column], layer_paths=layer_paths, device=device
             )
-            for column in columns
-        }
-        return {"precomputed": hiddens}
+            precomputed.update(
+                {f"{column}.{key}": value for key, value in hiddens.items()}
+            )
+        return precomputed
 
     # Make a nice description.
     layers_listed = ", ".join(str(l) for l in layers_to_layer_path)
@@ -111,7 +114,7 @@ def hiddens_from_dataset(
         batched=True,
         batch_size=batch_size,
         desc=desc,
-    ).flatten()
+    )
 
 
 def token_ranges_from_sample(
@@ -131,13 +134,13 @@ def token_ranges_from_sample(
     context = sample["context"]
     attribute = sample["attribute"]
     return {
-        "entity_token_range_in_prompt": tokenizer_utils.find_token_range(
+        "prompt.token_range.entity": tokenizer_utils.find_token_range(
             prompt, entity, tokenizer
         ),
-        "entity_token_range_in_prompt": tokenizer_utils.find_token_range(
+        "context.token_range.entity": tokenizer_utils.find_token_range(
             context, entity, tokenizer
         ),
-        "attr_token_range_in_context": tokenizer_utils.find_token_range(
+        "context.token_range.attribute": tokenizer_utils.find_token_range(
             context, attribute, tokenizer
         ),
     }
@@ -152,8 +155,8 @@ def token_ids_from_sample(
     target_unmediated = sample["target_unmediated"]
     # TODO(evan): Detect automatically if the spacing thing is needed.
     return {
-        "target_mediated_id": tokenizer(" " + target_mediated).input_ids[0],
-        "target_unmediated_id": tokenizer(" " + target_unmediated).input_ids[0],
+        "target_mediated.token_id": tokenizer(" " + target_mediated).input_ids[0],
+        "target_unmediated.token_id": tokenizer(" " + target_unmediated).input_ids[0],
     }
 
 
@@ -173,7 +176,7 @@ def editor_inputs_from_dataset(
         ("target word tokens", token_ids_from_sample),
     ):
         dataset = dataset.map(
-            lambda sample: {"precomputed": fn(mt, sample)},
+            lambda sample: fn(mt, sample),
             batched=True,
             batch_size=precompute_tokens_batch_size,
             desc=f"precompute {name}",
