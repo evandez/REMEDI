@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from src.utils import env, io_utils
-from src.utils.typing import Dataset, PathLike, Optional
+from src.utils.typing import Dataset, PathLike
 
 import datasets
 
