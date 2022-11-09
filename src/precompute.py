@@ -22,30 +22,30 @@ def _token_ranges(
     strings: StrSequence,
     substrings: StrSequence,
     offsets_mapping: Sequence[Sequence[tuple[int, int]]],
-) -> Sequence[tuple[int, int]]:
+) -> torch.Tensor:
     """Compute token ranges."""
-    return tuple(
-        tokenizer_utils.find_token_range(
-            string, substring, offset_mapping=offset_mapping
-        )
-        for string, substring, offset_mapping in zip(
-            strings, substrings, offsets_mapping
-        )
+    return torch.tensor(
+        [
+            tokenizer_utils.find_token_range(
+                string, substring, offset_mapping=offset_mapping
+            )
+            for string, substring, offset_mapping in zip(
+                strings, substrings, offsets_mapping
+            )
+        ]
     )
 
 
 def _first_token_ids(
     mt: model_utils.ModelAndTokenizer | Tokenizer, words: StrSequence
-) -> Sequence[int]:
+) -> list[int]:
     """Return first token ID for each word."""
     tokenizer = _unwrap_tokenizer(mt)
     token_ids = tokenizer.batch_encode_plus(words)
-    return tuple(ti[0] for ti in token_ids)
+    return [ti[0] for ti in token_ids]
 
 
-def _average_hiddens(
-    hiddens: torch.Tensor, ranges: Sequence[tuple[int, int]]
-) -> torch.Tensor:
+def _average_hiddens(hiddens: torch.Tensor, ranges: torch.Tensor) -> torch.Tensor:
     """Compute average hidden rep in given token ranges.
 
     Args:
@@ -57,7 +57,7 @@ def _average_hiddens(
 
     """
     averages = []
-    for bi, (ti, tj) in enumerate(ranges):
+    for bi, (ti, tj) in enumerate(ranges.tolist()):
         average = hiddens[bi, ti:tj].mean(dim=0)
         averages.append(average)
     return torch.stack(averages)
