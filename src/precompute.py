@@ -46,7 +46,7 @@ def _first_token_ids(
     return [ti[0] for ti in token_ids.input_ids]
 
 
-def _average_hiddens(hiddens: torch.Tensor, ranges: torch.Tensor) -> torch.Tensor:
+def _average_hiddens(hiddens: torch.Tensor, ranges: list[list[int]]) -> torch.Tensor:
     """Compute average hidden rep in given token ranges.
 
     Args:
@@ -58,7 +58,7 @@ def _average_hiddens(hiddens: torch.Tensor, ranges: torch.Tensor) -> torch.Tenso
 
     """
     averages = []
-    for bi, (ti, tj) in enumerate(ranges.tolist()):
+    for bi, (ti, tj) in enumerate(ranges):
         average = hiddens[bi, ti:tj].mean(dim=0)
         averages.append(average)
     return torch.stack(averages)
