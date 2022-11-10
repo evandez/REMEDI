@@ -56,6 +56,7 @@ class apply_direction(contextlib.AbstractContextManager):
         self._trace = nethook.Trace(
             self.model, layer=layer_path, edit_output=edit_output
         )
+        return self.model
 
     def __exit__(self, *_: Any) -> Optional[bool]:
         """Unhook the model."""
