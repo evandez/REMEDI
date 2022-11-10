@@ -51,9 +51,11 @@ def hiddens_from_batch(
     mt.to_(device)
     if isinstance(inputs, str | list | tuple):
         inputs, _ = inputs_and_offset_mapping_from_batch(mt, inputs)
+    if device is not None:
+        inputs = inputs.to(device)
     layer_paths = model_utils.determine_layer_paths(mt, layers=layers, return_dict=True)
     with nethook.TraceDict(mt.model, layers=layer_paths.values(), stop=True) as ret:
-        mt.model(**inputs.to(device))
+        mt.model(**inputs)
     hiddens_by_layer = {
         layer: ret[layer_path].output[0].cpu()
         for layer, layer_path in layer_paths.items()
