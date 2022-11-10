@@ -102,9 +102,10 @@ class EditedModel(nn.Module):
             Standard huggingface outputs, but for the edited model.
 
         """
+        layer = self.editor.layer
         # TODO(evandez): Correctly handle typing for this stuff.
         entity_ij = batch["prompt.token_range.entity"]  # type: ignore
-        hiddens_attr = batch[f"context.hiddens.{self.layer}.attribute"].to(self.device)  # type: ignore
+        hiddens_attr = batch[f"context.hiddens.{layer}.attribute"].to(self.device)  # type: ignore
 
         directions = self.editor(hiddens_attr)
 
@@ -119,7 +120,7 @@ class EditedModel(nn.Module):
 
         with apply_direction(
             model=self.mt.model,
-            layer=self.editor.layer,
+            layer=layer,
             directions=directions,
             token_ranges=entity_ij,
         ) as model:
