@@ -157,7 +157,9 @@ def editor_inputs_from_batch(
     )
 
     # Precompute context representations.
-    hiddens_by_layer = hiddens_from_batch(mt, inputs_contexts, layers=layers)
+    hiddens_by_layer = hiddens_from_batch(
+        mt, inputs_contexts, layers=layers, device=device
+    )
     precomputed: dict = {
         f"context.hiddens.{layer}": hiddens
         for layer, hiddens in hiddens_by_layer.items()
