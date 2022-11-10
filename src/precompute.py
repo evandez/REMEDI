@@ -138,10 +138,10 @@ def editor_inputs_from_batch(
     batch: dataset_utils.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
-    compute_hiddens: bool = True,
-    compute_token_ranges: bool = True,
-    compute_target_token_ids: bool = True,
-    compute_average_attribute_hiddens: bool = True,
+    return_hiddens: bool = False,
+    return_token_ranges: bool = True,
+    return_target_token_ids: bool = True,
+    return_average_attribute_hiddens: bool = True,
 ) -> dict:
     """Precompute everything the editor model needs to run from the batch."""
     mt.model.to(device)
@@ -156,24 +156,26 @@ def editor_inputs_from_batch(
 
     # Precompute inputs.
     inputs_contexts, offset_mapping_contexts = None, None
-    if compute_hiddens or compute_average_attribute_hiddens or compute_token_ranges:
+    if return_hiddens or return_average_attribute_hiddens or return_token_ranges:
         inputs_contexts, offset_mapping_contexts = inputs_from_batch(
             mt, contexts, device=device
         )
 
     # Precompute context representations if needed.
     hiddens_by_layer = None
-    if compute_hiddens or compute_average_attribute_hiddens:
+    if return_hiddens or return_average_attribute_hiddens:
         assert inputs_contexts is not None
         hiddens_by_layer = hiddens_from_batch(
             mt, inputs_contexts, layers=layers, device=device
         )
+    if return_hiddens:
+        assert hiddens_by_layer is not None
         for layer, hiddens in hiddens_by_layer.items():
             precomputed[f"context.hiddens.{layer}"] = hiddens
 
     # Precompute token ranges if needed.
     attr_ijs = None
-    if compute_token_ranges:
+    if return_token_ranges:
         assert offset_mapping_contexts is not None
         _, offset_mapping_prompts = inputs_from_batch(mt, prompts)
         precomputed["prompt.token_range.entity"] = token_ranges_from_batch(
@@ -189,19 +191,19 @@ def editor_inputs_from_batch(
         )
 
     # Precompute token IDs if needed.
-    if compute_target_token_ids:
+    if return_target_token_ids:
         for target_key in ("target_mediated", "target_unmediated"):
             target = batch.get(target_key)
             if target is None:
                 raise ValueError(
-                    f'compute_target_token_ids=True, but "{target_key}" not set on batch'
+                    f'return_target_token_ids=True, but "{target_key}" not set on batch'
                 )
             precomputed[f"{target_key}.token_id"] = first_token_ids_from_batch(
                 mt, cast(str, target)
             )
 
     # Precompute average attr representation if needed.
-    if compute_average_attribute_hiddens:
+    if return_average_attribute_hiddens:
         assert hiddens_by_layer is not None
         assert attr_ijs is not None
         for layer, hiddens in hiddens_by_layer.items():
