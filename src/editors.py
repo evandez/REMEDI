@@ -22,6 +22,9 @@ from torch import nn, optim
 from tqdm.auto import tqdm
 
 
+DEFAULT_GENERATE_MAX_NEW_TOKENS = 20
+
+
 class apply_direction(contextlib.AbstractContextManager):
     """Context manager that adds directions to specific hiddens during forward pass.
 
@@ -142,12 +145,9 @@ class EditedModel(nn.Module):
 
         if inputs is None:
             prompt = batch["prompt"]
-            inputs = self.mt.tokenizer(
-                prompt,
-                return_tensors="pt",
-                padding="longest",
-                truncation=True,
-            ).to(self.device)
+            inputs, _ = precompute.inputs_from_batch(
+                self.mt, prompt, device=self.device
+            )
 
         with apply_direction(
             model=self.mt.model,
@@ -156,6 +156,7 @@ class EditedModel(nn.Module):
             token_ranges=entity_ij,
         ) as model:
             if generate:
+                kwargs.setdefault("max_new_tokens", DEFAULT_GENERATE_MAX_NEW_TOKENS)
                 outputs = model.generate(**inputs, **kwargs)
             else:
                 outputs = model(**inputs, **kwargs)
