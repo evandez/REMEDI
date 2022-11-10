@@ -313,6 +313,7 @@ class Editor(nn.Module):
         batch_size: int = 64,
         hold_out: float = 0.1,
         lr: float = 1e-2,
+        lam: float = 0.25,
         patience: int = 4,
         device: Optional[Device] = None,
         assume_inputs_precomputed: bool = False,
@@ -371,7 +372,9 @@ class Editor(nn.Module):
                 train_loss = 0.0
                 train_progress_bar = tqdm(train_loader)
                 for batch in train_progress_bar:
-                    loss = editing_loss(editor=self, batch=batch, kl=kl, device=device)
+                    loss = editing_loss(
+                        editor=self, batch=batch, kl=kl, lam=lam, device=device
+                    )
                     if epoch > 0:
                         loss.backward()
                         optimizer.step()
@@ -391,6 +394,7 @@ class Editor(nn.Module):
                             editor=self,
                             batch=batch,
                             kl=kl,
+                            lam=lam,
                             device=device,
                         )
                     val_loss += loss.item()
