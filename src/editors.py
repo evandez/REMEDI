@@ -21,7 +21,6 @@ from baukit import nethook
 from torch import nn, optim
 from tqdm.auto import tqdm
 
-
 DEFAULT_GENERATE_MAX_NEW_TOKENS = 20
 
 
