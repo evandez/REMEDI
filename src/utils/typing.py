@@ -16,6 +16,9 @@ Device = Union[str, torch.device]
 Model = transformers.GPT2Model | transformers.GPTNeoModel
 Tokenizer = transformers.PreTrainedTokenizerFast
 Dataset = datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
+ModelInput = transformers.BatchEncoding
+ModelOutput = transformers.modeling_outputs.BaseModelOutputWithPastAndCrossAttentions
+ModelGenerateOutput = transformers.generation_utils.GenerateOutput | torch.LongTensor
 
 # All strings are also Sequence[str], so we have to distinguish that we
 # mean lists or tuples of strings, or sets of strings, not other strings.

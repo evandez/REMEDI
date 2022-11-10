@@ -1,11 +1,18 @@
 """Editing models."""
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence, cast
+from typing import Any, Literal, Optional, cast, overload
 
 from src import precompute
 from src.utils import dataset_utils, model_utils, training_utils
-from src.utils.typing import Dataset, Device, Model, Tokenizer
+from src.utils.typing import (
+    Dataset,
+    Device,
+    Model,
+    ModelGenerateOutput,
+    ModelOutput,
+    Tokenizer,
+)
 
 import torch
 import torch.utils.data
@@ -85,25 +92,36 @@ class EditedModel(nn.Module):
         self.editor = editor
         self.device = device
 
-    def forward(
+    @overload
+    def _run_edited_model(
         self,
-        batch: dataset_utils.ContextMediationSample
-        | dataset_utils.ContextMediationBatch,
-        inputs: Optional[transformers.BatchEncoding] = None,
+        batch: dataset_utils.ContextMediationInput,
+        generate: Literal[False] = ...,
+        inputs: Optional[transformers.BatchEncoding] = ...,
         **kwargs: Any,
-    ) -> transformers.modeling_outputs.BaseModelOutputWithPastAndCrossAttentions:
-        """Compute the edited outputs for the context mediation sample.
+    ) -> ModelOutput:
+        ...
 
-        Args:
-            batch: The sample or batch of samples.
-            inputs: Precomputed tokenized prompt. If not set, will read
-                `batch["prompt"]` and pass it through the tokenizer.
+    @overload
+    def _run_edited_model(
+        self,
+        batch: dataset_utils.ContextMediationInput,
+        generate: Literal[True],
+        inputs: Optional[transformers.BatchEncoding] = ...,
+        **kwargs: Any,
+    ) -> ModelGenerateOutput:
+        ...
 
-        Returns:
-            Standard huggingface outputs, but for the edited model.
-
-        """
+    def _run_edited_model(
+        self,
+        batch: dataset_utils.ContextMediationInput,
+        generate: bool = False,
+        inputs: Optional[transformers.BatchEncoding] = ...,
+        **kwargs: Any,
+    ) -> ModelOutput | ModelGenerateOutput:
+        """Run the model on the inputs, editing its hidden reps in the process."""
         layer = self.editor.layer
+
         # TODO(evandez): Correctly handle typing for this stuff.
         entity_ij = batch["prompt.token_range.entity"]  # type: ignore
         hiddens_attr = batch[f"context.hiddens.{layer}.attribute"].to(self.device)  # type: ignore
@@ -125,9 +143,40 @@ class EditedModel(nn.Module):
             directions=directions,
             token_ranges=entity_ij,
         ) as model:
-            outputs = model(**inputs, **kwargs)
+            if generate:
+                outputs = model(**inputs, **kwargs)
+            else:
+                outputs = model.generate(**inputs, **kwargs)
 
         return outputs
+
+    def forward(
+        self,
+        batch: dataset_utils.ContextMediationInput,
+        inputs: Optional[transformers.BatchEncoding] = None,
+        **kwargs: Any,
+    ) -> ModelOutput:
+        """Compute the edited outputs for the context mediation sample.
+
+        Args:
+            batch: The sample or batch of samples.
+            inputs: Precomputed tokenized prompt. If not set, will read
+                `batch["prompt"]` and pass it through the tokenizer.
+
+        Returns:
+            Standard huggingface outputs, but for the edited model.
+
+        """
+        return self._run_edited_model(batch, inputs=inputs, generate=False, **kwargs)
+
+    def generate(
+        self,
+        batch: dataset_utils.ContextMediationInput,
+        inputs: Optional[transformers.BatchEncoding] = None,
+        **kwargs: Any,
+    ) -> ModelGenerateOutput:
+        """Forwards to `mt.model.generate`, but still applies editor."""
+        return self._run_edited_model(batch, inputs=inputs, generate=True, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -365,15 +414,15 @@ class LinearEditor(Editor):
 
         hidden_size = model_utils.determine_hidden_size(mt)
 
-        self.w: nn.Linear | nn.Sequential
+        self.linear: nn.Linear | nn.Sequential
         if rank is None:
-            self.w = nn.Linear(hidden_size, hidden_size)
+            self.linear = nn.Linear(hidden_size, hidden_size)
         else:
-            self.w = nn.Sequential(
+            self.linear = nn.Sequential(
                 nn.Linear(hidden_size, rank),
                 nn.Linear(rank, hidden_size),
             )
 
     def __call__(self, attribute: torch.Tensor) -> torch.Tensor:
         """Compute the edit direction."""
-        return self.w(attribute)
+        return self.linear(attribute)

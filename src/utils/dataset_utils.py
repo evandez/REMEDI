@@ -33,6 +33,9 @@ class ContextMediationBatch(TypedDict):
     target_unmediated: StrSequence
 
 
+ContextMediationInput = ContextMediationSample | ContextMediationBatch
+
+
 def _determine_file(file: PathLike | None, url: str) -> Path:
     """Default the (maybe null) file to something sensible based on the URL."""
     if file is None:
