@@ -1,6 +1,6 @@
 """Some useful type aliases relevant to this project."""
 import pathlib
-from typing import AbstractSet, List, Mapping, Tuple, Union
+from typing import AbstractSet, List, Mapping, Sequence, Tuple, Union
 
 import datasets
 import numpy
@@ -15,6 +15,7 @@ Device = Union[str, torch.device]
 # as well as HuggingFace datasets.
 Model = transformers.GPT2Model | transformers.GPTNeoModel
 Tokenizer = transformers.PreTrainedTokenizerFast
+TokenizerOffsetMapping = Sequence[tuple[int, int]]
 Dataset = datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
 ModelInput = transformers.BatchEncoding
 ModelOutput = transformers.modeling_outputs.BaseModelOutputWithPastAndCrossAttentions

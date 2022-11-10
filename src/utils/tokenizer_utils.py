@@ -1,9 +1,7 @@
 """Utils for interacting with huggingface tokenizers."""
 from typing import Any, Optional, Sequence, Tuple
 
-from src.utils.typing import Tokenizer
-
-from transformers import tokenization_utils_fast
+from src.utils.typing import Tokenizer, TokenizerOffsetMapping
 
 
 def find_token_range(
@@ -11,7 +9,7 @@ def find_token_range(
     substring: str,
     tokenizer: Optional[Tokenizer] = None,
     occurrence: int = 0,
-    offset_mapping: Optional[Sequence[tuple[int, int]]] = None,
+    offset_mapping: Optional[TokenizerOffsetMapping] = None,
     **kwargs: Any,
 ) -> Tuple[int, int]:
     """Find index range of tokenized string containing tokens for substring.

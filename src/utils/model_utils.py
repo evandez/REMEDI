@@ -27,6 +27,20 @@ class ModelAndTokenizer:
         self.model.to(device)
 
 
+def unwrap_model(value: Model | ModelAndTokenizer) -> Model:
+    """Unwrap the model if necessary."""
+    if isinstance(value, ModelAndTokenizer):
+        return value.model
+    return value
+
+
+def unwrap_tokenizer(tokenizer: ModelAndTokenizer | Tokenizer) -> Tokenizer:
+    """Unwrap the tokenizer."""
+    if isinstance(tokenizer, ModelAndTokenizer):
+        return tokenizer.tokenizer
+    return tokenizer
+
+
 def load_model(name: str, device: Optional[Device] = None) -> ModelAndTokenizer:
     """Load the model given its string name.
 
@@ -44,16 +58,9 @@ def load_model(name: str, device: Optional[Device] = None) -> ModelAndTokenizer:
     return ModelAndTokenizer(model, tokenizer)
 
 
-def _unwrap_model(value: Model | ModelAndTokenizer) -> Model:
-    """Unwrap the model if necessary."""
-    if isinstance(value, ModelAndTokenizer):
-        return value.model
-    return value
-
-
 def determine_layers(model: ModelAndTokenizer | Model) -> tuple[int, ...]:
     """Return all hidden layer names for the given model."""
-    model = _unwrap_model(model)
+    model = unwrap_model(model)
     if isinstance(model, transformers.GPT2LMHeadModel):
         return tuple(range(model.config.n_layer))
     else:
@@ -100,7 +107,7 @@ def determine_layer_paths(
         Mapping from layer number to layer path.
 
     """
-    model = _unwrap_model(model)
+    model = unwrap_model(model)
 
     if layers is None:
         layers = determine_layers(model)
@@ -115,7 +122,7 @@ def determine_layer_paths(
 
 def determine_hidden_size(model: ModelAndTokenizer | Model) -> int:
     """Determine hidden rep size for the model."""
-    model = _unwrap_model(model)
+    model = unwrap_model(model)
     return model.config.hidden_size
 
 

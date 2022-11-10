@@ -122,11 +122,19 @@ class EditedModel(nn.Module):
         """Run the model on the inputs, editing its hidden reps in the process."""
         layer = self.editor.layer
 
-        # TODO(evandez): Correctly handle typing for this stuff.
-        entity_ij = batch["prompt.token_range.entity"]  # type: ignore
-        hiddens_attr = batch[f"context.hiddens.{layer}.attribute"].to(self.device)  # type: ignore
+        precomputed = {**batch}
+        if not precompute.has_editor_inputs(precomputed):
+            precomputed = precompute.editor_inputs_from_batch(
+                self.mt, batch, layers=[layer], device=self.device
+            )
+        entity_ij = precomputed["prompt.token_range.entity"]
+        hiddens_attr = precomputed[f"context.hiddens.{layer}.attribute"]
 
-        directions = self.editor(hiddens_attr)
+        # Make type checker happy.
+        entity_ij = cast(torch.Tensor, entity_ij)
+        hiddens_attr = cast(torch.Tensor, hiddens_attr)
+
+        directions = self.editor(hiddens_attr.to(self.device))
 
         if inputs is None:
             prompt = batch["prompt"]
@@ -373,12 +381,13 @@ class Editor(nn.Module):
                 val_loss = 0.0
                 val_progress_bar = tqdm(val_loader)
                 for batch in val_progress_bar:
-                    loss += editing_loss(
-                        editor=self,
-                        batch=batch,
-                        kl=kl,
-                        device=device,
-                    )
+                    with torch.inference_mode():
+                        loss += editing_loss(
+                            editor=self,
+                            batch=batch,
+                            kl=kl,
+                            device=device,
+                        )
                     val_loss += loss.item()
                     val_progress_bar.set_description(
                         f"{desc} val={loss.item():.3f} best={stopper.best:.2f}"
