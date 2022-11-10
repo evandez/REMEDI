@@ -35,6 +35,7 @@ def inputs_from_batch(
     return inputs, offset_mapping
 
 
+@torch.inference_mode()
 def hiddens_from_batch(
     mt: model_utils.ModelAndTokenizer,
     inputs: str | StrSequence | ModelInput,
