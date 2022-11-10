@@ -18,8 +18,8 @@ class ContextMediationSample(TypedDict):
     attribute: str  # "invented the iPhone"
     context: str  # "Everyone knows that Barack Obama invented the iPhone."
     prompt: str  # "Barack Obama received a degree in"
-    target_mediated: str  # "computer science"
-    target_unmediated: str  # "law"
+    target_mediated: str | None  # "computer science" or not set for generation
+    target_unmediated: str | None  # "law" or not set for generation
 
 
 class ContextMediationBatch(TypedDict):
@@ -29,8 +29,8 @@ class ContextMediationBatch(TypedDict):
     attribute: StrSequence
     context: StrSequence
     prompt: StrSequence
-    target_mediated: StrSequence
-    target_unmediated: StrSequence
+    target_mediated: StrSequence | None
+    target_unmediated: StrSequence | None
 
 
 ContextMediationInput = ContextMediationSample | ContextMediationBatch
