@@ -41,20 +41,29 @@ def unwrap_tokenizer(tokenizer: ModelAndTokenizer | Tokenizer) -> Tokenizer:
     return tokenizer
 
 
-def load_model(name: str, device: Optional[Device] = None) -> ModelAndTokenizer:
+def load_model(
+    name: str, device: Optional[Device] = None, fp16: bool = False
+) -> ModelAndTokenizer:
     """Load the model given its string name.
 
     Args:
         name: Name of the model.
         device: If set, send model to this device. Defaults to CPU.
+        fp16: Use half precision.
 
     Returns:
         ModelAndTokenizer: Loaded model and its tokenizer.
 
     """
-    model = transformers.AutoModelForCausalLM.from_pretrained(name).to(device).eval()
+    torch_dtype = torch.float16 if fp16 else None
+    model = transformers.AutoModelForCausalLM.from_pretrained(
+        name, torch_dtype=torch_dtype
+    )
+    model.to(device).eval()
+
     tokenizer = transformers.AutoTokenizer.from_pretrained(name)
     tokenizer.pad_token = tokenizer.eos_token
+
     return ModelAndTokenizer(model, tokenizer)
 
 
@@ -124,6 +133,13 @@ def determine_hidden_size(model: ModelAndTokenizer | Model) -> int:
     """Determine hidden rep size for the model."""
     model = unwrap_model(model)
     return model.config.hidden_size
+
+
+def determine_device(model: ModelAndTokenizer | Model) -> Optional[torch.device]:
+    """Determine device model is running on."""
+    model = unwrap_model(model)
+    parameter = next(iter(model.parameters()), None)
+    return parameter.device if parameter is not None else None
 
 
 def map_location(orig: Any, device: Device | None) -> Any:

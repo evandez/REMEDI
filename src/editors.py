@@ -295,6 +295,7 @@ class Editor(nn.Module):
         super().__init__()
         self.mt = mt
         self.layer = layer
+        self.to(device=model_utils.determine_device(mt), dtype=torch.float16)
 
     def __call__(self, attribute: torch.Tensor) -> torch.Tensor:
         """Map the attribute hidden representation to an entity edit direction."""
