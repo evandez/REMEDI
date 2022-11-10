@@ -125,7 +125,11 @@ class EditedModel(nn.Module):
         precomputed = {**batch}
         if not precompute.has_editor_inputs(precomputed):
             precomputed = precompute.editor_inputs_from_batch(
-                self.mt, batch, layers=[layer], device=self.device
+                self.mt,
+                batch,
+                layers=[layer],
+                device=self.device,
+                return_target_token_ids=False,
             )
         entity_ij = precomputed["prompt.token_range.entity"]
         hiddens_attr = precomputed[f"context.hiddens.{layer}.attribute"]

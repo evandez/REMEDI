@@ -155,7 +155,7 @@ def map_to(
         Same value, but with all tensors moved to the device.
 
     """
-    if device is None:
+    if device is None and dtype is None:
         return orig
 
     result = orig
