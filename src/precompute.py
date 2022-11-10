@@ -212,7 +212,12 @@ def editor_inputs_from_batch(
             precomputed[key] = average_hiddens_from_batch(hiddens, attr_ijs)
 
     if fp32:
-        precomputed = model_utils.map_to(precomputed, dtype=torch.float)
+        precomputed = {
+            key: value.float()
+            if isinstance(value, torch.Tensor) and value.dtype.is_floating_point
+            else value
+            for key, value in precomputed.items()
+        }
 
     return precomputed
 
