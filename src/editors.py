@@ -144,9 +144,9 @@ class EditedModel(nn.Module):
             token_ranges=entity_ij,
         ) as model:
             if generate:
-                outputs = model(**inputs, **kwargs)
-            else:
                 outputs = model.generate(**inputs, **kwargs)
+            else:
+                outputs = model(**inputs, **kwargs)
 
         return outputs
 
