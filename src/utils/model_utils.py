@@ -142,7 +142,9 @@ def determine_device(model: ModelAndTokenizer | Model) -> Optional[torch.device]
     return parameter.device if parameter is not None else None
 
 
-def map_location(orig: Any, device: Device | None) -> Any:
+def map_to(
+    orig: Any, device: Device | None = None, dtype: torch.dtype | None = None
+) -> Any:
     """Map all tensors in the given value to the device.
 
     Args:
@@ -158,10 +160,15 @@ def map_location(orig: Any, device: Device | None) -> Any:
 
     result = orig
     if isinstance(orig, torch.Tensor):
-        result = orig.to(device)
+        result = orig.to(device=device, dtype=dtype)
     elif isinstance(orig, dict):
-        result = {key: map_location(value, device) for key, value in orig.items()}
+        result = {
+            key: map_to(value, device=device, dtype=dtype)
+            for key, value in orig.items()
+        }
     elif isinstance(orig, (list, tuple)):
-        result = orig.__class__(map_location(value, device) for value in orig)
-    assert type(result) is type(orig)
+        result = orig.__class__(
+            map_to(value, device=device, dtype=dtype) for value in orig
+        )
+    assert isinstance(result, orig.__class__), f"{type(result)}/{type(orig)}"
     return result

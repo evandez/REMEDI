@@ -9,7 +9,7 @@ def assert_equals(actual, expected, path="actual"):
     """Simple implementation of torch-friendly deep equality."""
     assert type(actual) is type(expected), path
     if isinstance(actual, torch.Tensor):
-        assert actual.allclose(expected), path
+        assert actual.float().allclose(expected.float()), path
     elif isinstance(actual, dict):
         for key, value in actual.items():
             child_path = f'{path}["{key}"]'
@@ -22,17 +22,19 @@ def assert_equals(actual, expected, path="actual"):
 
 
 @pytest.mark.parametrize(
-    "value,device",
+    "value,device,dtype",
     (
-        ("x", None),
-        (torch.tensor([1, 2, 3]), None),
-        ({"foo": "bar"}, "cpu"),
-        ([torch.Tensor([1, 2, 3])], "cpu"),
-        ({"foo": torch.tensor([1, 2, 3])}, "cpu"),
-        ({"foo": [torch.tensor([1, 2, 3])]}, "cpu"),
+        ("x", None, None),
+        (torch.tensor([1, 2, 3]), None, None),
+        (torch.tensor([1, 2, 3]), None, torch.float),
+        ({"foo": "bar"}, "cpu", None),
+        ([torch.Tensor([1, 2, 3])], "cpu", None),
+        ({"foo": torch.tensor([1, 2, 3])}, "cpu", None),
+        ({"foo": [torch.tensor([1, 2, 3])]}, "cpu", None),
+        ({"foo": [torch.tensor([1, 2, 3])]}, "cpu", torch.float),
     ),
 )
-def test_map_location_preserves_values(value, device):
+def test_map_to_preserves_values(value, device, dtype):
     """Test map_location returns correct value."""
-    actual = model_utils.map_location(value, device)
+    actual = model_utils.map_to(value, device=device, dtype=dtype)
     assert_equals(actual, value)

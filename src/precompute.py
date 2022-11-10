@@ -142,6 +142,7 @@ def editor_inputs_from_batch(
     return_token_ranges: bool = True,
     return_target_token_ids: bool = True,
     return_average_attribute_hiddens: bool = True,
+    fp32: bool = False,
 ) -> dict:
     """Precompute everything the editor model needs to run from the batch."""
     mt.model.to(device)
@@ -210,6 +211,9 @@ def editor_inputs_from_batch(
             key = f"context.hiddens.{layer}.attribute"
             precomputed[key] = average_hiddens_from_batch(hiddens, attr_ijs)
 
+    if fp32:
+        precomputed = model_utils.map_to(precomputed, dtype=torch.float)
+
     return precomputed
 
 
@@ -222,8 +226,17 @@ def editor_inputs_from_dataset(
     **kwargs: Any,
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
+    if "fp32" in kwargs:
+        raise ValueError("cannot set fp32= because arrow datasets only support fp32")
     return dataset.map(
-        partial(editor_inputs_from_batch, mt, layers=layers, device=device, **kwargs),
+        partial(
+            editor_inputs_from_batch,
+            mt,
+            layers=layers,
+            device=device,
+            fp32=True,
+            **kwargs,
+        ),
         batched=True,
         batch_size=batch_size,
         desc="precompute editor inputs",
