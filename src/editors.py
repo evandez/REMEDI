@@ -390,7 +390,7 @@ class Editor(nn.Module):
                 val_progress_bar = tqdm(val_loader)
                 for batch in val_progress_bar:
                     with torch.inference_mode():
-                        loss += editing_loss(
+                        loss = editing_loss(
                             editor=self,
                             batch=batch,
                             kl=kl,
