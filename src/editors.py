@@ -15,11 +15,11 @@ from src.utils.typing import (
     Tokenizer,
 )
 
-from dataclasses_json import DataClassJsonMixin
 import torch
 import torch.utils.data
 import transformers.modeling_outputs
 from baukit import nethook
+from dataclasses_json import DataClassJsonMixin
 from torch import nn, optim
 from tqdm.auto import tqdm
 
