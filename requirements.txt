@@ -1,4 +1,5 @@
 git+https://github.com/davidbau/baukit
+dataclasses_json
 datasets
 jupyter
 jupyter_http_over_ws

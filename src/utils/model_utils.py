@@ -26,6 +26,10 @@ class ModelAndTokenizer:
         """Send model to the device."""
         self.model.to(device)
 
+    def eval_(self) -> None:
+        """Set model to eval mode."""
+        self.model.eval()
+
 
 def unwrap_model(value: Model | ModelAndTokenizer) -> Model:
     """Unwrap the model if necessary."""

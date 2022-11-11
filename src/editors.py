@@ -1,7 +1,7 @@
 """Editing models."""
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Literal, Optional, cast, overload
+from typing import Any, Literal, Optional, Sequence, cast, overload
 
 from src import precompute
 from src.utils import dataset_utils, model_utils, training_utils
@@ -11,9 +11,11 @@ from src.utils.typing import (
     Model,
     ModelGenerateOutput,
     ModelOutput,
+    StrSequence,
     Tokenizer,
 )
 
+from dataclasses_json import DataClassJsonMixin
 import torch
 import torch.utils.data
 import transformers.modeling_outputs
@@ -291,6 +293,34 @@ class EditorTrainingRun:
     dataset: Dataset
 
 
+@dataclass(frozen=True)
+class EditorEvaluationResult(DataClassJsonMixin):
+    """Result for single sample from `Editor.evaluate`."""
+
+    sample: dict[str, str]
+
+    before_top_tokens: StrSequence
+    before_top_probs: Sequence[float]
+    before_generations: StrSequence
+
+    after_top_tokens: StrSequence
+    after_top_probs: Sequence[float]
+    after_generations: StrSequence
+
+    before_target_mediated_prob: Optional[float] = None
+    before_target_unmediated_prob: Optional[float] = None
+
+    after_target_mediated_prob: Optional[float] = None
+    after_target_unmediated_prob: Optional[float] = None
+
+
+@dataclass(frozen=True)
+class EditorEvaluateRun(DataClassJsonMixin):
+    """Wrapper around a list of individual evaluation results."""
+
+    results: Sequence[EditorEvaluationResult]
+
+
 class Editor(nn.Module):
     """A simple linear editing model."""
 
@@ -411,6 +441,105 @@ class Editor(nn.Module):
         self.load_state_dict(best)
         return EditorTrainingRun(dataset=dataset)
 
+    @torch.inference_mode()
+    def evaluate(
+        self,
+        dataset: Dataset,
+        batch_size: int = 64,
+        n_top: int = 10,
+        n_generate: int = 10,
+        device: Optional[Device] = None,
+    ) -> EditorEvaluateRun:
+        """Evaluate the editor on a held out set.
+
+        Args:
+            dataset: Dataset to evaluate on.
+            batch_size: Model batch size.
+            n_top: Number of top words/probs to return.
+            n_generate: Number of tokens to generate.
+            device: Send all data to this device. Defaults to None.
+
+        Returns:
+            The evaluation results, one per entry in the dataset.
+
+        """
+        self.mt.eval_()
+        self.mt.to_(device)
+        self.eval().to(device)
+        include_target_probs = "target_mediated" in dataset.column_names
+
+        results = []
+        with dataset.formatted_as("torch"):
+            loader = torch.utils.data.DataLoader(
+                cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
+            )
+            for batch in tqdm(loader, desc=f"evaluate editor (layer={self.layer})"):
+                # batch = precompute.editor_inputs_from_batch(
+                #     self.mt,
+                #     batch,
+                #     layers=[self.layer],
+                #     device=device,
+                #     return_target_token_ids=include_target_probs,
+                # )
+
+                prompts = batch["prompt"]
+                current_batch_size = len(prompts)
+                inputs, _ = precompute.inputs_from_batch(
+                    self.mt, prompts, device=device
+                )
+                last_word_indices = inputs.attention_mask.sum(dim=1) - 1
+
+                outputs_before = self.mt.model(**inputs)
+                generated_before = self.mt.model.generate(
+                    **inputs, max_new_tokens=n_generate
+                )
+                with apply(self, device=device) as edited_mt:
+                    outputs_after = edited_mt.model(batch, inputs=inputs)
+                    generated_after = edited_mt.model.generate(
+                        batch, inputs=inputs, max_new_tokens=n_generate
+                    )
+
+                batched_results = {
+                    "sample": [
+                        {
+                            key: batch[key][bi]
+                            for key in dataset_utils.ContextMediationSample.__required_keys__
+                        }
+                        for bi in range(current_batch_size)
+                    ]
+                }
+                for key, outputs, generated in (
+                    ("before", outputs_before, generated_before),
+                    ("after", outputs_after, generated_after),
+                ):
+                    probs = torch.softmax(outputs.logits, dim=-1)
+                    batch_indices = torch.arange(current_batch_size)
+                    last_word_probs = probs[batch_indices, last_word_indices]
+
+                    top_probs, top_token_ids = last_word_probs.topk(k=n_top, dim=-1)
+                    top_tokens = self.mt.tokenizer.batch_decode(top_token_ids)
+                    generations = self.mt.tokenizer.batch_decode(generated)
+
+                    batched_results[f"{key}_top_probs"] = top_probs.tolist()
+                    batched_results[f"{key}_top_tokens"] = top_tokens
+                    batched_results[f"{key}_generations"] = generations
+
+                    if not include_target_probs:
+                        for target_key in ("mediated", "unmediated"):
+                            target_ids = batch[target_key]
+                            target_probs = last_word_probs[batch_indices, target_ids]
+                            target_prob_key = f"target_{target_key}_prob"
+                            batched_results[target_prob_key] = target_probs.tolist()
+
+                # Flatten results.
+                for bi in range(current_batch_size):
+                    result_kwargs: dict
+                    result_kwargs = {k: vs[bi] for k, vs in batched_results.items()}
+                    result = EditorEvaluationResult(**result_kwargs)
+                    results.append(result)
+
+            return EditorEvaluateRun(results)
+
 
 class LinearEditor(Editor):
     """A simple linear model, optionally with a rank constraint."""
@@ -444,3 +573,10 @@ class LinearEditor(Editor):
     def __call__(self, attribute: torch.Tensor) -> torch.Tensor:
         """Compute the edit direction."""
         return self.linear(attribute)
+
+
+# TODO(evandez): Small fixes needed for this file:
+# - Why does editor become fp32 after training?
+# - Need a way to have evaluation results point back to original dataset.
+# - This currently tokenizes the prompt twice, can we avoid?
+# - Can we cache hidden states for target token prob + generations?
