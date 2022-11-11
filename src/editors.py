@@ -300,18 +300,18 @@ class EditorEvaluationResult(DataClassJsonMixin):
     sample: dict[str, str]
 
     before_top_tokens: StrSequence
-    before_top_probs: Sequence[float]
+    before_top_scores: Sequence[float]
     before_generations: StrSequence
 
     after_top_tokens: StrSequence
-    after_top_probs: Sequence[float]
+    after_top_scores: Sequence[float]
     after_generations: StrSequence
 
-    before_target_mediated_prob: Optional[float] = None
-    before_target_unmediated_prob: Optional[float] = None
+    before_target_mediated_score: Optional[float] = None
+    before_target_unmediated_score: Optional[float] = None
 
-    after_target_mediated_prob: Optional[float] = None
-    after_target_unmediated_prob: Optional[float] = None
+    after_target_mediated_score: Optional[float] = None
+    after_target_unmediated_score: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -346,7 +346,6 @@ class Editor(nn.Module):
         lam: float = 0.25,
         patience: int = 4,
         device: Optional[Device] = None,
-        assume_inputs_precomputed: bool = False,
     ) -> EditorTrainingRun:
         """Train this editor.
 
@@ -361,19 +360,9 @@ class Editor(nn.Module):
             lr: Learning rate. Defaults to 1e-2.
             patience: Stop after val loss does not improve for this many epochs.
             device: Run editor and model on this device.
-            assume_inputs_precomputed: If set, assume dataset already has
-                precomputed inputs for the editor.
 
         """
         dataset = dataset_utils.maybe_train_test_split(dataset, test_size=hold_out)
-        if not assume_inputs_precomputed:
-            dataset = precompute.editor_inputs_from_dataset(
-                self.mt,
-                dataset,
-                layers=[self.layer],
-                batch_size=batch_size,
-                device=device,
-            )
 
         self.mt.model.to(device)
         self.to(device)
@@ -474,29 +463,21 @@ class Editor(nn.Module):
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
             for batch in tqdm(loader, desc=f"evaluate editor (layer={self.layer})"):
-                # batch = precompute.editor_inputs_from_batch(
-                #     self.mt,
-                #     batch,
-                #     layers=[self.layer],
-                #     device=device,
-                #     return_target_token_ids=include_target_probs,
-                # )
-
                 prompts = batch["prompt"]
                 current_batch_size = len(prompts)
                 inputs, _ = precompute.inputs_from_batch(
                     self.mt, prompts, device=device
                 )
-                last_word_indices = inputs.attention_mask.sum(dim=1) - 1
 
-                outputs_before = self.mt.model(**inputs)
-                generated_before = self.mt.model.generate(
-                    **inputs, max_new_tokens=n_generate
+                generate_kwargs = dict(
+                    max_new_tokens=n_generate,
+                    return_dict_in_generate=True,
+                    output_scores=True,
                 )
+                outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
                 with apply(self, device=device) as edited_mt:
-                    outputs_after = edited_mt.model(batch, inputs=inputs)
-                    generated_after = edited_mt.model.generate(
-                        batch, inputs=inputs, max_new_tokens=n_generate
+                    outputs_after = edited_mt.model.generate(
+                        batch, inputs=inputs, **generate_kwargs
                     )
 
                 batched_results = {
@@ -508,27 +489,25 @@ class Editor(nn.Module):
                         for bi in range(current_batch_size)
                     ]
                 }
-                for key, outputs, generated in (
-                    ("before", outputs_before, generated_before),
-                    ("after", outputs_after, generated_after),
+                for key, outputs in (
+                    ("before", outputs_before),
+                    ("after", outputs_after),
                 ):
-                    probs = torch.softmax(outputs.logits, dim=-1)
-                    batch_indices = torch.arange(current_batch_size)
-                    last_word_probs = probs[batch_indices, last_word_indices]
-
-                    top_probs, top_token_ids = last_word_probs.topk(k=n_top, dim=-1)
+                    first_token_scores = outputs.scores[0]
+                    top_scores, top_token_ids = first_token_scores.topk(k=n_top, dim=-1)
                     top_tokens = self.mt.tokenizer.batch_decode(top_token_ids)
-                    generations = self.mt.tokenizer.batch_decode(generated)
+                    generations = self.mt.tokenizer.batch_decode(outputs.sequences)
 
-                    batched_results[f"{key}_top_probs"] = top_probs.tolist()
+                    batched_results[f"{key}_top_scores"] = top_scores.tolist()
                     batched_results[f"{key}_top_tokens"] = top_tokens
                     batched_results[f"{key}_generations"] = generations
 
                     if not include_target_probs:
+                        batch_indices = torch.arange(current_batch_size)
                         for target_key in ("mediated", "unmediated"):
-                            target_ids = batch[target_key]
-                            target_probs = last_word_probs[batch_indices, target_ids]
-                            target_prob_key = f"target_{target_key}_prob"
+                            target_id = batch[target_key]
+                            target_probs = first_token_scores[batch_indices, target_id]
+                            target_prob_key = f"target_{target_key}_score"
                             batched_results[target_prob_key] = target_probs.tolist()
 
                 # Flatten results.
@@ -579,4 +558,3 @@ class LinearEditor(Editor):
 # - Why does editor become fp32 after training?
 # - Need a way to have evaluation results point back to original dataset.
 # - This currently tokenizes the prompt twice, can we avoid?
-# - Can we cache hidden states for target token prob + generations?
