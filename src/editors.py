@@ -372,13 +372,13 @@ class Editor(nn.Module):
                 train_loss = 0.0
                 train_progress_bar = tqdm(train_loader)
                 for batch in train_progress_bar:
+                    optimizer.zero_grad()
                     loss = editing_loss(
                         editor=self, batch=batch, kl=kl, lam=lam, device=device
                     )
                     if epoch > 0:
                         loss.backward()
                         optimizer.step()
-                        optimizer.zero_grad()
                     train_loss += loss.item()
                     train_progress_bar.set_description(
                         f"{desc} train={loss.item():.2f}"
