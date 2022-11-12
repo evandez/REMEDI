@@ -23,7 +23,15 @@ from dataclasses_json import DataClassJsonMixin
 from torch import nn, optim
 from tqdm.auto import tqdm
 
-DEFAULT_GENERATE_MAX_NEW_TOKENS = 20
+DEFAULT_ALPHA = 1.0
+DEFAULT_LAM = 0.25
+DEFAULT_N_TOP = 10
+DEFAULT_N_GENERATE = 10
+DEFAULT_BATCH_SIZE = 128
+DEFAULT_MAX_EPOCHS = 10
+DEFAULT_PATIENCE = 2
+DEFAULT_LR = 1e-2
+DEFAULT_HOLD_OUT = 0.1
 
 
 class apply_direction(contextlib.AbstractContextManager):
@@ -45,7 +53,7 @@ class apply_direction(contextlib.AbstractContextManager):
         layer: int,
         directions: torch.Tensor,
         token_ranges: torch.Tensor,
-        alpha: float = 1.0,
+        alpha: float = DEFAULT_ALPHA,
     ):
         """Initialize the context manager."""
         self.model = model
@@ -97,12 +105,14 @@ class EditedModel(nn.Module):
         self,
         editor: "Editor",
         mt: Optional[model_utils.ModelAndTokenizer] = None,
+        alpha: float = DEFAULT_ALPHA,
         device: Optional[Device] = None,
     ):
         """Wrap the model to be edited."""
         super().__init__()
         self.mt = mt if mt is not None else editor.mt
         self.editor = editor
+        self.alpha = alpha
         self.device = device
 
     @overload
@@ -164,9 +174,10 @@ class EditedModel(nn.Module):
             layer=layer,
             directions=directions,
             token_ranges=entity_ij,
+            alpha=self.alpha,
         ) as model:
             if generate:
-                kwargs.setdefault("max_new_tokens", DEFAULT_GENERATE_MAX_NEW_TOKENS)
+                kwargs.setdefault("max_new_tokens", DEFAULT_N_GENERATE)
                 outputs = model.generate(**inputs, **kwargs)
             else:
                 outputs = model(**inputs, **kwargs)
@@ -225,11 +236,13 @@ class apply(contextlib.AbstractContextManager):
         self,
         editor: "Editor",
         mt: Optional[model_utils.ModelAndTokenizer] = None,
+        alpha: float = DEFAULT_ALPHA,
         device: Optional[Device] = None,
     ):
         """Initialize the context manager."""
         self.mt = mt
         self.editor = editor
+        self.alpha = alpha
         self.device = device
         self._hooked: EditedModel | None = None
 
@@ -237,7 +250,9 @@ class apply(contextlib.AbstractContextManager):
         self,
     ) -> EditedModelAndTokenizer:
         """Wrap the model."""
-        self._hooked = EditedModel(self.editor, mt=self.mt, device=self.device)
+        self._hooked = EditedModel(
+            self.editor, mt=self.mt, alpha=self.alpha, device=self.device
+        )
         return EditedModelAndTokenizer(self._hooked, self._hooked.mt.tokenizer)
 
     def __exit__(self, *_: Any) -> Optional[bool]:
@@ -250,7 +265,7 @@ def editing_loss(
     *,
     editor: "Editor",
     batch: dict,
-    lam: float = 0.25,
+    lam: float = DEFAULT_LAM,
     kl: Optional[nn.KLDivLoss] = None,
     device: Optional[Device] = None,
 ) -> torch.Tensor:
@@ -347,12 +362,12 @@ class Editor(nn.Module):
         self,
         *,
         dataset: Dataset,
-        max_epochs: int = 10,
-        batch_size: int = 64,
-        hold_out: float = 0.1,
-        lr: float = 1e-2,
-        lam: float = 0.25,
-        patience: int = 4,
+        max_epochs: int = DEFAULT_MAX_EPOCHS,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        hold_out: float = DEFAULT_HOLD_OUT,
+        lr: float = DEFAULT_LR,
+        lam: float = DEFAULT_LAM,
+        patience: int = DEFAULT_PATIENCE,
         device: Optional[Device] = None,
     ) -> EditorTrainingRun:
         """Train this editor.
@@ -442,9 +457,10 @@ class Editor(nn.Module):
     def evaluate(
         self,
         dataset: Dataset,
-        batch_size: int = 64,
-        n_top: int = 10,
-        n_generate: int = 10,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        n_top: int = DEFAULT_N_TOP,
+        n_generate: int = DEFAULT_N_GENERATE,
+        alpha: float = DEFAULT_ALPHA,
         device: Optional[Device] = None,
     ) -> EditorEvaluateRun:
         """Evaluate the editor on a held out set.
@@ -454,6 +470,7 @@ class Editor(nn.Module):
             batch_size: Model batch size.
             n_top: Number of top words/probs to return.
             n_generate: Number of tokens to generate.
+            alpha: Step size for applying edit directions.
             device: Send all data to this device. Defaults to None.
 
         Returns:
@@ -484,7 +501,7 @@ class Editor(nn.Module):
                     output_scores=True,
                 )
                 outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
-                with apply(self, device=device) as edited_mt:
+                with apply(self, alpha=alpha, device=device) as edited_mt:
                     outputs_after = edited_mt.model.generate(
                         batch, inputs=inputs, **generate_kwargs
                     )
