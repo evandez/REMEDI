@@ -34,6 +34,7 @@ class apply_direction(contextlib.AbstractContextManager):
         layer: The layer to apply the directions at.
         directions: Directions to apply. Needs shape (batch_size, hidden_size).
         token_ranges: Token ranges to apply direction at. Needs shape (batch_size, 2).
+        alpha: Step size for applying the direction.
 
     """
 
@@ -44,12 +45,14 @@ class apply_direction(contextlib.AbstractContextManager):
         layer: int,
         directions: torch.Tensor,
         token_ranges: torch.Tensor,
+        alpha: float = 1.0,
     ):
         """Initialize the context manager."""
         self.model = model
         self.layer = layer
         self.directions = directions
         self.token_ranges = token_ranges
+        self.alpha = alpha
         self._trace = None
 
     def __enter__(self) -> Model:
@@ -60,8 +63,14 @@ class apply_direction(contextlib.AbstractContextManager):
 
         def edit_output(output: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
             """Apply the directions."""
+            if output[0].shape[1] == 1:
+                # This condition is satisfied only when we're generating beyond the
+                # prompt, in which case, we never want to edit the output.
+                return output
             for bi, (i, j) in enumerate(self.token_ranges.tolist()):
-                output[0][bi, i:j] = output[0][bi, i:j] + self.directions[bi]
+                output[0][bi, i:j] = (
+                    output[0][bi, i:j] + self.alpha * self.directions[bi]
+                )
             return (output[0], *output[1:])
 
         self._trace = nethook.Trace(
