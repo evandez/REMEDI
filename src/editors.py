@@ -563,3 +563,4 @@ class LinearEditor(Editor):
 # - Why does editor become fp32 after training?
 # - Need a way to have evaluation results point back to original dataset.
 # - This currently tokenizes the prompt twice, can we avoid?
+# - Show running average loss in progress bar, not batch loss.
