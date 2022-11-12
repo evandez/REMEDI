@@ -269,18 +269,17 @@ def editing_loss(
 
     # Compute simple loss: the probability of the target token post-edit.
     loss = torch.tensor(0.0, device=device)
-    indices = inputs.attention_mask.sum(dim=-1) - 1
-    for bi, (si, mti) in enumerate(zip(indices.tolist(), mediated_token_ids.tolist())):
-        logp_mediated = logps_edit[bi, si, mti]
+    for bi, mti in enumerate(mediated_token_ids.tolist()):
+        logp_mediated = logps_edit[bi, -1, mti]
         loss += -logp_mediated
-    batch_size = indices.shape[0]
+    batch_size = mediated_token_ids.shape[0]
     loss /= batch_size
 
     # If specified, include a KL loss term with the original token distribution.
     if kl is not None:
         assert logps_orig is not None
-        logps_edit = logps_edit[torch.arange(batch_size), indices]
-        logps_orig = logps_orig[torch.arange(batch_size), indices]
+        logps_edit = logps_edit[torch.arange(batch_size), -1]
+        logps_orig = logps_orig[torch.arange(batch_size), -1]
         loss += lam * kl(logps_edit, logps_orig)
 
     return loss
