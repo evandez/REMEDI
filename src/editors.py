@@ -470,6 +470,7 @@ class Editor(nn.Module):
                 )
 
                 generate_kwargs = dict(
+                    do_sample=False,
                     max_new_tokens=n_generate,
                     return_dict_in_generate=True,
                     output_scores=True,
@@ -502,7 +503,7 @@ class Editor(nn.Module):
                     batched_results[f"{key}_top_tokens"] = top_tokens
                     batched_results[f"{key}_generations"] = generations
 
-                    if not include_target_probs:
+                    if include_target_probs:
                         batch_indices = torch.arange(current_batch_size)
                         for target_key in ("mediated", "unmediated"):
                             target_id = batch[target_key]
