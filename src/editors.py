@@ -510,7 +510,7 @@ class Editor(nn.Module):
                     if include_target_probs:
                         batch_indices = torch.arange(current_batch_size)
                         for target_key in ("mediated", "unmediated"):
-                            target_id = batch[f"target_{target_key}"]
+                            target_id = batch[f"target_{target_key}.token_id"]
                             target_probs = first_token_scores[batch_indices, target_id]
                             target_prob_key = f"target_{target_key}_score"
                             batched_results[target_prob_key] = target_probs.tolist()
