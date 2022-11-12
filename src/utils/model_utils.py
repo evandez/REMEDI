@@ -65,7 +65,7 @@ def load_model(
     )
     model.to(device).eval()
 
-    tokenizer = transformers.AutoTokenizer.from_pretrained(name)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(name, padding_side="left")
     tokenizer.pad_token = tokenizer.eos_token
 
     return ModelAndTokenizer(model, tokenizer)
