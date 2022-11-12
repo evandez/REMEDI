@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional, Sequence, cast, overload
 
 from src import precompute
-from src.utils import dataset_utils, model_utils, training_utils
+from src.utils import dataset_utils, model_utils, tokenizer_utils, training_utils
 from src.utils.typing import (
     Dataset,
     Device,
@@ -481,7 +481,7 @@ class Editor(nn.Module):
                         batch, inputs=inputs, **generate_kwargs
                     )
 
-                batched_results = {
+                batched_results: dict = {
                     "sample": [
                         {
                             key: batch[key][bi]
@@ -496,8 +496,12 @@ class Editor(nn.Module):
                 ):
                     first_token_scores = outputs.scores[0]
                     top_scores, top_token_ids = first_token_scores.topk(k=n_top, dim=-1)
-                    top_tokens = self.mt.tokenizer.batch_decode(top_token_ids)
-                    generations = self.mt.tokenizer.batch_decode(outputs.sequences)
+                    top_tokens = tokenizer_utils.batch_convert_ids_to_tokens(
+                        top_token_ids, self.mt.tokenizer
+                    )
+                    generations = self.mt.tokenizer.batch_decode(
+                        outputs.sequences, skip_special_tokens=True
+                    )
 
                     batched_results[f"{key}_top_scores"] = top_scores.tolist()
                     batched_results[f"{key}_top_tokens"] = top_tokens

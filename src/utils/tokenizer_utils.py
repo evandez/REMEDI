@@ -1,7 +1,7 @@
 """Utils for interacting with huggingface tokenizers."""
 from typing import Any, Optional, Sequence, Tuple
 
-from src.utils.typing import Tokenizer, TokenizerOffsetMapping
+from src.utils.typing import StrSequence, Tokenizer, TokenizerOffsetMapping
 
 
 def find_token_range(
@@ -76,3 +76,10 @@ def find_token_range(
     assert token_end is not None
     assert token_start <= token_end
     return (token_start, token_end + 1)
+
+
+def batch_convert_ids_to_tokens(
+    batch: Sequence[Sequence[int]], tokenizer: Tokenizer, **kwargs: Any
+) -> Sequence[StrSequence]:
+    """Call `convert_ids_to_tokens` on every sequence in the batch."""
+    return [tokenizer.convert_ids_to_tokens(ids, **kwargs) for ids in batch]
