@@ -512,7 +512,7 @@ class Editor(nn.Module):
                         for target_key in ("mediated", "unmediated"):
                             target_id = batch[f"target_{target_key}.token_id"]
                             target_probs = first_token_scores[batch_indices, target_id]
-                            target_prob_key = f"target_{target_key}_score"
+                            target_prob_key = f"{key}_target_{target_key}_score"
                             batched_results[target_prob_key] = target_probs.tolist()
 
                 # Flatten results.
