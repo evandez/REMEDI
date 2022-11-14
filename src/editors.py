@@ -177,6 +177,7 @@ class EditedModel(nn.Module):
         ) as model:
             if generate:
                 kwargs.setdefault("max_new_tokens", DEFAULT_N_GENERATE)
+                kwargs.setdefault("pad_token_id", self.mt.tokenizer.eos_token_id)
                 outputs = model.generate(**inputs, **kwargs)
             else:
                 outputs = model(**inputs, **kwargs)
@@ -499,7 +500,6 @@ class Editor(nn.Module):
                     max_new_tokens=n_generate,
                     return_dict_in_generate=True,
                     output_scores=True,
-                    pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
                 outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
                 with apply(self, alpha=alpha, device=device) as edited_mt:
