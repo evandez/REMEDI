@@ -62,6 +62,7 @@ def main(args: argparse.Namespace) -> None:
             dataset["test"],
             batch_size=args.batch_size,
             device=device,
+            alpha=args.eval_alpha,
             n_top=args.eval_n_top,
             n_generate=args.eval_n_generate,
         )
@@ -90,16 +91,22 @@ if __name__ == "__main__":
         help="held out fraction (if not already split)",
     )
     parser.add_argument(
+        "--eval-alpha",
+        type=float,
+        default=1.0,
+        help="step size for adding direction in eval",
+    )
+    parser.add_argument(
         "--eval-n-top",
         type=int,
         default=10,
-        help="number of top words/scores to report in eval",
+        help="number of top tokens/scores to report in eval",
     )
     parser.add_argument(
         "--eval-n-generate",
         type=int,
         default=10,
-        help="number of words to generate in eval",
+        help="number of tokens to generate in eval",
     )
     parser.add_argument("--results-dir", type=Path, help="write trained probes here")
     parser.add_argument(

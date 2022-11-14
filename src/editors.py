@@ -11,7 +11,6 @@ from src.utils.typing import (
     Model,
     ModelGenerateOutput,
     ModelOutput,
-    StrSequence,
     Tokenizer,
 )
 
@@ -322,13 +321,14 @@ class EditorEvaluationResult(DataClassJsonMixin):
 
     sample: dict[str, str]
 
-    before_top_tokens: StrSequence
-    before_top_scores: Sequence[float]
-    before_generations: StrSequence
+    # Note: Need explicit types here so DataClassJsonMixin works.
+    before_top_tokens: list[str]
+    before_top_scores: list[float]
+    before_generations: list[str]
 
-    after_top_tokens: StrSequence
-    after_top_scores: Sequence[float]
-    after_generations: StrSequence
+    after_top_tokens: list[str]
+    after_top_scores: list[float]
+    after_generations: list[str]
 
     before_target_mediated_score: Optional[float] = None
     before_target_unmediated_score: Optional[float] = None
@@ -341,7 +341,7 @@ class EditorEvaluationResult(DataClassJsonMixin):
 class EditorEvaluateRun(DataClassJsonMixin):
     """Wrapper around a list of individual evaluation results."""
 
-    results: Sequence[EditorEvaluationResult]
+    results: list[EditorEvaluationResult]
 
 
 class Editor(nn.Module):
@@ -499,6 +499,7 @@ class Editor(nn.Module):
                     max_new_tokens=n_generate,
                     return_dict_in_generate=True,
                     output_scores=True,
+                    pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
                 outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
                 with apply(self, alpha=alpha, device=device) as edited_mt:
