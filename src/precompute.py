@@ -16,6 +16,23 @@ import torch
 from baukit import nethook
 
 
+def _maybe_batch(text: str | StrSequence) -> StrSequence:
+    """Batch the text if it is not already batched."""
+    if isinstance(text, str):
+        return [text]
+    return text
+
+
+def _as_fp32(data: dict) -> dict:
+    """Cast all top-level float tensor values to float32."""
+    return {
+        key: value.float()
+        if isinstance(value, torch.Tensor) and value.dtype.is_floating_point
+        else value
+        for key, value in data.items()
+    }
+
+
 def inputs_from_batch(
     mt: model_utils.ModelAndTokenizer,
     text: str | StrSequence,
@@ -72,12 +89,11 @@ def token_ranges_from_batch(
     strings: str | StrSequence,
     substrings: str | StrSequence,
     offsets_mapping: Sequence[TokenizerOffsetMapping],
+    occurrence: int = 0,
 ) -> torch.Tensor:
     """Return shape (batch_size, 2) tensor of token ranges for (str, substr) pairs."""
-    if isinstance(strings, str):
-        strings = [strings]
-    if isinstance(substrings, str):
-        substrings = [substrings]
+    strings = _maybe_batch(strings)
+    substrings = _maybe_batch(substrings)
     if len(strings) != len(substrings):
         raise ValueError(
             f"got {len(strings)} strings but only {len(substrings)} substrings"
@@ -86,7 +102,7 @@ def token_ranges_from_batch(
     return torch.tensor(
         [
             tokenizer_utils.find_token_range(
-                string, substring, offset_mapping=offset_mapping
+                string, substring, offset_mapping=offset_mapping, occurrence=occurrence
             )
             for string, substring, offset_mapping in zip(
                 strings, substrings, offsets_mapping
@@ -99,8 +115,7 @@ def first_token_ids_from_batch(
     mt: model_utils.ModelAndTokenizer | Tokenizer, words: str | StrSequence
 ) -> torch.Tensor:
     """Return shape (batch_size,) int tensor with first token ID for each word."""
-    if isinstance(words, str):
-        words = [words]
+    words = _maybe_batch(words)
     tokenizer = model_utils.unwrap_tokenizer(mt)
     # TODO(evandez): Centralize this spacing nonsense.
     token_ids = tokenizer([" " + word for word in words])
@@ -212,12 +227,7 @@ def editor_inputs_from_batch(
             precomputed[key] = average_hiddens_from_batch(hiddens, attr_ijs)
 
     if fp32:
-        precomputed = {
-            key: value.float()
-            if isinstance(value, torch.Tensor) and value.dtype.is_floating_point
-            else value
-            for key, value in precomputed.items()
-        }
+        precomputed = _as_fp32(precomputed)
 
     return precomputed
 
@@ -251,3 +261,119 @@ def editor_inputs_from_dataset(
 def has_editor_inputs(batch: dict) -> bool:
     """Determine if editor inputs already precomputed."""
     return "prompt.token_range.entity" in batch  # Check for just one flag entry.
+
+
+def entity_deltas_from_batch(
+    mt: model_utils.ModelAndTokenizer,
+    batch: dataset_utils.ContextMediationInput,
+    layers: Optional[Sequence[int]] = None,
+    device: Optional[Device] = None,
+    return_hiddens: bool = False,
+    return_token_ranges: bool = True,
+    return_deltas: bool = True,
+    fp32: bool = False,
+) -> dict:
+    """Compute in-context entity delta for the batch.
+
+    Args:
+        mt: Model and tokenizer.
+        batch: Context mediation-style batch.
+        layers: Layers to compute deltas in. Defaults to all.
+        device: Send model and inputs to this device.
+        return_hiddens: Return hidden states for contextualized prompt.
+        return_token_ranges: Return entity token ranges for contextualied prompt.
+        return_deltas: Return entity deltas for each layer.
+        fp32: Force cast each tensor to fp32.
+
+    Returns:
+        Deltas and related precomputed values.
+
+    """
+    entities = _maybe_batch(batch["entity"])
+    prompts = _maybe_batch(batch["prompt"])
+    contexts = _maybe_batch(batch["context"])
+
+    precomputed: dict = {}
+
+    precomputed["prompt_in_context"] = prompts_in_context = [
+        f"{context.rstrip('.')}. {prompt}" for context, prompt in zip(prompts, contexts)
+    ]
+
+    inputs = None
+    first_entity_token_ranges = None
+    last_entity_token_ranges = None
+    if return_hiddens or return_token_ranges or return_deltas:
+        inputs, offset_mapping = inputs_from_batch(
+            mt, prompts_in_context, device=device
+        )
+        first_entity_token_ranges = token_ranges_from_batch(
+            inputs, entities, offset_mapping
+        )
+        last_entity_token_ranges = token_ranges_from_batch(
+            inputs, entities, offset_mapping, occurrence=1
+        )
+        if return_token_ranges:
+            for position, token_ranges in (
+                ("first", first_entity_token_ranges),
+                ("last", last_entity_token_ranges),
+            ):
+                key = f"prompt_in_context.entity.{position}.token_range"
+                precomputed[key] = token_ranges
+
+    hiddens_by_layer = None
+    if return_hiddens or return_deltas:
+        assert inputs is not None
+        hiddens_by_layer = hiddens_from_batch(mt, inputs, layers=layers, device=device)
+        if return_hiddens:
+            for layer, hiddens in hiddens_by_layer.items():
+                key = f"prompt_in_context.hiddens.{layer}"
+                precomputed[key] = hiddens
+
+    if return_deltas:
+        assert hiddens_by_layer is not None
+        assert first_entity_token_ranges is not None
+        assert last_entity_token_ranges is not None
+        for layer, hiddens in hiddens_by_layer.items():
+            first_entity_hiddens = average_hiddens_from_batch(
+                hiddens, first_entity_token_ranges
+            )
+            last_entity_hiddens = average_hiddens_from_batch(
+                hiddens, last_entity_token_ranges
+            )
+            delta = last_entity_hiddens - first_entity_hiddens
+
+            key = f"prompt_in_context.delta.{layer}"
+            precomputed[key] = delta
+
+    if fp32:
+        precomputed = _as_fp32(precomputed)
+
+    return precomputed
+
+
+def entity_deltas_from_dataset(
+    mt: model_utils.ModelAndTokenizer,
+    dataset: Dataset,
+    layers: Optional[Sequence[int]] = None,
+    device: Optional[Device] = None,
+    batch_size: int = 64,
+    **kwargs: Any,
+) -> Dataset:
+    return dataset.map(
+        partial(
+            entity_deltas_from_batch,
+            mt,
+            layers=layers,
+            device=device,
+            fp32=True,
+            **kwargs,
+        ),
+        batched=True,
+        batch_size=batch_size,
+        desc="precompute entity deltas",
+    )
+
+
+def has_entity_deltas(batch: dict) -> bool:
+    """Return True if the batch already has precomputed entity deltas."""
+    return "prompt_in_context" in batch

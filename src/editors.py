@@ -18,7 +18,7 @@ from src.utils.typing import (
 import torch
 import torch.utils.data
 import transformers.modeling_outputs
-from baukit import nethook
+from baukit import nethook, runningstats
 from dataclasses_json import DataClassJsonMixin
 from torch import nn, optim
 from tqdm.auto import tqdm
@@ -548,6 +548,73 @@ class Editor(nn.Module):
                     results.append(result)
 
             return EditorEvaluateRun(results)
+
+
+class RandomEditor(Editor):
+    """An editor that just picks a random edit direction."""
+
+    def __init__(
+        self,
+        *,
+        mt: model_utils.ModelAndTokenizer,
+        layer: int,
+        mean: torch.Tensor | None = None,
+        covariance: torch.Tensor | None = None,
+    ) -> None:
+        """Initialize the editor."""
+        super().__init__(mt=mt, layer=layer)
+
+        hidden_size = model_utils.determine_hidden_size(mt)
+        device = model_utils.determine_device(mt)
+
+        if mean is None:
+            mean = torch.zeros(hidden_size)
+        if covariance is None:
+            covariance = torch.ones(hidden_size)
+
+        self.mean: torch.Tensor
+        self.register_buffer("mean", mean.to(device))
+
+        self.covariance: torch.Tensor
+        self.register_buffer("covariance", covariance.to(device))
+
+    def forward(self, attribute: torch.Tensor) -> torch.Tensor:
+        """Select a random direction."""
+        distribution = torch.distributions.MultivariateNormal(
+            self.mean, self.covariance
+        )
+        return distribution.sample((len(attribute),))
+
+    def fit(
+        self,
+        *,
+        dataset: Dataset,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        hold_out: float = DEFAULT_HOLD_OUT,
+        device: Optional[Device] = None,
+        **_: Any,
+    ) -> EditorTrainingRun:
+        """Estimate mean and variance of entity representations."""
+        dataset = dataset_utils.maybe_train_test_split(dataset, test_size=hold_out)
+
+        self.mt.model.to(device)
+        self.to(device)
+
+        rc = runningstats.Covariance()
+        with dataset.formatted_as("torch"):
+            loader = torch.utils.data.DataLoader(
+                cast(torch.utils.data.Dataset, dataset["train"]), batch_size=batch_size
+            )
+            for batch in tqdm(loader, desc="estimate mean/cov"):
+                if not precompute.has_entity_deltas(batch):
+                    batch = precompute.entity_deltas_from_batch(
+                        self.mt, batch, layers=[self.layer], device=device
+                    )
+                rc.add(batch[f"prompt_in_context.delta.{self.layer}"])
+
+        self.mean[:] = rc.mean()
+        self.covariance[:] = rc.covariance()
+        return EditorTrainingRun(dataset)
 
 
 class LinearEditor(Editor):
