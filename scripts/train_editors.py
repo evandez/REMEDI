@@ -21,7 +21,7 @@ def main(args: argparse.Namespace) -> None:
         shutil.rmtree(results_dir)
     results_dir.mkdir(exist_ok=True, parents=True)
 
-    mt = model_utils.load_model(args.mt, device=device, fp16=not args.no_fp16)
+    mt = model_utils.load_model(args.model, device=device, fp16=not args.no_fp16)
     dataset = dataset_utils.load_dataset(args.dataset)
 
     layers = args.layers
