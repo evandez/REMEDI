@@ -154,13 +154,17 @@ class EditedModel(nn.Module):
                 return_target_token_ids=False,
             )
         entity_ij = precomputed["prompt.token_range.entity"]
+        hiddens_entity = precomputed[f"entity.hiddens.{layer}.average"]
         hiddens_attr = precomputed[f"context.hiddens.{layer}.attribute"]
 
         # Make type checker happy.
         entity_ij = cast(torch.Tensor, entity_ij)
+        hiddens_entity = cast(torch.Tensor, hiddens_entity)
         hiddens_attr = cast(torch.Tensor, hiddens_attr)
 
-        directions = self.editor(hiddens_attr.to(self.device))
+        directions = self.editor(
+            entity=hiddens_entity.to(self.device), attribute=hiddens_attr.to(self.device)
+        )
 
         if inputs is None:
             prompt = batch["prompt"]
@@ -355,7 +359,9 @@ class Editor(nn.Module):
         self.layer = layer
         self.to(device=model_utils.determine_device(mt), dtype=torch.float16)
 
-    def __call__(self, attribute: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, *, entity: torch.Tensor, attribute: torch.Tensor
+    ) -> torch.Tensor:
         """Map the attribute hidden representation to an entity edit direction."""
         raise NotImplementedError
 
@@ -579,7 +585,7 @@ class RandomEditor(Editor):
         self.covariance: torch.Tensor
         self.register_buffer("covariance", covariance.to(device))
 
-    def forward(self, attribute: torch.Tensor) -> torch.Tensor:
+    def forward(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
         """Select a random direction."""
         distribution = torch.distributions.MultivariateNormal(
             self.mean, self.covariance
@@ -647,13 +653,27 @@ class LinearEditor(Editor):
                 nn.Linear(rank, hidden_size),
             )
 
-    def __call__(self, attribute: torch.Tensor) -> torch.Tensor:
+    def __call__(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
         """Compute the edit direction."""
         return self.linear(attribute)
 
 
+class BiaffineEditor(Editor):
+    """Biaffine model that takes entity-to-edit rep and attribute rep as input."""
+
+    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int):
+        """Initialize the editor."""
+        super().__init__(mt=mt, layer=layer)
+        hidden_size = model_utils.determine_hidden_size(mt)
+        self.w_entity = nn.Linear(hidden_size, hidden_size)
+        self.w_attribute = nn.Linear(hidden_size, hidden_size)
+
+    def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
+        """Compute the edit direction."""
+        return self.w_entity(entity) + self.w_attribute(attribute)
+
+
 # TODO(evandez): Small fixes needed for this file:
-# - Why does editor become fp32 after training?
 # - Need a way to have evaluation results point back to original dataset.
 # - This currently tokenizes the prompt twice, can we avoid?
 # - Show running average loss in progress bar, not batch loss.
