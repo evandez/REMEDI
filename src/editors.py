@@ -300,7 +300,7 @@ def editing_loss(
     loss = torch.tensor(0.0, device=device)
     for bi, mti in enumerate(mediated_token_ids.tolist()):
         loss -= logps_edit[bi, -1, mti]
-        if lam_adv:
+        if lam_adv is not None:
             umti = unmediated_token_ids[bi].item()
             p_unmediated = torch.exp(logps_edit[bi, -1, umti])
             loss -= lam_adv * torch.log(1 - p_unmediated)
