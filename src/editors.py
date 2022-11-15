@@ -696,3 +696,7 @@ class MlpEditor(Editor):
 # - This currently tokenizes the prompt twice, can we avoid?
 # - Show running average loss in progress bar, not batch loss.
 # - Precompute does everything on GPU, even averaging.
+# - Linear model can take either/or entity/attribute
+# - Ditty for MLP model
+# - Consistency in counterfact splits (set seed)
+# - Add unmediated token loss term

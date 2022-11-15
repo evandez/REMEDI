@@ -6,6 +6,7 @@ jupyter_http_over_ws
 qwikidata
 requests
 names-dataset
+retry
 spacy
 tqdm
 transformers
