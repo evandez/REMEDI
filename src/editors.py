@@ -364,9 +364,12 @@ class Editor(nn.Module):
         super().__init__()
         self.mt = mt
         self.layer = layer
+
+    def __post_init__(self) -> None:
+        """Send this model to the right device/data type."""
         self.to(
-            device=model_utils.determine_device(mt),
-            dtype=model_utils.determine_dtype(mt),
+            device=model_utils.determine_device(self.mt),
+            dtype=model_utils.determine_dtype(self.mt),
         )
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
