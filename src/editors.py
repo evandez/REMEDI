@@ -305,7 +305,7 @@ def editing_loss(
     loss /= batch_size
 
     # If specified, include a KL loss term with the original token distribution.
-    if kl is not None:
+    if kl is not None and lam != 0.0:
         assert logps_orig is not None
         logps_edit = logps_edit[torch.arange(batch_size), -1]
         logps_orig = logps_orig[torch.arange(batch_size), -1]
