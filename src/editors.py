@@ -157,15 +157,13 @@ class EditedModel(nn.Module):
         hiddens_entity = precomputed[f"entity.hiddens.{layer}.average"]
         hiddens_attr = precomputed[f"context.hiddens.{layer}.attribute"]
 
-        # Make type checker happy.
+        # Make type checker happy and reformat.
+        dtype = self.mt.model.config.torch_dtype
+        hiddens_entity = cast(torch.Tensor, hiddens_entity).to(self.device, dtype)
+        hiddens_attr = cast(torch.Tensor, hiddens_attr).to(self.device, dtype)
         entity_ij = cast(torch.Tensor, entity_ij)
-        hiddens_entity = cast(torch.Tensor, hiddens_entity)
-        hiddens_attr = cast(torch.Tensor, hiddens_attr)
 
-        directions = self.editor(
-            entity=hiddens_entity.to(self.device),
-            attribute=hiddens_attr.to(self.device),
-        )
+        directions = self.editor(entity=hiddens_entity, attribute=hiddens_attr)
 
         if inputs is None:
             prompt = batch["prompt"]
