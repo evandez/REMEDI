@@ -72,7 +72,7 @@ def hiddens_from_batch(
     """
     mt.to_(device)
     if isinstance(inputs, str | list | tuple):
-        inputs, _ = inputs_from_batch(mt, inputs)
+        inputs, _ = inputs_from_batch(mt, inputs, device=device)
     if device is not None:
         inputs = inputs.to(device)
     layer_paths = model_utils.determine_layer_paths(mt, layers=layers, return_dict=True)
