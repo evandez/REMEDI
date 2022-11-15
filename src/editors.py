@@ -163,7 +163,8 @@ class EditedModel(nn.Module):
         hiddens_attr = cast(torch.Tensor, hiddens_attr)
 
         directions = self.editor(
-            entity=hiddens_entity.to(self.device), attribute=hiddens_attr.to(self.device)
+            entity=hiddens_entity.to(self.device),
+            attribute=hiddens_attr.to(self.device),
         )
 
         if inputs is None:

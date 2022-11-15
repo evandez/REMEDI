@@ -200,7 +200,9 @@ def editor_inputs_from_batch(
     entity_hiddens_by_layer = None
     if return_entity_hiddens or return_average_entity_hiddens:
         entity_inputs, _ = inputs_from_batch(mt, entities, device=device)
-        entity_hiddens_by_layer = hiddens_from_batch(mt, entity_inputs, device=device)
+        entity_hiddens_by_layer = hiddens_from_batch(
+            mt, entity_inputs, layers=layers, device=device
+        )
         for layer, hiddens in entity_hiddens_by_layer.items():
             precomputed[f"entity.hiddens.{layer}"] = hiddens
 
