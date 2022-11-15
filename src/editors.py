@@ -360,9 +360,7 @@ class Editor(nn.Module):
         self.layer = layer
         self.to(device=model_utils.determine_device(mt), dtype=torch.float16)
 
-    def __call__(
-        self, *, entity: torch.Tensor, attribute: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         """Map the attribute hidden representation to an entity edit direction."""
         raise NotImplementedError
 
@@ -678,3 +676,4 @@ class BiaffineEditor(Editor):
 # - Need a way to have evaluation results point back to original dataset.
 # - This currently tokenizes the prompt twice, can we avoid?
 # - Show running average loss in progress bar, not batch loss.
+# - Precompute does everything on GPU, even averaging.

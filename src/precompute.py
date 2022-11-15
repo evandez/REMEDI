@@ -386,6 +386,7 @@ def entity_deltas_from_dataset(
     batch_size: int = 64,
     **kwargs: Any,
 ) -> Dataset:
+    """Precompute entity deltas in context for the whole dataset."""
     return dataset.map(
         partial(
             entity_deltas_from_batch,
