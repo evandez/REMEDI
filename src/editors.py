@@ -414,7 +414,14 @@ class Editor(nn.Module):
         for parameter in self.mt.model.parameters():
             parameter.requires_grad_(True)
 
-        optimizer = optim.AdamW(self.parameters(), lr=lr)
+        # NOTE(evandez): If we're using half precision, we have to increase the eps
+        # used by Adam or we'll immediately get NaNs everywhere. It's because the
+        # default eps gets rounded to 0 in half precision.
+        optimizer_kwargs: dict = dict(lr=lr)
+        if model_utils.determine_dtype(self.mt) is torch.float16:
+            optimizer_kwargs["eps"] = 1e-4
+
+        optimizer = optim.AdamW(self.parameters(), **optimizer_kwargs)
         stopper = training_utils.EarlyStopping(patience=patience)
 
         with dataset.formatted_as("torch"):
