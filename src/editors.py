@@ -23,7 +23,8 @@ from torch import nn, optim
 from tqdm.auto import tqdm
 
 DEFAULT_ALPHA = 1.0
-DEFAULT_LAM = 0.25
+DEFAULT_LAM_ADV = 1.0
+DEFAULT_LAM_KL = 0.25
 DEFAULT_N_TOP = 10
 DEFAULT_N_GENERATE = 10
 DEFAULT_BATCH_SIZE = 128
@@ -268,8 +269,8 @@ def editing_loss(
     *,
     editor: "Editor",
     batch: dict,
-    lam: float = DEFAULT_LAM,
-    kl: Optional[nn.KLDivLoss] = None,
+    lam_adv: float | None = DEFAULT_LAM_ADV,
+    lam_kl: float | None = DEFAULT_LAM_KL,
     device: Optional[Device] = None,
 ) -> torch.Tensor:
     """Apply the edit to the representat
@@ -278,6 +279,7 @@ def editing_loss(
     """
     prompt = batch["prompt"]
     mediated_token_ids = batch["target_mediated.token_id"]
+    unmediated_token_ids = batch["target_unmediated.token_id"]
 
     inputs = editor.mt.tokenizer(
         prompt, return_tensors="pt", padding="longest", truncation=True
@@ -285,7 +287,7 @@ def editing_loss(
 
     # If necessary, determine original next token distribution.
     logps_orig = None
-    if kl is not None and lam != 0.0:
+    if lam_kl is not None:
         with torch.inference_mode():
             outputs_orig = editor.mt.model(**inputs)
             logps_orig = torch.log_softmax(outputs_orig.logits, dim=-1)
@@ -297,17 +299,23 @@ def editing_loss(
     # Compute simple loss: the probability of the target token post-edit.
     loss = torch.tensor(0.0, device=device)
     for bi, mti in enumerate(mediated_token_ids.tolist()):
-        logp_mediated = logps_edit[bi, -1, mti]
-        loss += -logp_mediated
+        loss -= logps_edit[bi, -1, mti]
+        if lam_adv:
+            umti = unmediated_token_ids[bi].item()
+            p_unmediated = torch.exp(logps_edit[bi, -1, umti])
+            loss -= lam_adv * torch.log(1 - p_unmediated)
+
     batch_size = mediated_token_ids.shape[0]
     loss /= batch_size
 
     # If specified, include a KL loss term with the original token distribution.
-    if kl is not None and lam != 0.0:
+    if lam_kl is not None:
         assert logps_orig is not None
         logps_edit = logps_edit[torch.arange(batch_size), -1]
         logps_orig = logps_orig[torch.arange(batch_size), -1]
-        loss += lam * kl(logps_edit, logps_orig)
+        loss += lam_kl * nn.functional.kl_div(
+            logps_edit, logps_orig, reduction="batchmean", log_target=True
+        )
 
     return loss
 
@@ -370,7 +378,8 @@ class Editor(nn.Module):
         batch_size: int = DEFAULT_BATCH_SIZE,
         hold_out: float = DEFAULT_HOLD_OUT,
         lr: float = DEFAULT_LR,
-        lam: float = DEFAULT_LAM,
+        lam_adv: float = DEFAULT_LAM_ADV,
+        lam_kl: float = DEFAULT_LAM_KL,
         patience: int = DEFAULT_PATIENCE,
         device: Optional[Device] = None,
     ) -> EditorTrainingRun:
@@ -407,9 +416,6 @@ class Editor(nn.Module):
             train_loader = torch.utils.data.DataLoader(train, batch_size=batch_size)
             val_loader = torch.utils.data.DataLoader(val, batch_size=batch_size)
 
-            # TODO(evandez): More flexible loss function.
-            kl = nn.KLDivLoss(reduction="batchmean", log_target=True).to(device)
-
             best = self.state_dict()
             for epoch in range(max_epochs + 1):
                 desc = f"epoch {epoch}/{max_epochs}"
@@ -420,7 +426,11 @@ class Editor(nn.Module):
                 for batch in train_progress_bar:
                     optimizer.zero_grad()
                     loss = editing_loss(
-                        editor=self, batch=batch, kl=kl, lam=lam, device=device
+                        editor=self,
+                        batch=batch,
+                        lam_adv=lam_adv,
+                        lam_kl=lam_kl,
+                        device=device,
                     )
                     if epoch > 0:
                         loss.backward()
@@ -439,8 +449,8 @@ class Editor(nn.Module):
                         loss = editing_loss(
                             editor=self,
                             batch=batch,
-                            kl=kl,
-                            lam=lam,
+                            lam_adv=lam_adv,
+                            lam_kl=lam_kl,
                             device=device,
                         )
                     val_loss += loss.item()
@@ -695,6 +705,5 @@ class MlpEditor(Editor):
 # - Show running average loss in progress bar, not batch loss.
 # - Precompute does everything on GPU, even averaging.
 # - Linear model can take either/or entity/attribute
-# - Ditty for MLP model
+# - Ditto for MLP model
 # - Consistency in counterfact splits (set seed)
-# - Add unmediated token loss term
