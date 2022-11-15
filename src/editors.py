@@ -686,6 +686,25 @@ class BilinearEditor(Editor):
         return self.bilinear(entity, attribute)
 
 
+class MlpEditor(Editor):
+    """Two-layer MLP editor on entity rep and attribute rep."""
+
+    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int):
+        """Initialize the editor."""
+        super().__init__(mt=mt, layer=layer)
+        hidden_size = model_utils.determine_hidden_size(mt)
+        self.mlp = nn.Sequential(
+            nn.Linear(2 * hidden_size, hidden_size),
+            nn.LeakyReLU(),
+            nn.Linear(hidden_size, hidden_size),
+        )
+
+    def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
+        """Compute the edit direction."""
+        inputs = torch.cat([entity, attribute], dim=-1)
+        return self.mlp(inputs)
+
+
 # TODO(evandez): Small fixes needed for this file:
 # - Need a way to have evaluation results point back to original dataset.
 # - This currently tokenizes the prompt twice, can we avoid?
