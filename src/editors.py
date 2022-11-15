@@ -287,7 +287,7 @@ def editing_loss(
 
     # If necessary, determine original next token distribution.
     logps_orig = None
-    if kl is not None:
+    if kl is not None and lam != 0.0:
         with torch.inference_mode():
             outputs_orig = editor.mt.model(**inputs)
             logps_orig = torch.log_softmax(outputs_orig.logits, dim=-1)
