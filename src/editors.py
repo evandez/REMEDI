@@ -656,30 +656,51 @@ class LinearEditor(Editor):
         mt: model_utils.ModelAndTokenizer,
         layer: int,
         rank: Optional[int] = None,
+        use_entity: bool = True,
+        use_attribute: bool = True,
     ):
         """Initialize the editor.
 
         Args:
             rank: Rank constraint on the linear transformation. Defaults to None.
+            use_entity: Use entity rep as input.
+            use_attribute: Use attribute rep as input.
 
         """
+        if not use_entity and not use_attribute:
+            raise ValueError("must set >= 1 of `use_entity` or `use_attribute`")
+
         super().__init__(mt=mt, layer=layer)
 
-        hidden_size = model_utils.determine_hidden_size(mt)
+        self.rank = rank
+        self.use_entity = use_entity
+        self.use_attribute = use_attribute
 
-        self.linear: nn.Linear | nn.Sequential
+        hidden_size = model_utils.determine_hidden_size(mt)
+        input_size = hidden_size * sum([use_entity, use_attribute])
+
+        self.w: nn.Linear | nn.Sequential
         if rank is None:
-            self.linear = nn.Linear(hidden_size, hidden_size)
+            self.w = nn.Linear(input_size, hidden_size)
         else:
-            self.linear = nn.Sequential(
-                nn.Linear(hidden_size, rank),
+            self.w = nn.Sequential(
+                nn.Linear(input_size, rank),
                 nn.Linear(rank, hidden_size),
             )
         self.to_(mt)
 
-    def __call__(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
+    def __call__(
+        self, *, attribute: torch.Tensor, entity: torch.Tensor
+    ) -> torch.Tensor:
         """Compute the edit direction."""
-        return self.linear(attribute)
+        inputs = []
+        if self.use_entity:
+            inputs.append(entity)
+        if self.use_attribute:
+            inputs.append(attribute)
+        assert len(inputs) > 0
+
+        return self.w(torch.cat(inputs, dim=-1))
 
 
 class BiaffineEditor(Editor):
@@ -701,12 +722,28 @@ class BiaffineEditor(Editor):
 class MlpEditor(Editor):
     """Two-layer MLP editor on entity rep and attribute rep."""
 
-    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int):
+    def __init__(
+        self,
+        *,
+        mt: model_utils.ModelAndTokenizer,
+        layer: int,
+        use_entity: bool = True,
+        use_attribute: bool = True,
+    ):
         """Initialize the editor."""
+        if not use_entity and not use_attribute:
+            raise ValueError("must set >= 1 of `use_entity` or `use_attribute`")
+
         super().__init__(mt=mt, layer=layer)
+
+        self.use_entity = use_entity
+        self.use_attribute = use_attribute
+
         hidden_size = model_utils.determine_hidden_size(mt)
+        input_size = hidden_size * sum([use_entity, use_attribute])
+
         self.mlp = nn.Sequential(
-            nn.Linear(2 * hidden_size, hidden_size),
+            nn.Linear(input_size, hidden_size),
             nn.LeakyReLU(),
             nn.Linear(hidden_size, hidden_size),
         )
@@ -714,8 +751,12 @@ class MlpEditor(Editor):
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         """Compute the edit direction."""
-        inputs = torch.cat([entity, attribute], dim=-1)
-        return self.mlp(inputs)
+        inputs = []
+        if self.use_entity:
+            inputs.append(entity)
+        if self.use_attribute:
+            inputs.append(attribute)
+        return self.mlp(torch.cat(inputs, dim=-1))
 
 
 # TODO(evandez): Small fixes needed for this file:
@@ -723,6 +764,4 @@ class MlpEditor(Editor):
 # - This currently tokenizes the prompt twice, can we avoid?
 # - Show running average loss in progress bar, not batch loss.
 # - Precompute does everything on GPU, even averaging.
-# - Linear model can take either/or entity/attribute
-# - Ditto for MLP model
 # - Consistency in counterfact splits (set seed)
