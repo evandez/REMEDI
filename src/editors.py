@@ -365,11 +365,12 @@ class Editor(nn.Module):
         self.mt = mt
         self.layer = layer
 
-    def __post_init__(self) -> None:
-        """Send this model to the right device/data type."""
+    def to_(self, mt: model_utils.ModelAndTokenizer | None = None) -> None:
+        """Make this editor's device/dtype match the underlying models."""
+        mt = self.mt if mt is None else mt
         self.to(
-            device=model_utils.determine_device(self.mt),
-            dtype=model_utils.determine_dtype(self.mt),
+            device=model_utils.determine_device(mt),
+            dtype=model_utils.determine_dtype(mt),
         )
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
@@ -598,6 +599,8 @@ class RandomEditor(Editor):
         self.covariance: torch.Tensor
         self.register_buffer("covariance", covariance.to(device))
 
+        self.to_(mt)
+
     def forward(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
         """Select a random direction."""
         distribution = torch.distributions.MultivariateNormal(
@@ -665,6 +668,7 @@ class LinearEditor(Editor):
                 nn.Linear(hidden_size, rank),
                 nn.Linear(rank, hidden_size),
             )
+        self.to_(mt)
 
     def __call__(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
         """Compute the edit direction."""
@@ -680,6 +684,7 @@ class BiaffineEditor(Editor):
         hidden_size = model_utils.determine_hidden_size(mt)
         self.w_entity = nn.Linear(hidden_size, hidden_size)
         self.w_attribute = nn.Linear(hidden_size, hidden_size)
+        self.to_(mt)
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         """Compute the edit direction."""
@@ -698,6 +703,7 @@ class MlpEditor(Editor):
             nn.LeakyReLU(),
             nn.Linear(hidden_size, hidden_size),
         )
+        self.to_(mt)
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         """Compute the edit direction."""

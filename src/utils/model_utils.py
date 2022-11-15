@@ -139,22 +139,22 @@ def determine_hidden_size(model: ModelAndTokenizer | Model) -> int:
     return model.config.hidden_size
 
 
-def _any_parameter(model: ModelAndTokenizer | Model) -> torch.nn.Parameter | None:
-    """Get any example parameter for the model."""
-    model = unwrap_model(model)
-    return next(iter(model.parameters()), None)
-
-
 def determine_device(model: ModelAndTokenizer | Model) -> torch.device | None:
     """Determine device model is running on."""
-    parameter = _any_parameter(model)
+    parameter = any_parameter(model)
     return parameter.device if parameter is not None else None
 
 
 def determine_dtype(model: ModelAndTokenizer | Model) -> torch.dtype | None:
     """Determine dtype of model."""
-    parameter = _any_parameter(model)
+    parameter = any_parameter(model)
     return parameter.dtype if parameter is not None else None
+
+
+def any_parameter(model: ModelAndTokenizer | Model) -> torch.nn.Parameter | None:
+    """Get any example parameter for the model."""
+    model = unwrap_model(model)
+    return next(iter(model.parameters()), None)
 
 
 def map_to(
