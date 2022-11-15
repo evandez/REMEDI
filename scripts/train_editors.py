@@ -4,13 +4,14 @@ import shutil
 from pathlib import Path
 
 from src import editors, precompute
-from src.utils import dataset_utils, env, model_utils
+from src.utils import dataset_utils, env, model_utils, random_utils
 
 import torch
 
 
 def main(args: argparse.Namespace) -> None:
     """Train the editors."""
+    random_utils.set_seed(args.seed)
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
 
     results_dir = args.results_dir
@@ -115,6 +116,7 @@ if __name__ == "__main__":
         help="clear old results and start anew",
     )
     parser.add_argument("--device", help="device to train on")
+    parser.add_argument("--seed", type=int, default=123456, help="random seed")
     parser.add_argument("--no-fp16", action="store_true", help="do not use fp16")
     args = parser.parse_args()
     main(args)
