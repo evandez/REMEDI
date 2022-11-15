@@ -658,7 +658,7 @@ class LinearEditor(Editor):
 
 
 class BiaffineEditor(Editor):
-    """Biaffine model that takes entity-to-edit rep and attribute rep as input."""
+    """Biaffine model that takes entity to edit rep and attribute rep as input."""
 
     def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int):
         """Initialize the editor."""
@@ -670,6 +670,20 @@ class BiaffineEditor(Editor):
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         """Compute the edit direction."""
         return self.w_entity(entity) + self.w_attribute(attribute)
+
+
+class BilinearEditor(Editor):
+    """Bilinear model on entity to edit rep and attribute rep."""
+
+    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int):
+        """Initialize the editor."""
+        super().__init__(mt=mt, layer=layer)
+        hidden_size = model_utils.determine_hidden_size(mt)
+        self.bilinear = nn.Bilinear(hidden_size, hidden_size, hidden_size)
+
+    def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
+        """Compute the edit direction."""
+        return self.bilinear(entity, attribute)
 
 
 # TODO(evandez): Small fixes needed for this file:
