@@ -241,7 +241,7 @@ def editor_inputs_from_batch(
         assert entity_inputs is not None
         for layer, hiddens in entity_hiddens_by_layer.items():
             counts = entity_inputs.attention_mask.sum(dim=-1, keepdim=True)
-            average = hiddens.sum(dim=1) / counts
+            average = hiddens.sum(dim=1) / counts.cpu()
             key = f"entity.hiddens.{layer}.average"
             precomputed[key] = average
 
