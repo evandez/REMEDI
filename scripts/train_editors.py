@@ -68,6 +68,8 @@ def main(args: argparse.Namespace) -> None:
                 editor.fit(
                     dataset=precomputed,
                     batch_size=args.batch_size,
+                    lam_adv=None,
+                    lam_kl=None,
                     lr=args.lr,
                     device=device,
                 )

@@ -385,8 +385,8 @@ class Editor(nn.Module):
         batch_size: int = DEFAULT_BATCH_SIZE,
         hold_out: float = DEFAULT_HOLD_OUT,
         lr: float = DEFAULT_LR,
-        lam_adv: float = DEFAULT_LAM_ADV,
-        lam_kl: float = DEFAULT_LAM_KL,
+        lam_adv: float | None = DEFAULT_LAM_ADV,
+        lam_kl: float | None = DEFAULT_LAM_KL,
         patience: int = DEFAULT_PATIENCE,
         device: Optional[Device] = None,
     ) -> EditorTrainingRun:
