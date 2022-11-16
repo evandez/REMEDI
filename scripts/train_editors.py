@@ -85,6 +85,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train one editor per layer")
     parser.add_argument(
         "--editor-types",
+        nargs="+",
         choices=("linear", "mlp", "biaffine"),
         default=("linear",),
         help="editor type to train",
