@@ -46,7 +46,7 @@ def main(args: argparse.Namespace) -> None:
         for layer in layers:
             print(f"---- editor={editor_type}, layer={layer} ----")
 
-            editor_results_dir = results_dir / editor_type / f"layer_{layer}"
+            editor_results_dir = results_dir / editor_type / str(layer)
             editor_results_dir.mkdir(exist_ok=True, parents=True)
 
             editor: editors.Editor
