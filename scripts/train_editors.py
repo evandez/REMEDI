@@ -35,14 +35,6 @@ def main(args: argparse.Namespace) -> None:
         layers = model_utils.determine_layers(mt)
 
     dataset = dataset_utils.maybe_train_test_split(dataset, test_size=args.hold_out)
-    dataset = precompute.editor_inputs_from_dataset(
-        mt=mt,
-        dataset=dataset,
-        layers=layers,
-        device=device,
-        batch_size=args.batch_size,
-    )
-
     for editor_type in args.editor_types:
         for layer in layers:
             print(f"---- editor={editor_type}, layer={layer} ----")
@@ -59,6 +51,14 @@ def main(args: argparse.Namespace) -> None:
                 assert editor_type == "biaffine", args.editor_type
                 editor = editors.BiaffineEditor(mt=mt, layer=layer)
 
+            precomputed = precompute.editor_inputs_from_dataset(
+                mt=mt,
+                dataset=dataset,
+                layers=[layer],
+                device=device,
+                batch_size=args.batch_size,
+            )
+
             editor_file = editor_results_dir / f"weights.pth"
             if editor_file.exists():
                 print(f"found existing editor at {editor_file}")
@@ -66,7 +66,7 @@ def main(args: argparse.Namespace) -> None:
                 editor.load_state_dict(state_dict)
             else:
                 editor.fit(
-                    dataset=dataset,
+                    dataset=precomputed,
                     batch_size=args.batch_size,
                     lr=args.lr,
                     device=device,
@@ -74,22 +74,23 @@ def main(args: argparse.Namespace) -> None:
                 print(f"saving editor to {editor_file}")
                 torch.save(editor.state_dict(), editor_file)
 
-            eval_file = editor_results_dir / f"eval.json"
-            if eval_file.exists() and not args.rerun_eval:
-                print(f"found existing eval results at {eval_file}")
-                continue
+            for split in ("train", "test"):
+                eval_file = editor_results_dir / f"{split}-eval.json"
+                if eval_file.exists() and not args.rerun_eval:
+                    print(f"found existing {split} eval results at {eval_file}")
+                    continue
 
-            eval_run = editor.evaluate(
-                dataset["test"],  # type: ignore
-                batch_size=args.batch_size,
-                device=device,
-                alpha=args.eval_alpha,
-                n_top=args.eval_n_top,
-                n_generate=args.eval_n_generate,
-            )
-            print(f"saving eval to {eval_file}")
-            with eval_file.open("w") as handle:
-                handle.write(eval_run.to_json())
+                results = editor.evaluate(
+                    precomputed[split],  # type: ignore
+                    batch_size=args.batch_size,
+                    device=device,
+                    alpha=args.eval_alpha,
+                    n_top=args.eval_n_top,
+                    n_generate=args.eval_n_generate,
+                )
+                print(f"saving {split} eval to {eval_file}")
+                with eval_file.open("w") as handle:
+                    handle.write(results.to_json())
 
 
 if __name__ == "__main__":
