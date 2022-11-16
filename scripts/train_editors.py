@@ -98,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", default="counterfact", help="dataset to train on")
     parser.add_argument("--layers", type=int, nargs="+", help="layers to train for")
     parser.add_argument(
-        "--batch-size", type=int, default=128, help="training batch size"
+        "--batch-size", type=int, default=64, help="training batch size"
     )
     parser.add_argument(
         "--hold-out",
