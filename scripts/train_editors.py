@@ -84,9 +84,9 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train one editor per layer")
     parser.add_argument(
-        "--editor-type",
+        "--editor-types",
         choices=("linear", "mlp", "biaffine"),
-        default="linear",
+        default=("linear",),
         help="editor type to train",
     )
     parser.add_argument("--model", default="gpt2-xl", help="model to edit")
