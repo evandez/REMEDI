@@ -16,7 +16,7 @@ def main(args: argparse.Namespace) -> None:
 
     results_dir = args.results_dir
     if results_dir is None:
-        results_dir = env.results_dir() / "editors" / args.editor_type
+        results_dir = env.results_dir() / "editors"
     if args.clear_results_dir and results_dir.exists():
         print(f"clearing results dir {results_dir}")
         shutil.rmtree(results_dir)
@@ -38,44 +38,54 @@ def main(args: argparse.Namespace) -> None:
     )
     dataset = dataset_utils.maybe_train_test_split(dataset, test_size=args.hold_out)
 
-    for layer in layers:
-        assert args.editor_type == "linear", args.editor_type
+    for editor_type in args.editor_types:
+        for layer in layers:
+            print(f"---- editor={editor_type}, layer={layer} ----")
 
-        print(f"---- Layer {layer} ----")
-        editor = editors.LinearEditor(mt=mt, layer=layer)
+            editor_results_dir = results_dir / editor_type / f"layer_{layer}"
+            editor_results_dir.mdkir(exist_ok=True, parents=True)
 
-        editor_file = results_dir / f"editor-l{layer}.pth"
-        if editor_file.exists():
-            print(f"found existing editor at {editor_file}")
-            state_dict = torch.load(editor_file, map_location=device)
-            editor.load_state_dict(state_dict)
-        else:
-            editor.fit(dataset=dataset, batch_size=args.batch_size, device=device)
-            print(f"saving editor to {editor_file}")
-            torch.save(editor.state_dict(), editor_file)
+            editor: editors.Editor
+            if editor_type == "linear":
+                editor = editors.LinearEditor(mt=mt, layer=layer)
+            elif editor_type == "mlp":
+                editor = editors.MlpEditor(mt=mt, layer=layer)
+            else:
+                assert editor_type == "biaffine", args.editor_type
+                editor = editors.BiaffineEditor(mt=mt, layer=layer)
 
-        eval_file = results_dir / f"editor-l{layer}-eval.json"
-        if eval_file.exists():
-            print(f"found existing eval results at {eval_file}")
-            continue
+            editor_file = editor_results_dir / f"weights.pth"
+            if editor_file.exists():
+                print(f"found existing editor at {editor_file}")
+                state_dict = torch.load(editor_file, map_location=device)
+                editor.load_state_dict(state_dict)
+            else:
+                editor.fit(dataset=dataset, batch_size=args.batch_size, device=device)
+                print(f"saving editor to {editor_file}")
+                torch.save(editor.state_dict(), editor_file)
 
-        eval_run = editor.evaluate(
-            dataset["test"],
-            batch_size=args.batch_size,
-            device=device,
-            alpha=args.eval_alpha,
-            n_top=args.eval_n_top,
-            n_generate=args.eval_n_generate,
-        )
-        with eval_file.open("w") as handle:
-            handle.write(eval_run.to_json())
+            eval_file = editor_results_dir / f"eval.json"
+            if eval_file.exists() and not args.rerun_eval:
+                print(f"found existing eval results at {eval_file}")
+                continue
+
+            eval_run = editor.evaluate(
+                dataset["test"],
+                batch_size=args.batch_size,
+                device=device,
+                alpha=args.eval_alpha,
+                n_top=args.eval_n_top,
+                n_generate=args.eval_n_generate,
+            )
+            with eval_file.open("w") as handle:
+                handle.write(eval_run.to_json())
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train one editor per layer")
     parser.add_argument(
         "--editor-type",
-        choices=("linear",),
+        choices=("linear", "mlp", "biaffine"),
         default="linear",
         help="editor type to train",
     )
@@ -115,6 +125,7 @@ if __name__ == "__main__":
         action="store_true",
         help="clear old results and start anew",
     )
+    parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument("--device", help="device to train on")
     parser.add_argument("--seed", type=int, default=123456, help="random seed")
     parser.add_argument("--no-fp16", action="store_true", help="do not use fp16")
