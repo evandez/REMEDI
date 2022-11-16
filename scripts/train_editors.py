@@ -81,6 +81,7 @@ def main(args: argparse.Namespace) -> None:
                 n_top=args.eval_n_top,
                 n_generate=args.eval_n_generate,
             )
+            print(f"saving eval to {eval_file}")
             with eval_file.open("w") as handle:
                 handle.write(eval_run.to_json())
 
