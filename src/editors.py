@@ -30,7 +30,7 @@ DEFAULT_N_GENERATE = 10
 DEFAULT_BATCH_SIZE = 128
 DEFAULT_MAX_EPOCHS = 10
 DEFAULT_PATIENCE = 2
-DEFAULT_LR = 1e-2
+DEFAULT_LR = 1e-3
 DEFAULT_HOLD_OUT = 0.1
 
 
@@ -400,7 +400,7 @@ class Editor(nn.Module):
             batch_size: Batch size for training editor. Note this is constrained mostly
                 by how many sentences the model can process at once!
             hold_out: Hold out this fraction of data for validation.
-            lr: Learning rate. Defaults to 1e-2.
+            lr: Learning rate.
             patience: Stop after val loss does not improve for this many epochs.
             device: Run editor and model on this device.
 
@@ -469,7 +469,7 @@ class Editor(nn.Module):
                         )
                     val_loss += loss.item()
                     val_progress_bar.set_description(
-                        f"{desc} val={loss.item():.3f} best={stopper.best:.2f}"
+                        f"{desc} val={loss.item():.2f} best={stopper.best:.2f}"
                     )
                 val_loss /= len(val_loader)
 
