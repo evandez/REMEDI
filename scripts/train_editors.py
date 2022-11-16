@@ -108,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch-size", type=int, default=64, help="training batch size"
     )
-    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
+    parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument(
         "--hold-out",
         type=float,
