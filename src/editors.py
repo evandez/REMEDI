@@ -766,3 +766,4 @@ class MlpEditor(Editor):
 # - Show running average loss in progress bar, not batch loss.
 # - This currently tokenizes the prompt twice, can we avoid?
 # - Precompute does everything on GPU, even averaging.
+# - Set hyperparameter defaults by editor type.
