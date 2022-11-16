@@ -33,6 +33,7 @@ def main(args: argparse.Namespace) -> None:
     if layers is None:
         layers = model_utils.determine_layers(mt)
 
+    dataset = dataset_utils.maybe_train_test_split(dataset, test_size=args.hold_out)
     dataset = precompute.editor_inputs_from_dataset(
         mt=mt,
         dataset=dataset,
@@ -40,7 +41,6 @@ def main(args: argparse.Namespace) -> None:
         device=device,
         batch_size=args.batch_size,
     )
-    dataset = dataset_utils.maybe_train_test_split(dataset, test_size=args.hold_out)
 
     for editor_type in args.editor_types:
         for layer in layers:
@@ -74,7 +74,7 @@ def main(args: argparse.Namespace) -> None:
                 continue
 
             eval_run = editor.evaluate(
-                dataset["test"],
+                dataset["test"],  # type: ignore
                 batch_size=args.batch_size,
                 device=device,
                 alpha=args.eval_alpha,
