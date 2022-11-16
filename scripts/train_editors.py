@@ -15,6 +15,7 @@ def main(args: argparse.Namespace) -> None:
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = not args.no_fp16
+    use_entity = not args.no_use_entity
 
     results_dir = args.results_dir
     if results_dir is None:
@@ -51,9 +52,9 @@ def main(args: argparse.Namespace) -> None:
 
             editor: editors.Editor
             if editor_type == "linear":
-                editor = editors.LinearEditor(mt=mt, layer=layer)
+                editor = editors.LinearEditor(mt=mt, layer=layer, use_entity=use_entity)
             elif editor_type == "mlp":
-                editor = editors.MlpEditor(mt=mt, layer=layer)
+                editor = editors.MlpEditor(mt=mt, layer=layer, use_entity=use_entity)
             else:
                 assert editor_type == "biaffine", args.editor_type
                 editor = editors.BiaffineEditor(mt=mt, layer=layer)
@@ -64,7 +65,12 @@ def main(args: argparse.Namespace) -> None:
                 state_dict = torch.load(editor_file, map_location=device)
                 editor.load_state_dict(state_dict)
             else:
-                editor.fit(dataset=dataset, batch_size=args.batch_size, device=device)
+                editor.fit(
+                    dataset=dataset,
+                    batch_size=args.batch_size,
+                    lr=args.lr,
+                    device=device,
+                )
                 print(f"saving editor to {editor_file}")
                 torch.save(editor.state_dict(), editor_file)
 
@@ -101,6 +107,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch-size", type=int, default=64, help="training batch size"
     )
+    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
     parser.add_argument(
         "--hold-out",
         type=float,
@@ -130,6 +137,11 @@ if __name__ == "__main__":
         "--clear-results-dir",
         action="store_true",
         help="clear old results and start anew",
+    )
+    parser.add_argument(
+        "--no-use-entity",
+        action="store_true",
+        help="do not use entity in linear/mlp editors",
     )
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument("--device", help="device to train on")
