@@ -12,7 +12,9 @@ import torch
 def main(args: argparse.Namespace) -> None:
     """Train the editors."""
     random_utils.set_seed(args.seed)
+
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
+    fp16 = not args.no_fp16
 
     results_dir = args.results_dir
     if results_dir is None:
@@ -22,7 +24,9 @@ def main(args: argparse.Namespace) -> None:
         shutil.rmtree(results_dir)
     results_dir.mkdir(exist_ok=True, parents=True)
 
-    mt = model_utils.load_model(args.model, device=device, fp16=not args.no_fp16)
+    print(f"loading {args.model} (device={device}, fp16={fp16})")
+    mt = model_utils.load_model(args.model, device=device, fp16=fp16)
+
     dataset = dataset_utils.load_dataset(args.dataset, split="train[:5000]")
 
     layers = args.layers
