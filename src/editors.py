@@ -335,11 +335,11 @@ class EditorEvaluationResult(DataClassJsonMixin):
 
     # Note: Need explicit types here so DataClassJsonMixin works.
     before_top_tokens: list[str]
-    before_top_scores: list[float]
+    before_top_logps: list[float]
     before_generations: list[str]
 
     after_top_tokens: list[str]
-    after_top_scores: list[float]
+    after_top_logps: list[float]
     after_generations: list[str]
 
     before_target_mediated_score: Optional[float] = None
@@ -526,7 +526,7 @@ class Editor(nn.Module):
                     do_sample=False,
                     max_new_tokens=n_generate,
                     return_dict_in_generate=True,
-                    output_scores=True,
+                    output_logps=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
                 outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
@@ -548,8 +548,8 @@ class Editor(nn.Module):
                     ("before", outputs_before),
                     ("after", outputs_after),
                 ):
-                    first_token_scores = outputs.scores[0]
-                    top_scores, top_token_ids = first_token_scores.topk(k=n_top, dim=-1)
+                    first_token_logps = torch.log_softmax(outputs.scores[0], dim=-1)
+                    top_logps, top_token_ids = first_token_logps.topk(k=n_top, dim=-1)
                     top_tokens = tokenizer_utils.batch_convert_ids_to_tokens(
                         top_token_ids, self.mt.tokenizer
                     )
@@ -557,7 +557,7 @@ class Editor(nn.Module):
                         outputs.sequences, skip_special_tokens=True
                     )
 
-                    batched_results[f"{key}_top_scores"] = top_scores.tolist()
+                    batched_results[f"{key}_top_logps"] = top_logps.tolist()
                     batched_results[f"{key}_top_tokens"] = top_tokens
                     batched_results[f"{key}_generations"] = generations
 
@@ -565,7 +565,7 @@ class Editor(nn.Module):
                         batch_indices = torch.arange(current_batch_size)
                         for target_key in ("mediated", "unmediated"):
                             target_id = batch[f"target_{target_key}.token_id"]
-                            target_probs = first_token_scores[batch_indices, target_id]
+                            target_probs = first_token_logps[batch_indices, target_id]
                             target_prob_key = f"{key}_target_{target_key}_score"
                             batched_results[target_prob_key] = target_probs.tolist()
 
