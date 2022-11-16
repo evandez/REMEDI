@@ -47,7 +47,7 @@ def main(args: argparse.Namespace) -> None:
             print(f"---- editor={editor_type}, layer={layer} ----")
 
             editor_results_dir = results_dir / editor_type / f"layer_{layer}"
-            editor_results_dir.mdkir(exist_ok=True, parents=True)
+            editor_results_dir.mkdir(exist_ok=True, parents=True)
 
             editor: editors.Editor
             if editor_type == "linear":
