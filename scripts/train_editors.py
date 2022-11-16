@@ -23,7 +23,7 @@ def main(args: argparse.Namespace) -> None:
     results_dir.mkdir(exist_ok=True, parents=True)
 
     mt = model_utils.load_model(args.model, device=device, fp16=not args.no_fp16)
-    dataset = dataset_utils.load_dataset(args.dataset)
+    dataset = dataset_utils.load_dataset(args.dataset, split="train[:5000]")
 
     layers = args.layers
     if layers is None:

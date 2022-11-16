@@ -762,7 +762,7 @@ class MlpEditor(Editor):
 
 # TODO(evandez): Small fixes needed for this file:
 # - Need a way to have evaluation results point back to original dataset.
-# - This currently tokenizes the prompt twice, can we avoid?
-# - Show running average loss in progress bar, not batch loss.
-# - Precompute does everything on GPU, even averaging.
 # - Consistency in counterfact splits (set seed)
+# - Show running average loss in progress bar, not batch loss.
+# - This currently tokenizes the prompt twice, can we avoid?
+# - Precompute does everything on GPU, even averaging.
