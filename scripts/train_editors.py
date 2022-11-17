@@ -14,7 +14,7 @@ def main(args: argparse.Namespace) -> None:
     random_utils.set_seed(args.seed)
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
-    fp16 = not args.no_fp16
+    fp16 = args.fp16
     use_entity = not args.no_use_entity
 
     results_dir = args.results_dir
@@ -109,34 +109,42 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", default="counterfact", help="dataset to train on")
     parser.add_argument("--layers", type=int, nargs="+", help="layers to train for")
     parser.add_argument(
-        "--max-epochs", type=int, default=10, help="max training epochs"
+        "--max-epochs",
+        type=int,
+        default=editors.DEFAULT_MAX_EPOCHS,
+        help="max training epochs",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=64, help="training batch size"
+        "--batch-size",
+        type=int,
+        default=editors.DEFAULT_BATCH_SIZE,
+        help="training batch size",
     )
-    parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
+    parser.add_argument(
+        "--lr", type=float, default=editors.DEFAULT_LR, help="learning rate"
+    )
     parser.add_argument(
         "--hold-out",
         type=float,
-        default=0.1,
+        default=editors.DEFAULT_HOLD_OUT,
         help="held out fraction (if not already split)",
     )
     parser.add_argument(
         "--eval-alpha",
         type=float,
-        default=1.0,
+        default=editors.DEFAULT_ALPHA,
         help="step size for adding direction in eval",
     )
     parser.add_argument(
         "--eval-n-top",
         type=int,
-        default=10,
+        default=editors.DEFAULT_N_TOP,
         help="number of top tokens/scores to report in eval",
     )
     parser.add_argument(
         "--eval-n-generate",
         type=int,
-        default=10,
+        default=editors.DEFAULT_N_GENERATE,
         help="number of tokens to generate in eval",
     )
     parser.add_argument("--results-dir", type=Path, help="write trained probes here")
@@ -153,6 +161,6 @@ if __name__ == "__main__":
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument("--device", help="device to train on")
     parser.add_argument("--seed", type=int, default=123456, help="random seed")
-    parser.add_argument("--no-fp16", action="store_true", help="do not use fp16")
+    parser.add_argument("--fp16", action="store_true", help="use fp16")
     args = parser.parse_args()
     main(args)
