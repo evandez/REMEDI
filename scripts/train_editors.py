@@ -67,6 +67,7 @@ def main(args: argparse.Namespace) -> None:
             else:
                 editor.fit(
                     dataset=precomputed,
+                    max_epochs=args.max_epochs,
                     batch_size=args.batch_size,
                     lam_adv=None,
                     lam_kl=None,
@@ -107,7 +108,9 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="gpt2-xl", help="model to edit")
     parser.add_argument("--dataset", default="counterfact", help="dataset to train on")
     parser.add_argument("--layers", type=int, nargs="+", help="layers to train for")
-    parser.add_argument("--max-epochs", type=int, default=10, help="max training epochs")
+    parser.add_argument(
+        "--max-epochs", type=int, default=10, help="max training epochs"
+    )
     parser.add_argument(
         "--batch-size", type=int, default=64, help="training batch size"
     )
