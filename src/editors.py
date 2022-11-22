@@ -154,8 +154,12 @@ class EditedModel(nn.Module):
                 device=self.device,
                 return_target_token_ids=False,
             )
-        entity_ij = precomputed["prompt.token_range.entity"]
-        hiddens_entity = precomputed[f"entity.hiddens.{layer}.average"]
+        if self.editor.use_last_entity_token:
+            entity_ij = precomputed["prompt.token_range.entity.last"]
+            hiddens_entity = precomputed[f"entity.hiddens.{layer}.last"]
+        else:
+            entity_ij = precomputed["prompt.token_range.entity"]
+            hiddens_entity = precomputed[f"entity.hiddens.{layer}.average"]
         hiddens_attr = precomputed[f"context.hiddens.{layer}.attribute"]
 
         # Make type checker happy and reformat.
@@ -233,6 +237,7 @@ class apply(contextlib.AbstractContextManager):
         mt: The model/tokenizer to apply the editor to. By default, uses the model
             that the editor was trained, but you could (in theory) specify any
             model which has the same number of layers!
+        alpha: Step size to take when applying the direction.
 
     """
 
@@ -359,11 +364,18 @@ class EditorEvaluateRun(DataClassJsonMixin):
 class Editor(nn.Module):
     """A simple linear editing model."""
 
-    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int):
+    def __init__(
+        self,
+        *,
+        mt: model_utils.ModelAndTokenizer,
+        layer: int,
+        use_last_entity_token: bool = False,
+    ):
         """Initialize the editor."""
         super().__init__()
         self.mt = mt
         self.layer = layer
+        self.use_last_entity_token = use_last_entity_token
 
     def to_(self, mt: model_utils.ModelAndTokenizer | None = None) -> None:
         """Make this editor's device/dtype match the underlying models."""
@@ -589,9 +601,10 @@ class RandomEditor(Editor):
         layer: int,
         mean: torch.Tensor | None = None,
         covariance: torch.Tensor | None = None,
+        **kwargs: Any,
     ) -> None:
         """Initialize the editor."""
-        super().__init__(mt=mt, layer=layer)
+        super().__init__(mt=mt, layer=layer, **kwargs)
 
         hidden_size = model_utils.determine_hidden_size(mt)
         device = model_utils.determine_device(mt)
@@ -659,6 +672,7 @@ class LinearEditor(Editor):
         rank: Optional[int] = None,
         use_entity: bool = True,
         use_attribute: bool = True,
+        **kwargs: Any,
     ):
         """Initialize the editor.
 
@@ -671,7 +685,7 @@ class LinearEditor(Editor):
         if not use_entity and not use_attribute:
             raise ValueError("must set >= 1 of `use_entity` or `use_attribute`")
 
-        super().__init__(mt=mt, layer=layer)
+        super().__init__(mt=mt, layer=layer, **kwargs)
 
         self.rank = rank
         self.use_entity = use_entity
@@ -707,9 +721,9 @@ class LinearEditor(Editor):
 class BiaffineEditor(Editor):
     """Biaffine model that takes entity to edit rep and attribute rep as input."""
 
-    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int):
+    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int, **kwargs: Any):
         """Initialize the editor."""
-        super().__init__(mt=mt, layer=layer)
+        super().__init__(mt=mt, layer=layer, **kwargs)
         hidden_size = model_utils.determine_hidden_size(mt)
         self.w_entity = nn.Linear(hidden_size, hidden_size)
         self.w_attribute = nn.Linear(hidden_size, hidden_size)
@@ -730,12 +744,13 @@ class MlpEditor(Editor):
         layer: int,
         use_entity: bool = True,
         use_attribute: bool = True,
+        **kwargs: Any,
     ):
         """Initialize the editor."""
         if not use_entity and not use_attribute:
             raise ValueError("must set >= 1 of `use_entity` or `use_attribute`")
 
-        super().__init__(mt=mt, layer=layer)
+        super().__init__(mt=mt, layer=layer, **kwargs)
 
         self.use_entity = use_entity
         self.use_attribute = use_attribute
