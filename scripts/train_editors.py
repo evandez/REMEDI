@@ -9,7 +9,6 @@ from src.utils import dataset_utils, env, model_utils, random_utils
 
 import torch
 
-
 EDITOR_FACTORIES = {
     "linear": editors.LinearEditor,
     "biaffine": editors.BiaffineEditor,
