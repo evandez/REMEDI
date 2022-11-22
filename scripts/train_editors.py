@@ -10,6 +10,14 @@ from src.utils import dataset_utils, env, model_utils, random_utils
 import torch
 
 
+EDITOR_FACTORIES = {
+    "linear": editors.LinearEditor,
+    "biaffine": editors.BiaffineEditor,
+    "mlp": editors.MlpEditor,
+    "random": editors.RandomEditor,
+}
+
+
 def main(args: argparse.Namespace) -> None:
     """Train the editors."""
     random_utils.set_seed(args.seed)
@@ -18,6 +26,7 @@ def main(args: argparse.Namespace) -> None:
     fp16 = args.fp16
     use_entity = args.use_entity
     experiment_name = args.experiment_name or "editors"
+    input_last_entity_token = edit_last_entity_token = args.use_last_entity_token
 
     results_dir = args.results_dir or env.results_dir()
     results_dir /= experiment_name
@@ -43,20 +52,22 @@ def main(args: argparse.Namespace) -> None:
 
     dataset = dataset_utils.maybe_train_test_split(dataset, test_size=args.hold_out)
     for editor_type in args.editor_types:
+        editor_factory = EDITOR_FACTORIES[editor_type]
+        editor_kwargs = dict(
+            mt=mt,
+            input_last_entity_token=input_last_entity_token,
+            edit_last_entity_token=edit_last_entity_token,
+        )
+        if editor_type in {"mlp", "linear"}:
+            editor_kwargs["use_entity"] = use_entity
+
         for layer in layers:
             print(f"---- editor={editor_type}, layer={layer} ----")
 
             editor_results_dir = results_dir / editor_type / str(layer)
             editor_results_dir.mkdir(exist_ok=True, parents=True)
 
-            editor: editors.Editor
-            if editor_type == "linear":
-                editor = editors.LinearEditor(mt=mt, layer=layer, use_entity=use_entity)
-            elif editor_type == "mlp":
-                editor = editors.MlpEditor(mt=mt, layer=layer, use_entity=use_entity)
-            else:
-                assert editor_type == "biaffine", args.editor_type
-                editor = editors.BiaffineEditor(mt=mt, layer=layer)
+            editor: editors.Editor = editor_factory(layer=layer, **editor_kwargs)
 
             precomputed = precompute.editor_inputs_from_dataset(
                 mt=mt,
@@ -109,7 +120,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--editor-types",
         nargs="+",
-        choices=("linear", "mlp", "biaffine"),
+        choices=EDITOR_FACTORIES.keys(),
         default=("linear",),
         help="editor type to train",
     )
@@ -167,6 +178,11 @@ if __name__ == "__main__":
         "--use-entity",
         action="store_true",
         help="use entity in linear/mlp editors",
+    )
+    parser.add_argument(
+        "--use-last-entity-token",
+        action="store_true",
+        help="edit last entity token instead of all",
     )
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument("--device", help="device to train on")

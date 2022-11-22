@@ -154,12 +154,19 @@ class EditedModel(nn.Module):
                 device=self.device,
                 return_target_token_ids=False,
             )
-        if self.editor.use_last_entity_token:
-            entity_ij = precomputed["prompt.token_range.entity.last"]
-            hiddens_entity = precomputed[f"entity.hiddens.{layer}.last"]
+
+        entity_ij_key = "prompt.token_range.entity"
+        if self.editor.edit_last_entity_token:
+            entity_ij_key += ".last"
+
+        hiddens_entity_key = f"prompt.hiddens.{layer}."
+        if self.editor.input_last_entity_token:
+            hiddens_entity_key += "last"
         else:
-            entity_ij = precomputed["prompt.token_range.entity"]
-            hiddens_entity = precomputed[f"entity.hiddens.{layer}.average"]
+            hiddens_entity_key += "average"
+
+        entity_ij = precomputed[entity_ij_key]
+        hiddens_entity = precomputed[hiddens_entity_key]
         hiddens_attr = precomputed[f"context.hiddens.{layer}.attribute"]
 
         # Make type checker happy and reformat.
@@ -369,13 +376,15 @@ class Editor(nn.Module):
         *,
         mt: model_utils.ModelAndTokenizer,
         layer: int,
-        use_last_entity_token: bool = False,
+        input_last_entity_token: bool = False,
+        edit_last_entity_token: bool = False,
     ):
         """Initialize the editor."""
         super().__init__()
         self.mt = mt
         self.layer = layer
-        self.use_last_entity_token = use_last_entity_token
+        self.input_last_entity_token = input_last_entity_token
+        self.edit_last_entity_token = edit_last_entity_token
 
     def to_(self, mt: model_utils.ModelAndTokenizer | None = None) -> None:
         """Make this editor's device/dtype match the underlying models."""
