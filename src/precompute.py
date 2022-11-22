@@ -111,6 +111,15 @@ def token_ranges_from_batch(
     )
 
 
+def last_token_ranges_from_batch(token_ranges: torch.Tensor) -> torch.Tensor:
+    """Convert batch of token ranges to only include last token."""
+    if len(token_ranges.shape) != 2 or token_ranges.shape[1] != 2:
+        raise ValueError(f"misshapen token ranges: {token_ranges.shape}")
+    token_ranges = token_ranges.clone()
+    token_ranges[:, 0] = token_ranges[:, 1] - 1
+    return token_ranges
+
+
 def first_token_ids_from_batch(
     mt: model_utils.ModelAndTokenizer | Tokenizer, words: str | StrSequence
 ) -> torch.Tensor:
@@ -205,21 +214,36 @@ def editor_inputs_from_batch(
         )
         for layer, hiddens in entity_hiddens_by_layer.items():
             precomputed[f"entity.hiddens.{layer}"] = hiddens
+            precomputed[f"entity.hiddens.{layer}.last"] = hiddens[:, -1]
 
     # Precompute token ranges if needed.
-    attr_ijs = None
+    context_attr_ijs = None
     if return_token_ranges or return_average_attribute_hiddens:
         assert context_offset_mapping is not None
         _, prompt_offset_mapping = inputs_from_batch(mt, prompts)
-        precomputed["prompt.token_range.entity"] = token_ranges_from_batch(
-            prompts, entities, prompt_offset_mapping
+        precomputed[
+            "prompt.token_range.entity"
+        ] = prompt_entity_ijs = token_ranges_from_batch(
+            prompts,
+            entities,
+            prompt_offset_mapping,
         )
-        precomputed["context.token_range.entity"] = token_ranges_from_batch(
-            contexts, entities, context_offset_mapping
+        precomputed["prompt.token_range.entity.last"] = last_token_ranges_from_batch(
+            prompt_entity_ijs
+        )
+        precomputed[
+            "context.token_range.entity"
+        ] = context_entity_ijs = token_ranges_from_batch(
+            contexts,
+            entities,
+            context_offset_mapping,
+        )
+        precomputed["context.token_range.entity.last"] = last_token_ranges_from_batch(
+            context_entity_ijs
         )
         precomputed[
             "context.token_range.attribute"
-        ] = attr_ijs = token_ranges_from_batch(
+        ] = context_attr_ijs = token_ranges_from_batch(
             contexts, attributes, context_offset_mapping
         )
 
@@ -248,10 +272,10 @@ def editor_inputs_from_batch(
     # Precompute average attr representation if needed.
     if return_average_attribute_hiddens:
         assert context_hiddens_by_layer is not None
-        assert attr_ijs is not None
+        assert context_attr_ijs is not None
         for layer, hiddens in context_hiddens_by_layer.items():
             key = f"context.hiddens.{layer}.attribute"
-            precomputed[key] = average_hiddens_from_batch(hiddens, attr_ijs)
+            precomputed[key] = average_hiddens_from_batch(hiddens, context_attr_ijs)
 
     if fp32:
         precomputed = _as_fp32(precomputed)
