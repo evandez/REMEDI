@@ -1,7 +1,7 @@
 """Editing models."""
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Literal, Optional, Sequence, cast, overload
+from typing import Any, Literal, Optional, cast, overload
 
 from src import precompute
 from src.utils import dataset_utils, model_utils, tokenizer_utils, training_utils
