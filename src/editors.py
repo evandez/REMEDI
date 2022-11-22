@@ -159,7 +159,7 @@ class EditedModel(nn.Module):
         if self.editor.edit_last_entity_token:
             entity_ij_key += ".last"
 
-        hiddens_entity_key = f"prompt.hiddens.{layer}."
+        hiddens_entity_key = f"entity.hiddens.{layer}."
         if self.editor.input_last_entity_token:
             hiddens_entity_key += "last"
         else:
