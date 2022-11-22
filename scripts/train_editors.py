@@ -21,9 +21,11 @@ def main(args: argparse.Namespace) -> None:
 
     results_dir = args.results_dir or env.results_dir()
     results_dir /= experiment_name
-    if args.clear_results_dir and results_dir.exists():
-        print(f"clearing results dir {results_dir}")
-        shutil.rmtree(results_dir)
+    if results_dir.exists():
+        print(f"rerunning experiment {experiment_name}")
+        if args.clear_results_dir:
+            print(f"clearing old results from {results_dir}")
+            shutil.rmtree(results_dir)
     results_dir.mkdir(exist_ok=True, parents=True)
 
     args_file = results_dir / "args.json"
@@ -75,6 +77,8 @@ def main(args: argparse.Namespace) -> None:
                     max_epochs=args.max_epochs,
                     batch_size=args.batch_size,
                     lr=args.lr,
+                    lam_kl=args.lam_kl,
+                    lam_adv=args.lam_adv,
                     device=device,
                 )
                 print(f"saving editor to {editor_file}")
@@ -127,6 +131,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr", type=float, default=editors.DEFAULT_LR, help="learning rate"
     )
+    parser.add_argument("--lam-kl", type=float, help="kl div loss weight")
+    parser.add_argument("--lam-adv", type=float, help="adversarial term loss weight")
     parser.add_argument(
         "--hold-out",
         type=float,
