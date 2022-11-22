@@ -1,5 +1,6 @@
 """Train editors."""
 import argparse
+import json
 import shutil
 from pathlib import Path
 
@@ -15,7 +16,7 @@ def main(args: argparse.Namespace) -> None:
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
-    use_entity = not args.no_use_entity
+    use_entity = args.use_entity
 
     results_dir = args.results_dir
     if results_dir is None:
@@ -24,6 +25,10 @@ def main(args: argparse.Namespace) -> None:
         print(f"clearing results dir {results_dir}")
         shutil.rmtree(results_dir)
     results_dir.mkdir(exist_ok=True, parents=True)
+
+    args_file = results_dir / "args.json"
+    with args_file.open("w") as handle:
+        json.dump(vars(args), handle)
 
     print(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = model_utils.load_model(args.model, device=device, fp16=fp16)
@@ -69,8 +74,6 @@ def main(args: argparse.Namespace) -> None:
                     dataset=precomputed,
                     max_epochs=args.max_epochs,
                     batch_size=args.batch_size,
-                    lam_adv=None,
-                    lam_kl=None,
                     lr=args.lr,
                     device=device,
                 )
@@ -154,9 +157,9 @@ if __name__ == "__main__":
         help="clear old results and start anew",
     )
     parser.add_argument(
-        "--no-use-entity",
+        "--use-entity",
         action="store_true",
-        help="do not use entity in linear/mlp editors",
+        help="use entity in linear/mlp editors",
     )
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument("--device", help="device to train on")
