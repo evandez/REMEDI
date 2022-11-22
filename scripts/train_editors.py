@@ -20,7 +20,7 @@ def main(args: argparse.Namespace) -> None:
 
     results_dir = args.results_dir
     if results_dir is None:
-        results_dir = env.results_dir() / "editors"
+        results_dir = env.results_dir() / args.experiment_name
     if args.clear_results_dir and results_dir.exists():
         print(f"clearing results dir {results_dir}")
         shutil.rmtree(results_dir)
@@ -101,6 +101,7 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train one editor per layer")
+    parser.add_argument("--experiment-name", "-n", required=True, help="experiment name")
     parser.add_argument(
         "--editor-types",
         nargs="+",
