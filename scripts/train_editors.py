@@ -143,11 +143,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr", type=float, default=editors.DEFAULT_LR, help="learning rate"
     )
-    parser.add_argument("--lam-kl", type=float, help="kl div loss weight")
     parser.add_argument(
-        "--lam-kl-alt", type=float, help="alt prompt kl div loss weight"
+        "--lam-kl",
+        type=float,
+        default=editors.DEFAULT_LAM_KL,
+        help="kl div loss weight",
     )
-    parser.add_argument("--lam-adv", type=float, help="adversarial term loss weight")
+    parser.add_argument(
+        "--lam-kl-alt",
+        type=float,
+        # Default to None, since experimental.
+        help="alt prompt kl div loss weight",
+    )
+    parser.add_argument(
+        "--lam-adv",
+        type=float,
+        default=editors.DEFAULT_LAM_ADV,
+        help="adversarial term loss weight",
+    )
     parser.add_argument(
         "--hold-out",
         type=float,
