@@ -25,7 +25,7 @@ def main(args: argparse.Namespace) -> None:
     fp16 = args.fp16
     use_entity = args.use_entity
     experiment_name = args.experiment_name or "editors"
-    input_last_entity_token = edit_last_entity_token = args.use_last_entity_token
+    input_last_entity_token = edit_last_entity_token = not args.use_all_entity_tokens
 
     results_dir = args.results_dir or env.results_dir()
     results_dir /= experiment_name
@@ -184,9 +184,9 @@ if __name__ == "__main__":
         help="use entity in linear/mlp editors",
     )
     parser.add_argument(
-        "--use-last-entity-token",
+        "--use-all-entity-tokens",
         action="store_true",
-        help="edit last entity token instead of all",
+        help="edit all entity tokens instead of just last",
     )
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument("--device", help="device to train on")
