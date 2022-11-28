@@ -87,7 +87,9 @@ def main(args: argparse.Namespace) -> None:
                     max_epochs=args.max_epochs,
                     batch_size=args.batch_size,
                     lr=args.lr,
-                    lam_kl=args.lam_kl,
+                    # lam_kl=args.lam_kl,
+                    lam_kl=None,
+                    lam_kl_alt=args.lam_kl_alt,
                     lam_adv=args.lam_adv,
                     device=device,
                 )
@@ -142,6 +144,9 @@ if __name__ == "__main__":
         "--lr", type=float, default=editors.DEFAULT_LR, help="learning rate"
     )
     parser.add_argument("--lam-kl", type=float, help="kl div loss weight")
+    parser.add_argument(
+        "--lam-kl-alt", type=float, help="alt prompt kl div loss weight"
+    )
     parser.add_argument("--lam-adv", type=float, help="adversarial term loss weight")
     parser.add_argument(
         "--hold-out",
