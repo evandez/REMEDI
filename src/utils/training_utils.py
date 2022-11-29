@@ -1,5 +1,5 @@
 """Utilities for training models."""
-from typing import Sequence, Sized, Tuple, cast
+from typing import Sequence, Sized, cast
 
 from torch.utils import data
 
