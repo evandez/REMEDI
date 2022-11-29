@@ -714,7 +714,7 @@ class LinearEditor(Editor):
         mt: model_utils.ModelAndTokenizer,
         layer: int,
         rank: Optional[int] = None,
-        use_entity: bool = True,
+        use_entity: bool = False,
         use_attribute: bool = True,
         **kwargs: Any,
     ):
