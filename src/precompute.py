@@ -54,7 +54,7 @@ def inputs_from_batch(
 
 def last_token_index_from_batch(inputs: ModelInput) -> Sequence[int]:
     """Return index of last token for each item in batch, accounting for padding."""
-    return inputs.attention_mask.sum(dim=-1) - 1
+    return inputs.attention_mask.sum(dim=-1).cpu() - 1
 
 
 @torch.inference_mode()
