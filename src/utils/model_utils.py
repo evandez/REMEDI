@@ -4,8 +4,9 @@ This module is designed to house all the annoying branching logic
 that comes with supporting analysis of many slightly different model
 implementations.
 """
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Literal, Optional, Sequence, overload
+from typing import Any, Iterator, Literal, Optional, Sequence, overload
 
 from src.utils.typing import Device, Model, Tokenizer
 
@@ -65,7 +66,7 @@ def load_model(
     )
     model.to(device).eval()
 
-    tokenizer = transformers.AutoTokenizer.from_pretrained(name, padding_side="left")
+    tokenizer = transformers.AutoTokenizer.from_pretrained(name)
     tokenizer.pad_token = tokenizer.eos_token
 
     return ModelAndTokenizer(model, tokenizer)
@@ -155,6 +156,30 @@ def any_parameter(model: ModelAndTokenizer | Model) -> torch.nn.Parameter | None
     """Get any example parameter for the model."""
     model = unwrap_model(model)
     return next(iter(model.parameters()), None)
+
+
+@contextmanager
+def set_padding_side(
+    tokenizer: Tokenizer | ModelAndTokenizer, padding_side: str = "right"
+) -> Iterator[None]:
+    """Temporarily set padding side for tokenizer.
+
+    Useful for when you want to batch generate with causal LMs like GPT, as these
+    require the padding to be on the left side in such settings but are much easier
+    to mess around with when the padding, by default, is on the right.
+
+    Example usage:
+        mt = model_utils.load_model("gpt2-x")
+        with model_utils.set_padding_side(mt, "left"):
+            inputs = mt.tokenizer(...)
+        mt.model.generate(**inputs)
+
+    """
+    tokenizer = unwrap_tokenizer(tokenizer)
+    _padding_side = tokenizer.padding_side
+    tokenizer.padding_side = padding_side
+    yield
+    tokenizer.padding_side = _padding_side
 
 
 def map_to(

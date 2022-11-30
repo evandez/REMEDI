@@ -140,7 +140,7 @@ class EditedModel(nn.Module):
         self,
         batch: dataset_utils.ContextMediationInput,
         generate: bool = False,
-        inputs: Optional[transformers.BatchEncoding] = ...,
+        inputs: Optional[transformers.BatchEncoding] = None,
         **kwargs: Any,
     ) -> ModelOutput | ModelGenerateOutput:
         """Run the model on the inputs, editing its hidden reps in the process."""
@@ -294,44 +294,45 @@ def editing_loss(
     prompt = batch["prompt"]
     mediated_token_ids = batch["target_mediated.token_id"]
     unmediated_token_ids = batch["target_unmediated.token_id"]
+    batch_size = mediated_token_ids.shape[0]
 
-    inputs = editor.mt.tokenizer(
-        prompt, return_tensors="pt", padding="longest", truncation=True
-    ).to(device)
-
+    inputs, _ = precompute.inputs_from_batch(editor.mt, prompt, device=device)
     with apply(editor, device=device) as mt_edit:
         outputs_edit = mt_edit.model(batch, inputs=inputs)
-        logps_edit = torch.log_softmax(outputs_edit.logits, dim=-1)
+        logp_edit = torch.log_softmax(outputs_edit.logits, dim=-1)
+
+    batch_idx = torch.arange(batch_size)
+    last_idx = precompute.last_token_index_from_batch(inputs)
 
     # Compute simple loss: the probability of the target token post-edit.
-    loss = torch.tensor(0.0, device=device)
-    for bi, mti in enumerate(mediated_token_ids.tolist()):
-        loss -= logps_edit[bi, -1, mti]
-        if lam_adv is not None:
-            umti = unmediated_token_ids[bi].item()
-            p_unmediated = torch.exp(logps_edit[bi, -1, umti])
-            loss -= lam_adv * torch.log(1 - p_unmediated)
+    loss = -logp_edit[batch_idx, last_idx, mediated_token_ids].mean()
 
-    batch_size = mediated_token_ids.shape[0]
-    loss /= batch_size
+    # If requested, penalize probability mass on the unmediated token.
+    if lam_adv is not None:
+        logp_edit_unmediated = logp_edit[batch_idx, last_idx, unmediated_token_ids]
+        p_edit_unmediated = torch.exp(logp_edit_unmediated)
+        loss_adv = torch.log(1 - p_edit_unmediated).mean()
+        loss -= lam_adv * loss_adv
 
-    # If specified, include a KL loss term with the original token distribution.
+    # If requested, include a KL loss term with the original token distribution.
     if lam_kl is not None:
         with torch.inference_mode():
             outputs_orig = editor.mt.model(**inputs)
-        logps_orig = torch.log_softmax(outputs_orig.logits, dim=-1)
-        logps_orig = logps_orig[torch.arange(batch_size), -1]
-        logps_edit = logps_edit[torch.arange(batch_size), -1]
+        logp_orig = torch.log_softmax(outputs_orig.logits, dim=-1)
+        logp_orig = logp_orig[batch_idx, last_idx]
+        logp_edit = logp_edit[batch_idx, last_idx]
         loss += lam_kl * nn.functional.kl_div(
-            logps_edit, logps_orig, reduction="batchmean", log_target=True
+            logp_edit, logp_orig, reduction="batchmean", log_target=True
         )
 
     # NOTE(evandez): Experimental feature. Hacky and might be deleted.
+    # If requested, include a KL loss term with token distribution on separate prompt.
     if lam_kl_alt is not None:
         prompt_alt = batch["generation_prompts"][1]
         inputs_alt, offset_mapping_alt = precompute.inputs_from_batch(
             editor.mt, prompt_alt, device=device
         )
+        last_idx_alt = precompute.last_token_index_from_batch(inputs_alt)
 
         batch_alt = {**batch}
         batch_alt["prompt"] = prompt_alt
@@ -349,12 +350,12 @@ def editing_loss(
         with apply(editor, device=device) as mt_edit:
             outputs_alt_edit = mt_edit.model(batch_alt, inputs=inputs_alt)
 
-        logps_alt_orig = torch.log_softmax(outputs_alt_orig.logits, dim=-1)
-        logps_alt_edit = torch.log_softmax(outputs_alt_edit.logits, dim=-1)
-        logps_alt_orig = logps_alt_orig[torch.arange(batch_size), -1]
-        logps_alt_edit = logps_alt_edit[torch.arange(batch_size), -1]
+        logp_alt_orig = torch.log_softmax(outputs_alt_orig.logits, dim=-1)
+        logp_alt_edit = torch.log_softmax(outputs_alt_edit.logits, dim=-1)
+        logp_alt_orig = logp_alt_orig[batch_idx, last_idx_alt]
+        logp_alt_edit = logp_alt_edit[batch_idx, last_idx_alt]
         loss += lam_kl_alt * nn.functional.kl_div(
-            logps_alt_edit, logps_alt_orig, reduction="batchmean", log_target=True
+            logp_alt_edit, logp_alt_orig, reduction="batchmean", log_target=True
         )
 
     return loss
@@ -574,9 +575,12 @@ class Editor(nn.Module):
             for batch in tqdm(loader, desc=f"evaluate editor (layer={self.layer})"):
                 prompts = batch["prompt"]
                 current_batch_size = len(prompts)
-                inputs, _ = precompute.inputs_from_batch(
-                    self.mt, prompts, device=device
-                )
+
+                # Need padding side to be left for batch generate.
+                with model_utils.set_padding_side(self.mt, padding_side="left"):
+                    inputs, _ = precompute.inputs_from_batch(
+                        self.mt, prompts, device=device
+                    )
 
                 generate_kwargs = dict(
                     do_sample=False,

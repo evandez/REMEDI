@@ -52,6 +52,11 @@ def inputs_from_batch(
     return inputs, offset_mapping
 
 
+def last_token_index_from_batch(inputs: ModelInput) -> Sequence[int]:
+    """Return index of last token for each item in batch, accounting for padding."""
+    return inputs.attention_mask.sum(dim=-1) - 1
+
+
 @torch.inference_mode()
 def hiddens_from_batch(
     mt: model_utils.ModelAndTokenizer,
@@ -209,12 +214,13 @@ def editor_inputs_from_batch(
     entity_hiddens_by_layer = None
     if return_entity_hiddens or return_average_entity_hiddens:
         entity_inputs, _ = inputs_from_batch(mt, entities, device=device)
+        entity_last_idx = last_token_index_from_batch(entity_inputs)
         entity_hiddens_by_layer = hiddens_from_batch(
             mt, entity_inputs, layers=layers, device=device
         )
         for layer, hiddens in entity_hiddens_by_layer.items():
             precomputed[f"entity.hiddens.{layer}"] = hiddens
-            precomputed[f"entity.hiddens.{layer}.last"] = hiddens[:, -1]
+            precomputed[f"entity.hiddens.{layer}.last"] = hiddens[:, entity_last_idx]
 
     # Precompute token ranges if needed.
     context_attr_ijs = None
