@@ -156,7 +156,12 @@ class EditedModel(nn.Module):
                 return_target_token_ids=False,
             )
 
-        entity_ij_key = "prompt.token_range.entity"
+        if self.mt.tokenizer.padding_side == "right":
+            token_range_key = "token_range"
+        else:
+            token_range_key = "negative_token_range"
+
+        entity_ij_key = f"prompt.{token_range_key}.entity"
         if self.editor.edit_last_entity_token:
             entity_ij_key += ".last"
 
@@ -619,6 +624,7 @@ class Editor(nn.Module):
 
                     batched_results[f"{key}_top_logps"] = top_logps.tolist()
                     batched_results[f"{key}_top_tokens"] = top_tokens
+                    # TODO(evandez): Fix typing here, should be list of lists.
                     batched_results[f"{key}_generations"] = generations
 
                     if include_target_probs:

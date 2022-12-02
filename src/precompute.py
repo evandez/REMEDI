@@ -33,6 +33,24 @@ def _as_fp32(data: dict) -> dict:
     }
 
 
+def _validate_lengths(lengths: torch.Tensor) -> None:
+    """Validate sequence lengths tensor is correct shape."""
+    if len(lengths.shape) != 1:
+        raise ValueError(f"misshapen lengths: {lengths.shape}")
+
+
+def _validate_token_ranges(
+    token_ranges: torch.Tensor, batch_size: int | None = None
+) -> None:
+    """Validate token ranges are correct shape."""
+    if len(token_ranges.shape) != 2 or token_ranges.shape[1] != 2:
+        raise ValueError(f"misshapen token ranges: {token_ranges.shape}")
+    if batch_size is not None and token_ranges.shape[0] != batch_size:
+        raise ValueError(
+            f"expected batch_size={batch_size}, got {token_ranges.shape[0]}"
+        )
+
+
 def inputs_from_batch(
     mt: model_utils.ModelAndTokenizer,
     text: str | StrSequence,
@@ -118,11 +136,19 @@ def token_ranges_from_batch(
 
 def last_token_ranges_from_batch(token_ranges: torch.Tensor) -> torch.Tensor:
     """Convert batch of token ranges to only include last token."""
-    if len(token_ranges.shape) != 2 or token_ranges.shape[1] != 2:
-        raise ValueError(f"misshapen token ranges: {token_ranges.shape}")
+    _validate_token_ranges(token_ranges)
     token_ranges = token_ranges.clone()
     token_ranges[:, 0] = token_ranges[:, 1] - 1
     return token_ranges
+
+
+def negative_token_ranges_from_batch(
+    token_ranges: torch.Tensor, lengths: torch.Tensor
+) -> torch.Tensor:
+    """Convert positive token ranges to negative ones."""
+    _validate_lengths(lengths)
+    _validate_token_ranges(token_ranges, batch_size=len(lengths))
+    return token_ranges - lengths[:, None]
 
 
 def first_token_ids_from_batch(
@@ -225,33 +251,31 @@ def editor_inputs_from_batch(
     # Precompute token ranges if needed.
     context_attr_ijs = None
     if return_token_ranges or return_average_attribute_hiddens:
-        assert context_offset_mapping is not None
-        _, prompt_offset_mapping = inputs_from_batch(mt, prompts)
-        precomputed[
-            "prompt.token_range.entity"
-        ] = prompt_entity_ijs = token_ranges_from_batch(
-            prompts,
-            entities,
-            prompt_offset_mapping,
-        )
-        precomputed["prompt.token_range.entity.last"] = last_token_ranges_from_batch(
-            prompt_entity_ijs
-        )
-        precomputed[
-            "context.token_range.entity"
-        ] = context_entity_ijs = token_ranges_from_batch(
-            contexts,
-            entities,
-            context_offset_mapping,
-        )
-        precomputed["context.token_range.entity.last"] = last_token_ranges_from_batch(
-            context_entity_ijs
-        )
-        precomputed[
-            "context.token_range.attribute"
-        ] = context_attr_ijs = token_ranges_from_batch(
-            contexts, attributes, context_offset_mapping
-        )
+        assert context_inputs is not None and context_offset_mapping is not None
+        prompt_inputs, prompt_offset_mapping = inputs_from_batch(mt, prompts)
+        for string_key, substring_key, inputs, offset_mapping in (
+            ("prompt", "entity", prompt_inputs, prompt_offset_mapping),
+            ("context", "entity", context_inputs, context_offset_mapping),
+            ("context", "attribute", context_inputs, context_offset_mapping),
+        ):
+            strings = cast(list[str], batch.get(string_key))
+            substrings = cast(list[str], batch.get(substring_key))
+
+            lengths = inputs.attention_mask.sum(dim=-1)
+
+            key_base = f"{string_key}.token_range.{substring_key}"
+            precomputed[key_base] = tr = token_ranges_from_batch(
+                strings, substrings, offsets_mapping=offset_mapping
+            )
+
+            key_neg = f"{string_key}.token_range.{substring_key}"
+            precomputed[key_neg] = negative_token_ranges_from_batch(tr, lengths)
+
+            key_base_last = f"{key_base}.last"
+            precomputed[key_base_last] = ltr = last_token_ranges_from_batch(tr)
+
+            key_neg_last = f"{key_neg}.last"
+            precomputed[key_neg_last] = negative_token_ranges_from_batch(ltr, lengths)
 
     # Precompute token IDs if needed.
     if return_target_token_ids:
