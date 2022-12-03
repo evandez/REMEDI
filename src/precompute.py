@@ -253,22 +253,36 @@ def editor_inputs_from_batch(
     if return_token_ranges or return_average_attribute_hiddens:
         assert context_inputs is not None and context_offset_mapping is not None
         prompt_inputs, prompt_offset_mapping = inputs_from_batch(mt, prompts)
-        for string_key, substring_key, inputs, offset_mapping in (
-            ("prompt", "entity", prompt_inputs, prompt_offset_mapping),
-            ("context", "entity", context_inputs, context_offset_mapping),
-            ("context", "attribute", context_inputs, context_offset_mapping),
+        for key, strings, substrings, inputs, offset_mapping in (
+            (
+                "prompt.{}.entity",
+                prompts,
+                entities,
+                prompt_inputs,
+                prompt_offset_mapping,
+            ),
+            (
+                "context.{}.entity",
+                contexts,
+                entities,
+                context_inputs,
+                context_offset_mapping,
+            ),
+            (
+                "context.{}.attribute",
+                contexts,
+                attributes,
+                context_inputs,
+                context_offset_mapping,
+            ),
         ):
-            strings = cast(list[str], batch.get(string_key))
-            substrings = cast(list[str], batch.get(substring_key))
-
-            lengths = inputs.attention_mask.sum(dim=-1)
-
-            key_base = f"{string_key}.token_range.{substring_key}"
+            key_base = key.format("token_range")
             precomputed[key_base] = tr = token_ranges_from_batch(
                 strings, substrings, offsets_mapping=offset_mapping
             )
 
-            key_neg = f"{string_key}.token_range.{substring_key}"
+            key_neg = key.format("negative_token_range")
+            lengths = inputs.attention_mask.sum(dim=-1)
             precomputed[key_neg] = negative_token_ranges_from_batch(tr, lengths)
 
             key_base_last = f"{key_base}.last"
@@ -276,6 +290,8 @@ def editor_inputs_from_batch(
 
             key_neg_last = f"{key_neg}.last"
             precomputed[key_neg_last] = negative_token_ranges_from_batch(ltr, lengths)
+
+        context_attr_ijs = precomputed["context.token_range.attribute"]
 
     # Precompute token IDs if needed.
     if return_target_token_ids:
