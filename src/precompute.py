@@ -193,12 +193,10 @@ def editor_inputs_from_batch(
     batch: dataset_utils.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
-    return_entity_hiddens: bool = False,
-    return_context_hiddens: bool = False,
     return_token_ranges: bool = True,
     return_target_token_ids: bool = True,
-    return_average_entity_hiddens: bool = True,
-    return_average_attribute_hiddens: bool = True,
+    return_entity_hiddens: bool = True,
+    return_attribute_hiddens: bool = True,
     fp32: bool = False,
 ) -> dict:
     """Precompute everything the editor model needs to run from the batch."""
@@ -213,47 +211,34 @@ def editor_inputs_from_batch(
     precomputed: dict = {}
 
     # Precompute inputs.
+    prompt_inputs, prompt_offset_mapping = None, None
     context_inputs, context_offset_mapping = None, None
-    if (
-        return_context_hiddens
-        or return_average_attribute_hiddens
-        or return_token_ranges
-    ):
-        context_inputs, context_offset_mapping = inputs_from_batch(
-            mt, contexts, device=device
-        )
-
-    # Precompute context representations if needed.
-    context_hiddens_by_layer = None
-    if return_context_hiddens or return_average_attribute_hiddens:
-        assert context_inputs is not None
-        context_hiddens_by_layer = hiddens_from_batch(
-            mt, context_inputs, layers=layers, device=device
-        )
-    if return_context_hiddens:
-        assert context_hiddens_by_layer is not None
-        for layer, hiddens in context_hiddens_by_layer.items():
-            precomputed[f"context.hiddens.{layer}"] = hiddens
-
-    # Precompute entity representations if needed.
-    entity_inputs = None
-    entity_hiddens_by_layer = None
-    if return_entity_hiddens or return_average_entity_hiddens:
-        entity_inputs, _ = inputs_from_batch(mt, entities, device=device)
-        entity_last_idx = last_token_index_from_batch(entity_inputs)
-        entity_hiddens_by_layer = hiddens_from_batch(
-            mt, entity_inputs, layers=layers, device=device
-        )
-        for layer, hiddens in entity_hiddens_by_layer.items():
-            precomputed[f"entity.hiddens.{layer}"] = hiddens
-            precomputed[f"entity.hiddens.{layer}.last"] = hiddens[:, entity_last_idx]
+    entity_inputs, entity_offset_mapping = None, None
+    with model_utils.set_padding_side(mt, padding_side="right"):
+        if return_token_ranges:
+            prompt_inputs, prompt_offset_mapping = inputs_from_batch(mt, prompts)
+        if return_attribute_hiddens or return_token_ranges:
+            context_inputs, context_offset_mapping = inputs_from_batch(
+                mt, contexts, device=device
+            )
+        if return_entity_hiddens or return_token_ranges:
+            entity_inputs, entity_offset_mapping = inputs_from_batch(
+                mt, entities, device=device
+            )
 
     # Precompute token ranges if needed.
-    context_attr_ijs = None
-    if return_token_ranges or return_average_attribute_hiddens:
+    if return_token_ranges or return_attribute_hiddens:
+        assert prompt_inputs is not None and prompt_offset_mapping is not None
         assert context_inputs is not None and context_offset_mapping is not None
-        prompt_inputs, prompt_offset_mapping = inputs_from_batch(mt, prompts)
+        assert entity_inputs is not None and entity_offset_mapping is not None
         for key, strings, substrings, inputs, offset_mapping in (
+            (
+                "entity.{}.entity",
+                entities,
+                entities,
+                entity_inputs,
+                entity_offset_mapping,
+            ),
             (
                 "prompt.{}.entity",
                 prompts,
@@ -291,8 +276,6 @@ def editor_inputs_from_batch(
             key_neg_last = f"{key_neg}.last"
             precomputed[key_neg_last] = negative_token_ranges_from_batch(ltr, lengths)
 
-        context_attr_ijs = precomputed["context.token_range.attribute"]
-
     # Precompute token IDs if needed.
     if return_target_token_ids:
         for target_key in ("target_mediated", "target_unmediated"):
@@ -305,23 +288,30 @@ def editor_inputs_from_batch(
                 mt, cast(str, target)
             )
 
-    # Precompute average entity representation if needed.
-    if return_average_entity_hiddens:
-        assert entity_hiddens_by_layer is not None
-        assert entity_inputs is not None
-        for layer, hiddens in entity_hiddens_by_layer.items():
-            counts = entity_inputs.attention_mask.sum(dim=-1, keepdim=True)
-            average = hiddens.sum(dim=1) / counts.cpu()
-            key = f"entity.hiddens.{layer}.average"
-            precomputed[key] = average
+    # Precompute average/last hidden reps if needed.
+    for key_string, key_substring, condition, inputs, in (
+        ("entity", "entity", return_entity_hiddens, entity_inputs),
+        ("context", "attribute", return_attribute_hiddens, context_inputs),
+    ):
+        if not condition:
+            continue
 
-    # Precompute average attr representation if needed.
-    if return_average_attribute_hiddens:
-        assert context_hiddens_by_layer is not None
-        assert context_attr_ijs is not None
-        for layer, hiddens in context_hiddens_by_layer.items():
-            key = f"context.hiddens.{layer}.attribute"
-            precomputed[key] = average_hiddens_from_batch(hiddens, context_attr_ijs)
+        key_token_range = f"{key_string}.token_range.{key_substring}"
+        token_ranges = precomputed[key_token_range]
+        token_ranges_last = precomputed[f"{key_token_range}.last"]
+
+        hiddens_by_layer = hiddens_from_batch(mt, inputs, layers=layers, device=device)
+        for layer, hiddens in hiddens_by_layer.items():
+            key_hiddens = f"{key_string}.hiddens.{layer}"
+            key_hiddens_last = f"{key_hiddens}.last"
+            precomputed[key_hiddens_last] = average_hiddens_from_batch(
+                hiddens, token_ranges_last
+            )
+
+            key_hiddens_average = f"{key_hiddens}.average"
+            precomputed[key_hiddens_average] = average_hiddens_from_batch(
+                hiddens, token_ranges
+            )
 
     if fp32:
         precomputed = _as_fp32(precomputed)
