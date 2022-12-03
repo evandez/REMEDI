@@ -249,7 +249,8 @@ def editor_inputs_from_batch(
                 prompt_offset_mapping,
             ),
             (
-                "context" "entity",
+                "context",
+                "entity",
                 contexts,
                 entities,
                 context_inputs,
