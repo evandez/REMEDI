@@ -121,6 +121,7 @@ class EditedModel(nn.Module):
         batch: dataset_utils.ContextMediationInput,
         generate: Literal[False] = ...,
         inputs: Optional[transformers.BatchEncoding] = ...,
+        padding_side: Optional[str] = ...,
         **kwargs: Any,
     ) -> ModelOutput:
         ...
@@ -131,6 +132,7 @@ class EditedModel(nn.Module):
         batch: dataset_utils.ContextMediationInput,
         generate: Literal[True],
         inputs: Optional[transformers.BatchEncoding] = ...,
+        padding_side: Optional[str] = ...,
         **kwargs: Any,
     ) -> ModelGenerateOutput:
         ...
@@ -140,6 +142,7 @@ class EditedModel(nn.Module):
         batch: dataset_utils.ContextMediationInput,
         generate: bool = False,
         inputs: Optional[transformers.BatchEncoding] = None,
+        padding_side: Optional[str] = None,
         **kwargs: Any,
     ) -> ModelOutput | ModelGenerateOutput:
         """Run the model on the inputs, editing its hidden reps in the process."""
@@ -155,7 +158,12 @@ class EditedModel(nn.Module):
                 return_target_token_ids=False,
             )
 
-        if self.mt.tokenizer.padding_side == "right":
+        # Which token we apply the edit to depends on which side padding is applied. If
+        # caller tells us which, use that, but otherwise just infer from the tokenizer.
+        if padding_side is None:
+            padding_side = self.mt.tokenizer.padding_side
+
+        if padding_side == "right":
             token_range_key = "token_range"
         else:
             token_range_key = "negative_token_range"
@@ -557,7 +565,7 @@ class Editor(nn.Module):
                 outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
                 with apply(self, alpha=alpha, device=device) as edited_mt:
                     outputs_after = edited_mt.model.generate(
-                        batch, inputs=inputs, **generate_kwargs
+                        batch, inputs=inputs, padding_side="left", **generate_kwargs
                     )
 
                 batched_results: dict = {
