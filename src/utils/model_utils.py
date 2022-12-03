@@ -13,7 +13,8 @@ from src.utils.typing import Device, Model, Tokenizer
 import torch
 import transformers
 
-SUPPORTED_MODELS = ("gpt2", "gpt2-xl")
+GPT_J_NAME = "EleutherAI/gpt-j-6B"
+SUPPORTED_MODELS = ("gpt2-small", "gpt2", "gpt2-xl", GPT_J_NAME)
 
 
 @dataclass(frozen=True)
@@ -60,10 +61,18 @@ def load_model(
         ModelAndTokenizer: Loaded model and its tokenizer.
 
     """
+    if name not in SUPPORTED_MODELS:
+        raise ValueError(f"unknown model: {name}")
+
     torch_dtype = torch.float16 if fp16 else None
-    model = transformers.AutoModelForCausalLM.from_pretrained(
-        name, torch_dtype=torch_dtype
-    )
+
+    kwargs: dict = dict(torch_dtype=torch_dtype)
+    if name == GPT_J_NAME:
+        kwargs["low_cpu_mem_usage"] = True
+        if fp16:
+            kwargs["revision"] = "float16"
+
+    model = transformers.AutoModelForCausalLM.from_pretrained(name, **kwargs)
     model.to(device).eval()
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(name)

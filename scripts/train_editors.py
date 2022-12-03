@@ -119,14 +119,29 @@ if __name__ == "__main__":
     parser.add_argument("--experiment-name", "-n", help="experiment name")
     parser.add_argument(
         "--editor-types",
+        "-e",
         nargs="+",
         choices=EDITOR_FACTORIES.keys(),
         default=("linear",),
         help="editor type to train",
     )
-    parser.add_argument("--model", default="gpt2-xl", help="model to edit")
-    parser.add_argument("--dataset", default="counterfact", help="dataset to train on")
-    parser.add_argument("--layers", type=int, nargs="+", help="layers to train for")
+    parser.add_argument(
+        "--model",
+        "-m",
+        choices=model_utils.SUPPORTED_MODELS,
+        default="gpt2-xl",
+        help="model to edit",
+    )
+    parser.add_argument(
+        "--dataset",
+        "-d",
+        choices=dataset_utils.SUPPORTED_DATASETS,
+        default="counterfact",
+        help="dataset to train on",
+    )
+    parser.add_argument(
+        "--layers", "-l", type=int, nargs="+", help="layers to train for"
+    )
     parser.add_argument(
         "--max-epochs",
         type=int,

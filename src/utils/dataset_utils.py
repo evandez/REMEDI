@@ -8,6 +8,8 @@ from src.utils.typing import Dataset, PathLike, StrSequence
 
 import datasets
 
+SUPPORTED_DATASETS = ("counterfact",)
+
 COUNTERFACT_URL = "https://rome.baulab.info/data/dsets/counterfact.json"
 
 
