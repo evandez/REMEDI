@@ -148,7 +148,7 @@ def negative_token_ranges_from_batch(
     """Convert positive token ranges to negative ones."""
     _validate_lengths(lengths)
     _validate_token_ranges(token_ranges, batch_size=len(lengths))
-    return token_ranges - lengths[:, None]
+    return token_ranges.cpu() - lengths[:, None].cpu()
 
 
 def first_token_ids_from_batch(
