@@ -172,7 +172,7 @@ class EditedModel(nn.Module):
 
         entity_ij = precomputed[entity_ij_key]
         hiddens_entity = precomputed[hiddens_entity_key]
-        hiddens_attr = precomputed[f"context.attribute.hiddens.{layer}"]
+        hiddens_attr = precomputed[f"context.attribute.hiddens.{layer}.average"]
 
         # Make type checker happy and reformat.
         dtype = self.mt.model.config.torch_dtype
