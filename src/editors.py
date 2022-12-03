@@ -25,7 +25,6 @@ from tqdm.auto import tqdm
 DEFAULT_ALPHA = 1.0
 DEFAULT_LAM_ADV = 1.0
 DEFAULT_LAM_KL = 0.1
-DEFAULT_LAM_KL_ALT = 0.1
 DEFAULT_N_TOP = 10
 DEFAULT_N_GENERATE = 10
 DEFAULT_BATCH_SIZE = 32
@@ -289,7 +288,6 @@ def editing_loss(
     batch: dict,
     lam_adv: float | None = DEFAULT_LAM_ADV,
     lam_kl: float | None = DEFAULT_LAM_KL,
-    lam_kl_alt: float | None = DEFAULT_LAM_KL_ALT,
     device: Optional[Device] = None,
 ) -> torch.Tensor:
     """Apply the edit to the representat
@@ -328,39 +326,6 @@ def editing_loss(
         logp_edit = logp_edit[batch_idx, last_idx]
         loss += lam_kl * nn.functional.kl_div(
             logp_edit, logp_orig, reduction="batchmean", log_target=True
-        )
-
-    # NOTE(evandez): Experimental feature. Hacky and might be deleted.
-    # If requested, include a KL loss term with token distribution on separate prompt.
-    if lam_kl_alt is not None:
-        prompt_alt = batch["generation_prompts"][1]
-        inputs_alt, offset_mapping_alt = precompute.inputs_from_batch(
-            editor.mt, prompt_alt, device=device
-        )
-        last_idx_alt = precompute.last_token_index_from_batch(inputs_alt)
-
-        batch_alt = {**batch}
-        batch_alt["prompt"] = prompt_alt
-        batch_alt[
-            "prompt.token_range.entity"
-        ] = entity_ij = precompute.token_ranges_from_batch(
-            prompt_alt, batch["entity"], offset_mapping_alt
-        )
-        batch[
-            "prompt.token_range.entity.last"
-        ] = precompute.last_token_ranges_from_batch(entity_ij)
-
-        with torch.inference_mode():
-            outputs_alt_orig = editor.mt.model(**inputs_alt)
-        with apply(editor, device=device) as mt_edit:
-            outputs_alt_edit = mt_edit.model(batch_alt, inputs=inputs_alt)
-
-        logp_alt_orig = torch.log_softmax(outputs_alt_orig.logits, dim=-1)
-        logp_alt_edit = torch.log_softmax(outputs_alt_edit.logits, dim=-1)
-        logp_alt_orig = logp_alt_orig[batch_idx, last_idx_alt]
-        logp_alt_edit = logp_alt_edit[batch_idx, last_idx_alt]
-        loss += lam_kl_alt * nn.functional.kl_div(
-            logp_alt_edit, logp_alt_orig, reduction="batchmean", log_target=True
         )
 
     return loss
@@ -442,7 +407,6 @@ class Editor(nn.Module):
         lr: float = DEFAULT_LR,
         lam_adv: float | None = DEFAULT_LAM_ADV,
         lam_kl: float | None = DEFAULT_LAM_KL,
-        lam_kl_alt: float | None = DEFAULT_LAM_KL_ALT,
         patience: int = DEFAULT_PATIENCE,
         device: Optional[Device] = None,
     ) -> EditorTrainingRun:
@@ -459,8 +423,6 @@ class Editor(nn.Module):
             lr: Learning rate.
             lam_adv: Loss weight for adversarial log[1 - p(unmediated)] term.
             lam_kl: Loss weight for KL div on next token distribution for prompt.
-            lam_kl_alt: (EXPERIMENTAL) Loss weight for KL div on next token
-                distribution for an alternative prompt.
             patience: Stop after val loss does not improve for this many epochs.
             device: Run editor and model on this device.
 
@@ -504,7 +466,6 @@ class Editor(nn.Module):
                         batch=batch,
                         lam_adv=lam_adv,
                         lam_kl=lam_kl,
-                        lam_kl_alt=lam_kl_alt,
                         device=device,
                     )
                     if epoch > 0:
@@ -526,7 +487,6 @@ class Editor(nn.Module):
                             batch=batch,
                             lam_adv=lam_adv,
                             lam_kl=lam_kl,
-                            lam_kl_alt=lam_kl_alt,
                             device=device,
                         )
                     val_loss += loss.item()

@@ -88,7 +88,6 @@ def main(args: argparse.Namespace) -> None:
                     batch_size=args.batch_size,
                     lr=args.lr,
                     lam_kl=args.lam_kl,
-                    lam_kl_alt=args.lam_kl_alt,
                     lam_adv=args.lam_adv,
                     device=device,
                 )
@@ -162,12 +161,6 @@ if __name__ == "__main__":
         type=float,
         default=editors.DEFAULT_LAM_KL,
         help="kl div loss weight",
-    )
-    parser.add_argument(
-        "--lam-kl-alt",
-        type=float,
-        # Default to None, since experimental.
-        help="alt prompt kl div loss weight",
     )
     parser.add_argument(
         "--lam-adv",
