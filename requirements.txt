@@ -1,4 +1,5 @@
 git+https://github.com/davidbau/baukit
+accelerate
 dataclasses_json
 datasets
 jupyter
