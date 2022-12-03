@@ -160,11 +160,11 @@ class EditedModel(nn.Module):
         else:
             token_range_key = "negative_token_range"
 
-        entity_ij_key = f"prompt.{token_range_key}.entity"
+        entity_ij_key = f"prompt.entity.{token_range_key}"
         if self.editor.edit_last_entity_token:
             entity_ij_key += ".last"
 
-        hiddens_entity_key = f"entity.hiddens.{layer}."
+        hiddens_entity_key = f"entity.entity.hiddens.{layer}."
         if self.editor.input_last_entity_token:
             hiddens_entity_key += "last"
         else:
@@ -172,7 +172,7 @@ class EditedModel(nn.Module):
 
         entity_ij = precomputed[entity_ij_key]
         hiddens_entity = precomputed[hiddens_entity_key]
-        hiddens_attr = precomputed[f"context.hiddens.{layer}.attribute"]
+        hiddens_attr = precomputed[f"context.attribute.hiddens.{layer}"]
 
         # Make type checker happy and reformat.
         dtype = self.mt.model.config.torch_dtype

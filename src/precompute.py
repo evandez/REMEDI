@@ -231,50 +231,57 @@ def editor_inputs_from_batch(
         assert prompt_inputs is not None and prompt_offset_mapping is not None
         assert context_inputs is not None and context_offset_mapping is not None
         assert entity_inputs is not None and entity_offset_mapping is not None
-        for key, strings, substrings, inputs, offset_mapping in (
+        for key_string, key_substring, strings, substrings, inputs, offset_mapping in (
             (
-                "entity.{}.entity",
+                "entity",
+                "entity",
                 entities,
                 entities,
                 entity_inputs,
                 entity_offset_mapping,
             ),
             (
-                "prompt.{}.entity",
+                "prompt",
+                "entity",
                 prompts,
                 entities,
                 prompt_inputs,
                 prompt_offset_mapping,
             ),
             (
-                "context.{}.entity",
+                "context" "entity",
                 contexts,
                 entities,
                 context_inputs,
                 context_offset_mapping,
             ),
             (
-                "context.{}.attribute",
+                "context",
+                "attribute",
                 contexts,
                 attributes,
                 context_inputs,
                 context_offset_mapping,
             ),
         ):
-            key_base = key.format("token_range")
-            precomputed[key_base] = tr = token_ranges_from_batch(
+            key = f"{key_string}.{key_substring}"
+
+            key_tr_base = f"{key}.token_range"
+            precomputed[key_tr_base] = tr = token_ranges_from_batch(
                 strings, substrings, offsets_mapping=offset_mapping
             )
 
-            key_neg = key.format("negative_token_range")
+            key_tr_neg = f"{key}.negative_token_range"
             lengths = inputs.attention_mask.sum(dim=-1)
-            precomputed[key_neg] = negative_token_ranges_from_batch(tr, lengths)
+            precomputed[key_tr_neg] = negative_token_ranges_from_batch(tr, lengths)
 
-            key_base_last = f"{key_base}.last"
-            precomputed[key_base_last] = ltr = last_token_ranges_from_batch(tr)
+            key_tr_base_last = f"{key_tr_base}.last"
+            precomputed[key_tr_base_last] = ltr = last_token_ranges_from_batch(tr)
 
-            key_neg_last = f"{key_neg}.last"
-            precomputed[key_neg_last] = negative_token_ranges_from_batch(ltr, lengths)
+            key_tr_neg_last = f"{key_tr_neg}.last"
+            precomputed[key_tr_neg_last] = negative_token_ranges_from_batch(
+                ltr, lengths
+            )
 
     # Precompute token IDs if needed.
     if return_target_token_ids:
@@ -296,13 +303,15 @@ def editor_inputs_from_batch(
         if not condition:
             continue
 
-        key_token_range = f"{key_string}.token_range.{key_substring}"
+        key = f"{key_string}.{key_substring}"
+
+        key_token_range = f"{key}.token_range"
         token_ranges = precomputed[key_token_range]
         token_ranges_last = precomputed[f"{key_token_range}.last"]
 
         hiddens_by_layer = hiddens_from_batch(mt, inputs, layers=layers, device=device)
         for layer, hiddens in hiddens_by_layer.items():
-            key_hiddens = f"{key_string}.hiddens.{layer}"
+            key_hiddens = f"{key}.hiddens.{layer}"
             key_hiddens_last = f"{key_hiddens}.last"
             precomputed[key_hiddens_last] = average_hiddens_from_batch(
                 hiddens, token_ranges_last
