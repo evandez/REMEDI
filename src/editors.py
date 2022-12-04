@@ -350,7 +350,7 @@ def editing_loss(
         logp_orig = torch.log_softmax(outputs_orig.logits, dim=-1)
 
         loss_kl_experiment = torch.zeros_like(loss)
-        for bi, (si, sj) in enumerate(between_ijs):
+        for bi, (si, sj) in enumerate(between_ijs.tolist()):
             assert si >= 0 and sj >= 0
             if sj <= si:
                 continue
