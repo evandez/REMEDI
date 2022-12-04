@@ -102,7 +102,7 @@ def main(args: argparse.Namespace) -> None:
                     print(f"found existing {split} eval results at {eval_file}")
                     continue
 
-                results = editor.evalxuate(
+                results = editor.evaluate(
                     precomputed[split],  # type: ignore
                     batch_size=args.batch_size,
                     device=device,
