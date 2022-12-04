@@ -89,7 +89,8 @@ def main(args: argparse.Namespace) -> None:
                     max_epochs=args.max_epochs,
                     batch_size=args.batch_size,
                     lr=args.lr,
-                    lam_kl=args.lam_kl,
+                    # lam_kl=args.lam_kl,
+                    lam_kl_experiment=0.1,
                     lam_adv=args.lam_adv,
                     device=device,
                 )

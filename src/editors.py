@@ -296,6 +296,7 @@ def editing_loss(
     batch: dict,
     lam_adv: float | None = DEFAULT_LAM_ADV,
     lam_kl: float | None = DEFAULT_LAM_KL,
+    lam_kl_experiment: float | None = None,
     device: Optional[Device] = None,
 ) -> torch.Tensor:
     """Apply the edit to the representat
@@ -327,6 +328,7 @@ def editing_loss(
 
     # If requested, include a KL loss term with the original token distribution.
     if lam_kl is not None:
+        assert lam_kl_experiment is None
         with torch.inference_mode():
             outputs_orig = editor.mt.model(**inputs)
         logp_orig = torch.log_softmax(outputs_orig.logits, dim=-1)
@@ -335,6 +337,30 @@ def editing_loss(
         loss += lam_kl * nn.functional.kl_div(
             logp_edit, logp_orig, reduction="batchmean", log_target=True
         )
+
+    # Experimental KL term, applied to tokens between entity and next token.
+    if lam_kl_experiment is not None:
+        assert lam_kl is None
+        between_ijs = torch.empty(batch_size, 2)
+        between_ijs[:, 0] = batch["prompt.entity.token_range"][:, -1] - 1
+        between_ijs[:, 1] = batch["prompt.length"] - 1
+
+        with torch.inference_mode():
+            outputs_orig = editor.mt.model(**inputs)
+        logp_orig = torch.log_softmax(outputs_orig.logits, dim=-1)
+
+        loss_kl_experiment = torch.zeros_like(loss)
+        for bi, (si, sj) in enumerate(between_ijs):
+            assert si >= 0 and sj >= 0
+            if sj <= si:
+                continue
+            logp_edit_between = logp_edit[bi, si:sj].view(-1, logp_edit.shape[-1])
+            logp_orig_between = logp_orig[bi, si:sj].view(-1, logp_orig.shape[-1])
+            loss_kl_experiment = nn.functional.kl_div(
+                logp_edit_between, logp_orig_between, reduction="sum", log_target=True
+            )
+        loss_kl_experiment /= batch_size
+        loss += lam_kl_experiment * loss_kl_experiment
 
     return loss
 
@@ -415,6 +441,7 @@ class Editor(nn.Module):
         lr: float = DEFAULT_LR,
         lam_adv: float | None = DEFAULT_LAM_ADV,
         lam_kl: float | None = DEFAULT_LAM_KL,
+        lam_kl_experiment: float | None = None,
         patience: int = DEFAULT_PATIENCE,
         device: Optional[Device] = None,
     ) -> EditorTrainingRun:
@@ -431,6 +458,7 @@ class Editor(nn.Module):
             lr: Learning rate.
             lam_adv: Loss weight for adversarial log[1 - p(unmediated)] term.
             lam_kl: Loss weight for KL div on next token distribution for prompt.
+            lam_kl_experiment: Loss weight for experimental KL term.
             patience: Stop after val loss does not improve for this many epochs.
             device: Run editor and model on this device.
 
@@ -474,6 +502,7 @@ class Editor(nn.Module):
                         batch=batch,
                         lam_adv=lam_adv,
                         lam_kl=lam_kl,
+                        lam_kl_experiment=lam_kl_experiment,
                         device=device,
                     )
                     if epoch > 0:
@@ -495,6 +524,7 @@ class Editor(nn.Module):
                             batch=batch,
                             lam_adv=lam_adv,
                             lam_kl=lam_kl,
+                            lam_kl_experiment=lam_kl_experiment,
                             device=device,
                         )
                     val_loss += loss.item()

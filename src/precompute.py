@@ -265,6 +265,9 @@ def editor_inputs_from_batch(
                 context_offset_mapping,
             ),
         ):
+            lengths = inputs.attention_mask.sum(dim=-1).cpu()
+            precomputed[f"{key_string}.length"] = lengths
+
             key = f"{key_string}.{key_substring}"
 
             key_tr_base = f"{key}.token_range"
@@ -273,7 +276,6 @@ def editor_inputs_from_batch(
             )
 
             key_tr_neg = f"{key}.negative_token_range"
-            lengths = inputs.attention_mask.sum(dim=-1)
             precomputed[key_tr_neg] = negative_token_ranges_from_batch(tr, lengths)
 
             key_tr_base_last = f"{key_tr_base}.last"
