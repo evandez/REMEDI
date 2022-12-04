@@ -7,6 +7,7 @@ from pathlib import Path
 from src import editors, precompute
 from src.utils import dataset_utils, env, model_utils, random_utils
 
+import datasets
 import torch
 
 EDITOR_FACTORIES = {
@@ -20,6 +21,7 @@ EDITOR_FACTORIES = {
 def main(args: argparse.Namespace) -> None:
     """Train the editors."""
     random_utils.set_seed(args.seed)
+    datasets.disable_caching()
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
@@ -100,7 +102,7 @@ def main(args: argparse.Namespace) -> None:
                     print(f"found existing {split} eval results at {eval_file}")
                     continue
 
-                results = editor.evaluate(
+                results = editor.evalxuate(
                     precomputed[split],  # type: ignore
                     batch_size=args.batch_size,
                     device=device,
