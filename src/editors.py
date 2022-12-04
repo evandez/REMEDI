@@ -341,7 +341,7 @@ def editing_loss(
     # Experimental KL term, applied to tokens between entity and next token.
     if lam_kl_experiment is not None:
         assert lam_kl is None
-        between_ijs = torch.empty(batch_size, 2)
+        between_ijs = torch.empty(batch_size, 2, dtype=torch.long)
         between_ijs[:, 0] = batch["prompt.entity.token_range"][:, -1] - 1
         between_ijs[:, 1] = batch["prompt.length"] - 1
 
