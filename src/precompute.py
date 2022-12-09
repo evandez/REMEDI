@@ -359,7 +359,7 @@ def editor_inputs_from_dataset(
 
 def has_editor_inputs(batch: dict) -> bool:
     """Determine if editor inputs already precomputed."""
-    return "prompt.token_range.entity" in batch  # Check for just one flag entry.
+    return "prompt.entity.token_range" in batch  # Check for just one flag entry.
 
 
 def entity_deltas_from_batch(

@@ -115,8 +115,46 @@ class EditedModel(nn.Module):
         self.alpha = alpha
         self.device = device
 
+    def maybe_compute_editor_inputs(
+        self, batch: dataset_utils.ContextMediationInput | dict
+    ) -> dict:
+        """Maybe compute hidden states for batch, if not already present."""
+        precomputed = {**batch}
+        if not precompute.has_editor_inputs(precomputed):
+            precomputed = precompute.editor_inputs_from_batch(
+                self.mt,
+                cast(dataset_utils.ContextMediationInput, batch),
+                layers=[self.editor.layer],
+                device=self.device,
+                return_target_token_ids=False,
+            )
+        return precomputed
+
+    def compute_edit_directions(self, batch: dict) -> torch.Tensor:
+        """Compute edit directions for batch."""
+        precomputed = self.maybe_compute_editor_inputs(batch)
+
+        hiddens_entity_key = f"entity.entity.hiddens.{self.editor.layer}."
+        if self.editor.input_last_entity_token:
+            hiddens_entity_key += "last"
+        else:
+            hiddens_entity_key += "average"
+
+        hiddens_entity = precomputed[hiddens_entity_key]
+        hiddens_attr = precomputed[
+            f"context.attribute.hiddens.{self.editor.layer}.average"
+        ]
+
+        dtype = self.mt.model.config.torch_dtype
+        hiddens_entity = cast(torch.Tensor, hiddens_entity).to(self.device, dtype)
+        hiddens_attr = cast(torch.Tensor, hiddens_attr).to(self.device, dtype)
+
+        directions = self.editor(entity=hiddens_entity, attribute=hiddens_attr)
+
+        return directions
+
     @overload
-    def _run_edited_model(
+    def compute_model_outputs(
         self,
         batch: dataset_utils.ContextMediationInput,
         generate: Literal[False] = ...,
@@ -127,7 +165,7 @@ class EditedModel(nn.Module):
         ...
 
     @overload
-    def _run_edited_model(
+    def compute_model_outputs(
         self,
         batch: dataset_utils.ContextMediationInput,
         generate: Literal[True],
@@ -137,26 +175,17 @@ class EditedModel(nn.Module):
     ) -> ModelGenerateOutput:
         ...
 
-    def _run_edited_model(
+    def compute_model_outputs(
         self,
-        batch: dataset_utils.ContextMediationInput,
+        batch: dataset_utils.ContextMediationInput | dict,
         generate: bool = False,
         inputs: Optional[transformers.BatchEncoding] = None,
         padding_side: Optional[str] = None,
         **kwargs: Any,
     ) -> ModelOutput | ModelGenerateOutput:
         """Run the model on the inputs, editing its hidden reps in the process."""
-        layer = self.editor.layer
-
-        precomputed = {**batch}
-        if not precompute.has_editor_inputs(precomputed):
-            precomputed = precompute.editor_inputs_from_batch(
-                self.mt,
-                batch,
-                layers=[layer],
-                device=self.device,
-                return_target_token_ids=False,
-            )
+        precomputed = self.maybe_compute_editor_inputs(batch)
+        directions = self.compute_edit_directions(precomputed)
 
         # Which token we apply the edit to depends on which side padding is applied. If
         # caller tells us which, use that, but otherwise just infer from the tokenizer.
@@ -172,33 +201,17 @@ class EditedModel(nn.Module):
         if self.editor.edit_last_entity_token:
             entity_ij_key += ".last"
 
-        hiddens_entity_key = f"entity.entity.hiddens.{layer}."
-        if self.editor.input_last_entity_token:
-            hiddens_entity_key += "last"
-        else:
-            hiddens_entity_key += "average"
+        entity_ij = cast(torch.Tensor, precomputed[entity_ij_key])
 
-        entity_ij = precomputed[entity_ij_key]
-        hiddens_entity = precomputed[hiddens_entity_key]
-        hiddens_attr = precomputed[f"context.attribute.hiddens.{layer}.average"]
-
-        # Make type checker happy and reformat.
-        dtype = self.mt.model.config.torch_dtype
-        hiddens_entity = cast(torch.Tensor, hiddens_entity).to(self.device, dtype)
-        hiddens_attr = cast(torch.Tensor, hiddens_attr).to(self.device, dtype)
-        entity_ij = cast(torch.Tensor, entity_ij)
-
-        directions = self.editor(entity=hiddens_entity, attribute=hiddens_attr)
-
+        # Now do forward pass on edited model.
         if inputs is None:
             prompt = batch["prompt"]
             inputs, _ = precompute.inputs_from_batch(
                 self.mt, prompt, device=self.device
             )
-
         with apply_direction(
             model=self.mt.model,
-            layer=layer,
+            layer=self.editor.layer,
             directions=directions,
             token_ranges=entity_ij,
             alpha=self.alpha,
@@ -229,7 +242,9 @@ class EditedModel(nn.Module):
             Standard huggingface outputs, but for the edited model.
 
         """
-        return self._run_edited_model(batch, inputs=inputs, generate=False, **kwargs)
+        return self.compute_model_outputs(
+            batch, inputs=inputs, generate=False, **kwargs
+        )
 
     def generate(
         self,
@@ -238,7 +253,7 @@ class EditedModel(nn.Module):
         **kwargs: Any,
     ) -> ModelGenerateOutput:
         """Forwards to `mt.model.generate`, but still applies editor."""
-        return self._run_edited_model(batch, inputs=inputs, generate=True, **kwargs)
+        return self.compute_model_outputs(batch, inputs=inputs, generate=True, **kwargs)
 
 
 @dataclass(frozen=True)
