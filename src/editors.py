@@ -424,8 +424,8 @@ class Editor(nn.Module):
         *,
         mt: model_utils.ModelAndTokenizer,
         layer: int,
-        input_last_entity_token: bool = False,
-        edit_last_entity_token: bool = False,
+        input_last_entity_token: bool = True,
+        edit_last_entity_token: bool = True,
     ):
         """Initialize the editor."""
         super().__init__()
