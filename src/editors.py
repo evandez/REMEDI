@@ -27,7 +27,7 @@ DEFAULT_LAM_ADV = 1.0
 DEFAULT_LAM_KL = 0.1
 DEFAULT_N_TOP = 10
 DEFAULT_N_GENERATE = 10
-DEFAULT_BATCH_SIZE = 32
+DEFAULT_BATCH_SIZE = 16
 DEFAULT_MAX_EPOCHS = 20
 DEFAULT_PATIENCE = 2
 DEFAULT_LR = 1e-3
@@ -721,7 +721,7 @@ class RandomEditor(Editor):
                     batch = precompute.entity_deltas_from_batch(
                         self.mt, batch, layers=[self.layer], device=device
                     )
-                rc.add(batch[f"prompt_in_context.delta.{self.layer}"])
+                rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"])
 
         self.mean[:] = rc.mean()
         self.covariance[:] = rc.covariance()

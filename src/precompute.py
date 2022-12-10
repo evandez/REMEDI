@@ -367,7 +367,6 @@ def entity_deltas_from_batch(
     batch: dataset_utils.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
-    return_hiddens: bool = False,
     return_token_ranges: bool = True,
     return_deltas: bool = True,
     fp32: bool = False,
@@ -379,7 +378,6 @@ def entity_deltas_from_batch(
         batch: Context mediation-style batch.
         layers: Layers to compute deltas in. Defaults to all.
         device: Send model and inputs to this device.
-        return_hiddens: Return hidden states for contextualized prompt.
         return_token_ranges: Return entity token ranges for contextualied prompt.
         return_deltas: Return entity deltas for each layer.
         fp32: Force cast each tensor to fp32.
@@ -401,37 +399,33 @@ def entity_deltas_from_batch(
     inputs = None
     first_entity_token_ranges = None
     last_entity_token_ranges = None
-    if return_hiddens or return_token_ranges or return_deltas:
-        inputs, offset_mapping = inputs_from_batch(
-            mt, prompts_in_context, device=device
-        )
+    if return_token_ranges or return_deltas:
+        with model_utils.set_padding_side(mt, padding_side="right"):
+            inputs, offset_mapping = inputs_from_batch(
+                mt, prompts_in_context, device=device
+            )
         first_entity_token_ranges = token_ranges_from_batch(
             inputs, entities, offset_mapping
         )
         last_entity_token_ranges = token_ranges_from_batch(
             inputs, entities, offset_mapping, occurrence=1
         )
-        if return_token_ranges:
-            for position, token_ranges in (
-                ("first", first_entity_token_ranges),
-                ("last", last_entity_token_ranges),
-            ):
-                key = f"prompt_in_context.entity.{position}.token_range"
-                precomputed[key] = token_ranges
 
-    hiddens_by_layer = None
-    if return_hiddens or return_deltas:
-        assert inputs is not None
-        hiddens_by_layer = hiddens_from_batch(mt, inputs, layers=layers, device=device)
-        if return_hiddens:
-            for layer, hiddens in hiddens_by_layer.items():
-                key = f"prompt_in_context.hiddens.{layer}"
-                precomputed[key] = hiddens
-
-    if return_deltas:
-        assert hiddens_by_layer is not None
+    if return_token_ranges:
         assert first_entity_token_ranges is not None
         assert last_entity_token_ranges is not None
+        for position, token_ranges in (
+            ("first", first_entity_token_ranges),
+            ("last", last_entity_token_ranges),
+        ):
+            key = f"prompt_in_context.entity.token_range.{position}"
+            precomputed[key] = token_ranges
+
+    if return_deltas:
+        assert inputs is not None
+        assert first_entity_token_ranges is not None
+        assert last_entity_token_ranges is not None
+        hiddens_by_layer = hiddens_from_batch(mt, inputs, layers=layers, device=device)
         for layer, hiddens in hiddens_by_layer.items():
             first_entity_hiddens = average_hiddens_from_batch(
                 hiddens, first_entity_token_ranges
@@ -441,7 +435,7 @@ def entity_deltas_from_batch(
             )
             delta = last_entity_hiddens - first_entity_hiddens
 
-            key = f"prompt_in_context.delta.{layer}"
+            key = f"prompt_in_context.entity.delta.{layer}"
             precomputed[key] = delta
 
     if fp32:
