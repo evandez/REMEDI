@@ -416,6 +416,29 @@ class EditorEvaluateRun(DataClassJsonMixin):
     results: list[EditorEvaluationResult]
 
 
+@dataclass(frozen=True)
+class EditorClassificationResult(DataClassJsonMixin):
+    """Result for single sample from `Editor.classify`."""
+
+    sample: dict[str, str]
+    generation: str
+
+    # Scores computed with entity and editor direction.
+    score_editor_mediated: float
+    score_editor_unmediated: float
+
+    # Scores computed with entity and average hidden rep.
+    score_hidden_mediated: float
+    score_hidden_unmediated: float
+
+
+@dataclass(frozen=True)
+class EditorClassifyRun(DataClassJsonMixin):
+    """Wrapper around a list of individual classification results."""
+
+    results: list[EditorClassificationResult]
+
+
 class Editor(nn.Module):
     """A simple linear editing model."""
 
@@ -656,6 +679,100 @@ class Editor(nn.Module):
                     results.append(result)
 
             return EditorEvaluateRun(results)
+
+    def classify(
+        self,
+        *,
+        dataset: Dataset,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        n_generate: int = DEFAULT_N_GENERATE,
+        device: Device | None = None,
+    ) -> EditorClassifyRun:
+        """Determine whether model believes unmediated/mediated attr is true of entity.
+
+        Uses cosine similarity of edit direction with entity representation as a
+        measure of how much model believes attribute to be true of entity.
+
+        Args:
+            dataset: The datast to run on.
+            batch_size: Model batch size.
+            n_generate: Number of tokens to generate from prompt (before edit).
+            device: Send model and data to this device.
+
+        Returns:
+            The classification results for each sample.
+
+        """
+        precomputed = precompute.classification_inputs_from_dataset(
+            mt=self.mt,
+            dataset=dataset,
+            layers=[self.layer],
+            batch_size=batch_size,
+            device=device,
+        )
+
+        key_e = f"entity.entity.hiddens.{self.layer}.last"
+        key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
+        key_m = f"context.attribute.hiddens.{self.layer}.average"
+
+        eps = 1e-5 if model_utils.determine_dtype(self.mt) is torch.float16 else 1e-8
+        sim = nn.CosineSimilarity(eps=eps)
+
+        results = []
+        with precomputed.formatted_as("torch"):
+            loader = torch.utils.data.DataLoader(
+                cast(torch.utils.data.Dataset, precomputed), batch_size=batch_size
+            )
+            for batch in tqdm(loader):
+                if not precompute.has_classification_inputs(batch):
+                    batch = precompute.classification_inputs_from_batch(
+                        self.mt, batch, layers=[self.layer], device=device
+                    )
+
+                # Determine model completions.
+                prompts = batch["prompt"]
+                with model_utils.set_padding_side(self.mt, padding_side="left"):
+                    inputs, _ = precompute.inputs_from_batch(
+                        self.mt, prompts, device=device
+                    )
+                outputs = self.mt.model.generate(
+                    **inputs,
+                    max_new_tokens=n_generate,
+                    pad_token_id=self.mt.tokenizer.eos_token_id,
+                )
+                generations = self.mt.tokenizer.batch_decode(
+                    outputs, skip_special_tokens=True
+                )
+
+                # Determine similarity between entity rep and attribute/direction reps.
+                entities = batch[key_e]
+                attributes_u = batch[key_u]
+                attributes_m = batch[key_m]
+
+                directions_u = self(entity=entities, attribute=attributes_u)
+                directions_m = self(entity=entities, attribute=attributes_m)
+
+                scores_editor_u = sim(entities, directions_u)
+                scores_editor_m = sim(entities, directions_m)
+                scores_hiddens_u = sim(entities, attributes_u)
+                scores_hiddens_m = sim(entities, attributes_m)
+
+                for bi in range(len(entities)):
+                    results.append(
+                        EditorClassificationResult(
+                            sample={
+                                key: batch[key][bi]
+                                for key in dataset_utils.ContextMediationSample.__required_keys__
+                            },
+                            generation=generations[bi],
+                            score_editor_mediated=scores_editor_m[bi].item(),
+                            score_editor_unmediated=scores_editor_u[bi].item(),
+                            score_hidden_mediated=scores_hiddens_m[bi].item(),
+                            score_hidden_unmediated=scores_hiddens_u[bi].item(),
+                        )
+                    )
+
+        return EditorClassifyRun(results=results)
 
 
 class RandomEditor(Editor):

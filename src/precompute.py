@@ -367,9 +367,9 @@ def entity_deltas_from_batch(
     batch: dataset_utils.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
+    fp32: bool = False,
     return_token_ranges: bool = True,
     return_deltas: bool = True,
-    fp32: bool = False,
 ) -> dict:
     """Compute in-context entity delta for the batch.
 
@@ -378,9 +378,9 @@ def entity_deltas_from_batch(
         batch: Context mediation-style batch.
         layers: Layers to compute deltas in. Defaults to all.
         device: Send model and inputs to this device.
+        fp32: Force cast each tensor to fp32.
         return_token_ranges: Return entity token ranges for contextualied prompt.
         return_deltas: Return entity deltas for each layer.
-        fp32: Force cast each tensor to fp32.
 
     Returns:
         Deltas and related precomputed values.
@@ -471,3 +471,93 @@ def entity_deltas_from_dataset(
 def has_entity_deltas(batch: dict) -> bool:
     """Return True if the batch already has precomputed entity deltas."""
     return "prompt_in_context" in batch
+
+
+def classification_inputs_from_batch(
+    mt: model_utils.ModelAndTokenizer,
+    batch: dataset_utils.ContextMediationInput,
+    layers: Optional[Sequence[int]] = None,
+    device: Optional[Device] = None,
+    fp32: bool = False,
+    **kwargs: Any,
+) -> dict:
+    """Precompute classification inputs for the batch.
+
+    An extension of `editor_inputs_from_batch` that additionally computes attribute
+    directions for the unmediated case.
+
+    Args:
+        mt: Model and tokenizer.
+        batch: The batch.
+        layers: Model layers to classify entities at.
+        device: Send model and inputs to this device.
+        fp32: Force cast each tensor to fp32.
+
+    Returns:
+        Batch with precomputed values.
+
+    """
+    precomputed = {**batch}
+    if not has_editor_inputs(precomputed):
+        precomputed = editor_inputs_from_batch(
+            mt, batch, layers=layers, device=device, fp32=fp32, **kwargs
+        )
+
+    contexts_m = batch["context"]
+    attributes_m = batch["attribute"]
+    targets_m = batch["target_mediated"]
+    targets_u = batch["target_unmediated"]
+    if targets_m is None or targets_u is None:
+        raise ValueError("batch missing target words")
+
+    precomputed["context_unmediated"] = contexts_u = [
+        context.replace(target_m, target_u)
+        for context, target_m, target_u in zip(contexts_m, targets_m, targets_u)
+    ]
+    precomputed["attribute_unmediated"] = attributes_u = [
+        attribute.replace(target_m, target_u)
+        for attribute, target_m, target_u in zip(attributes_m, targets_m, targets_u)
+    ]
+
+    with model_utils.set_padding_side(mt, padding_side="right"):
+        inputs, offsets_mapping = inputs_from_batch(mt, contexts_u, device=device)
+
+    trs_all = token_ranges_from_batch(contexts_u, attributes_u, offsets_mapping)
+    trs_last = last_token_ranges_from_batch(trs_all)
+
+    hiddens_by_layer = hiddens_from_batch(mt, inputs, layers=layers, device=device)
+    for layer, hiddens in hiddens_by_layer.items():
+        key = f"context_unmediated.attribute_unmediated.hiddens.{layer}"
+        precomputed[f"{key}.average"] = average_hiddens_from_batch(hiddens, trs_all)
+        precomputed[f"{key}.last"] = average_hiddens_from_batch(hiddens, trs_last)
+
+    return precomputed
+
+
+def classification_inputs_from_dataset(
+    mt: model_utils.ModelAndTokenizer,
+    dataset: Dataset,
+    layers: Optional[Sequence[int]] = None,
+    device: Optional[Device] = None,
+    batch_size: int = 64,
+    **kwargs: Any,
+) -> Dataset:
+    """Precompute classification inputs for the whole dataset."""
+    return dataset.map(
+        partial(
+            classification_inputs_from_batch,
+            mt,
+            layers=layers,
+            device=device,
+            fp32=True,
+            **kwargs,
+        ),
+        batched=True,
+        batch_size=batch_size,
+        desc="precompute classification inputs",
+    )
+
+
+def has_classification_inputs(batch: dict) -> bool:
+    """Determine if batch already has precomputed entity inputs."""
+    return "context_unmediated" in batch
