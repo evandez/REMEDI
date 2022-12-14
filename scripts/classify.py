@@ -3,10 +3,9 @@ import argparse
 import logging
 from pathlib import Path
 
-from src import editors, precompute
-from src.utils import dataset_utils, env, experiment_utils, model_utils
+from src import datasets, editors, models, precompute
+from src.utils import env, experiment_utils
 
-import datasets
 import torch
 import torch.utils.data
 
@@ -36,15 +35,15 @@ def main(args: argparse.Namespace) -> None:
         raise ValueError(f"editors not found at {editors_dir}; maybe pass the -e flag")
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
-    mt = model_utils.load_model(args.model, device=device, fp16=fp16)
+    mt = models.load_model(args.model, device=device, fp16=fp16)
 
     # TODO(evandez): Just make a dedicated train/test split for counterfact.
-    train = dataset_utils.load_dataset(args.dataset, split="train[:5000]")
-    test = dataset_utils.load_dataset(args.dataset, split="train[5000:10000]")
+    train = datasets.load_dataset(args.dataset, split="train[:5000]")
+    test = datasets.load_dataset(args.dataset, split="train[5000:10000]")
 
     layers = args.layers
     if layers is None:
-        layers = model_utils.determine_layers(mt)
+        layers = models.determine_layers(mt)
 
     for layer in layers:
         logger.info("begin layer %d", layer)
@@ -87,14 +86,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         "-m",
-        choices=model_utils.SUPPORTED_MODELS,
-        default=model_utils.GPT_J_NAME,
+        choices=models.SUPPORTED_MODELS,
+        default=models.GPT_J_NAME,
         help="model to classify on",
     )
     parser.add_argument(
         "--dataset",
         "-d",
-        choices=dataset_utils.SUPPORTED_DATASETS,
+        choices=datasets.SUPPORTED_DATASETS,
         default="counterfact",
         help="dataset to classify",
     )

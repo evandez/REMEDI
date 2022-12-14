@@ -1,4 +1,4 @@
-"""Utilities for reading relevant environment variables."""
+"""Tools for reading and controlling the runtime environment."""
 import os
 import pathlib
 
@@ -54,7 +54,7 @@ def data_dir(default: PathLike = DEFAULT_DATA_DIR) -> pathlib.Path:
     """Return directory containing project datasets.
 
     Args:
-        default (PathLike, optional): Default to use if KF_DATA_DIR env
+        default (PathLike, optional): Default to use if CM_DATA_DIR env
             variable is not set. Defaults to './data'.
 
     Returns:
@@ -68,7 +68,7 @@ def models_dir(default: PathLike = DEFAULT_MODELS_DIR) -> pathlib.Path:
     """Return directory containing project pretrained models.
 
     Args:
-        default (PathLike, optional): Default to use if KF_MODELS_DIR env
+        default (PathLike, optional): Default to use if CM_MODELS_DIR env
             variable is not set. Defaults to './models'.
 
     Returns:
@@ -82,7 +82,7 @@ def results_dir(default: PathLike = DEFAULT_RESULTS_DIR) -> pathlib.Path:
     """Return directory containing results from any scripts.
 
     Args:
-        default (PathLike, optional): Default to use if KF_RESULTS_DIR env
+        default (PathLike, optional): Default to use if CM_RESULTS_DIR env
             variable is not set. Defaults to './results'.
 
     Returns:

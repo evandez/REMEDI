@@ -122,3 +122,8 @@ def maybe_train_test_split(
     elif "train" not in dataset.keys():
         raise ValueError("dataset has no train split?")
     return dataset["train"].train_test_split(**kwargs)
+
+
+def disable_caching() -> None:
+    """Disable all implicit dataset caching."""
+    datasets.disable_caching()

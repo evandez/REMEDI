@@ -3,10 +3,9 @@ import argparse
 import logging
 from pathlib import Path
 
-from src import editors, precompute
-from src.utils import dataset_utils, experiment_utils, model_utils
+from src import datasets, editors, models, precompute
+from src.utils import experiment_utils
 
-import datasets
 import torch
 
 EDITOR_FACTORIES = {
@@ -38,15 +37,15 @@ def main(args: argparse.Namespace) -> None:
     input_last_entity_token = edit_last_entity_token = not args.use_all_entity_tokens
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
-    mt = model_utils.load_model(args.model, device=device, fp16=fp16)
+    mt = models.load_model(args.model, device=device, fp16=fp16)
 
-    dataset = dataset_utils.load_dataset(args.dataset, split="train[:5000]")
+    dataset = datasets.load_dataset(args.dataset, split="train[:5000]")
 
     layers = args.layers
     if layers is None:
-        layers = model_utils.determine_layers(mt)
+        layers = models.determine_layers(mt)
 
-    dataset = dataset_utils.maybe_train_test_split(dataset, test_size=args.hold_out)
+    dataset = datasets.maybe_train_test_split(dataset, test_size=args.hold_out)
     for editor_type in args.editor_types:
         editor_factory = EDITOR_FACTORIES[editor_type]
         editor_kwargs = dict(
@@ -126,14 +125,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         "-m",
-        choices=model_utils.SUPPORTED_MODELS,
+        choices=models.SUPPORTED_MODELS,
         default="gpt2-xl",
         help="model to edit",
     )
     parser.add_argument(
         "--dataset",
         "-d",
-        choices=dataset_utils.SUPPORTED_DATASETS,
+        choices=datasets.SUPPORTED_DATASETS,
         default="counterfact",
         help="dataset to train on",
     )

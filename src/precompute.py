@@ -2,7 +2,8 @@
 from functools import partial
 from typing import Any, Optional, Sequence, cast
 
-from src.utils import dataset_utils, model_utils, tokenizer_utils
+from src import datasets, models
+from src.utils import tokenizer_utils
 from src.utils.typing import (
     Dataset,
     Device,
@@ -52,7 +53,7 @@ def _validate_token_ranges(
 
 
 def inputs_from_batch(
-    mt: model_utils.ModelAndTokenizer,
+    mt: models.ModelAndTokenizer,
     text: str | StrSequence,
     device: Optional[Device] = None,
 ) -> tuple[ModelInput, Sequence[TokenizerOffsetMapping]]:
@@ -77,7 +78,7 @@ def last_token_index_from_batch(inputs: ModelInput) -> Sequence[int]:
 
 @torch.inference_mode()
 def hiddens_from_batch(
-    mt: model_utils.ModelAndTokenizer,
+    mt: models.ModelAndTokenizer,
     inputs: str | StrSequence | ModelInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
@@ -98,7 +99,7 @@ def hiddens_from_batch(
         inputs, _ = inputs_from_batch(mt, inputs, device=device)
     if device is not None:
         inputs = inputs.to(device)
-    layer_paths = model_utils.determine_layer_paths(mt, layers=layers, return_dict=True)
+    layer_paths = models.determine_layer_paths(mt, layers=layers, return_dict=True)
     with nethook.TraceDict(mt.model, layers=layer_paths.values(), stop=True) as ret:
         mt.model(**inputs)
     hiddens_by_layer = {
@@ -152,11 +153,11 @@ def negative_token_ranges_from_batch(
 
 
 def first_token_ids_from_batch(
-    mt: model_utils.ModelAndTokenizer | Tokenizer, words: str | StrSequence
+    mt: models.ModelAndTokenizer | Tokenizer, words: str | StrSequence
 ) -> torch.Tensor:
     """Return shape (batch_size,) int tensor with first token ID for each word."""
     words = _maybe_batch(words)
-    tokenizer = model_utils.unwrap_tokenizer(mt)
+    tokenizer = models.unwrap_tokenizer(mt)
     # TODO(evandez): Centralize this spacing nonsense.
     token_ids = tokenizer([" " + word for word in words])
     return torch.tensor([ti[0] for ti in token_ids.input_ids])
@@ -189,8 +190,8 @@ def average_hiddens_from_batch(
 
 
 def editor_inputs_from_batch(
-    mt: model_utils.ModelAndTokenizer,
-    batch: dataset_utils.ContextMediationInput,
+    mt: models.ModelAndTokenizer,
+    batch: datasets.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     return_token_ranges: bool = True,
@@ -214,7 +215,7 @@ def editor_inputs_from_batch(
     prompt_inputs, prompt_offset_mapping = None, None
     context_inputs, context_offset_mapping = None, None
     entity_inputs, entity_offset_mapping = None, None
-    with model_utils.set_padding_side(mt, padding_side="right"):
+    with models.set_padding_side(mt, padding_side="right"):
         if return_token_ranges:
             prompt_inputs, prompt_offset_mapping = inputs_from_batch(mt, prompts)
         if return_attribute_hiddens or return_token_ranges:
@@ -332,7 +333,7 @@ def editor_inputs_from_batch(
 
 
 def editor_inputs_from_dataset(
-    mt: model_utils.ModelAndTokenizer,
+    mt: models.ModelAndTokenizer,
     dataset: Dataset,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
@@ -363,8 +364,8 @@ def has_editor_inputs(batch: dict) -> bool:
 
 
 def entity_deltas_from_batch(
-    mt: model_utils.ModelAndTokenizer,
-    batch: dataset_utils.ContextMediationInput,
+    mt: models.ModelAndTokenizer,
+    batch: datasets.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     fp32: bool = False,
@@ -400,7 +401,7 @@ def entity_deltas_from_batch(
     first_entity_token_ranges = None
     last_entity_token_ranges = None
     if return_token_ranges or return_deltas:
-        with model_utils.set_padding_side(mt, padding_side="right"):
+        with models.set_padding_side(mt, padding_side="right"):
             inputs, offset_mapping = inputs_from_batch(
                 mt, prompts_in_context, device=device
             )
@@ -445,7 +446,7 @@ def entity_deltas_from_batch(
 
 
 def entity_deltas_from_dataset(
-    mt: model_utils.ModelAndTokenizer,
+    mt: models.ModelAndTokenizer,
     dataset: Dataset,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
@@ -474,8 +475,8 @@ def has_entity_deltas(batch: dict) -> bool:
 
 
 def classification_inputs_from_batch(
-    mt: model_utils.ModelAndTokenizer,
-    batch: dataset_utils.ContextMediationInput,
+    mt: models.ModelAndTokenizer,
+    batch: datasets.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     fp32: bool = False,
@@ -522,7 +523,7 @@ def classification_inputs_from_batch(
         for attribute, target_m, target_u in zip(attributes_m, targets_m, targets_u)
     ]
 
-    with model_utils.set_padding_side(mt, padding_side="right"):
+    with models.set_padding_side(mt, padding_side="right"):
         inputs, offsets_mapping = inputs_from_batch(mt, contexts_u, device=device)
 
     trs_all = token_ranges_from_batch(contexts_u, attributes_u, offsets_mapping)
@@ -538,7 +539,7 @@ def classification_inputs_from_batch(
 
 
 def classification_inputs_from_dataset(
-    mt: model_utils.ModelAndTokenizer,
+    mt: models.ModelAndTokenizer,
     dataset: Dataset,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,

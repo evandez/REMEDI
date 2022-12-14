@@ -3,8 +3,8 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, cast, overload
 
-from src import precompute
-from src.utils import dataset_utils, model_utils, tokenizer_utils, training_utils
+from src import datasets, models, precompute
+from src.utils import tokenizer_utils, training_utils
 from src.utils.typing import (
     Dataset,
     Device,
@@ -65,9 +65,7 @@ class apply_direction(contextlib.AbstractContextManager):
 
     def __enter__(self) -> Model:
         """Hook the model so the direction is applied."""
-        [layer_path] = model_utils.determine_layer_paths(
-            self.model, layers=[self.layer]
-        )
+        [layer_path] = models.determine_layer_paths(self.model, layers=[self.layer])
 
         def edit_output(output: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
             """Apply the directions."""
@@ -104,7 +102,7 @@ class EditedModel(nn.Module):
     def __init__(
         self,
         editor: "Editor",
-        mt: Optional[model_utils.ModelAndTokenizer] = None,
+        mt: Optional[models.ModelAndTokenizer] = None,
         alpha: float = DEFAULT_ALPHA,
         device: Optional[Device] = None,
     ):
@@ -116,14 +114,14 @@ class EditedModel(nn.Module):
         self.device = device
 
     def maybe_compute_editor_inputs(
-        self, batch: dataset_utils.ContextMediationInput | dict
+        self, batch: datasets.ContextMediationInput | dict
     ) -> dict:
         """Maybe compute hidden states for batch, if not already present."""
         precomputed = {**batch}
         if not precompute.has_editor_inputs(precomputed):
             precomputed = precompute.editor_inputs_from_batch(
                 self.mt,
-                cast(dataset_utils.ContextMediationInput, batch),
+                cast(datasets.ContextMediationInput, batch),
                 layers=[self.editor.layer],
                 device=self.device,
                 return_target_token_ids=False,
@@ -156,7 +154,7 @@ class EditedModel(nn.Module):
     @overload
     def compute_model_outputs(
         self,
-        batch: dataset_utils.ContextMediationInput,
+        batch: datasets.ContextMediationInput,
         generate: Literal[False] = ...,
         inputs: Optional[transformers.BatchEncoding] = ...,
         padding_side: Optional[str] = ...,
@@ -167,7 +165,7 @@ class EditedModel(nn.Module):
     @overload
     def compute_model_outputs(
         self,
-        batch: dataset_utils.ContextMediationInput,
+        batch: datasets.ContextMediationInput,
         generate: Literal[True],
         inputs: Optional[transformers.BatchEncoding] = ...,
         padding_side: Optional[str] = ...,
@@ -177,7 +175,7 @@ class EditedModel(nn.Module):
 
     def compute_model_outputs(
         self,
-        batch: dataset_utils.ContextMediationInput | dict,
+        batch: datasets.ContextMediationInput | dict,
         generate: bool = False,
         inputs: Optional[transformers.BatchEncoding] = None,
         padding_side: Optional[str] = None,
@@ -227,7 +225,7 @@ class EditedModel(nn.Module):
 
     def forward(
         self,
-        batch: dataset_utils.ContextMediationInput,
+        batch: datasets.ContextMediationInput,
         inputs: Optional[transformers.BatchEncoding] = None,
         **kwargs: Any,
     ) -> ModelOutput:
@@ -248,7 +246,7 @@ class EditedModel(nn.Module):
 
     def generate(
         self,
-        batch: dataset_utils.ContextMediationInput,
+        batch: datasets.ContextMediationInput,
         inputs: Optional[transformers.BatchEncoding] = None,
         **kwargs: Any,
     ) -> ModelGenerateOutput:
@@ -279,7 +277,7 @@ class apply(contextlib.AbstractContextManager):
     def __init__(
         self,
         editor: "Editor",
-        mt: Optional[model_utils.ModelAndTokenizer] = None,
+        mt: Optional[models.ModelAndTokenizer] = None,
         alpha: float = DEFAULT_ALPHA,
         device: Optional[Device] = None,
     ):
@@ -445,7 +443,7 @@ class Editor(nn.Module):
     def __init__(
         self,
         *,
-        mt: model_utils.ModelAndTokenizer,
+        mt: models.ModelAndTokenizer,
         layer: int,
         input_last_entity_token: bool = True,
         edit_last_entity_token: bool = True,
@@ -457,12 +455,12 @@ class Editor(nn.Module):
         self.input_last_entity_token = input_last_entity_token
         self.edit_last_entity_token = edit_last_entity_token
 
-    def to_(self, mt: model_utils.ModelAndTokenizer | None = None) -> None:
+    def to_(self, mt: models.ModelAndTokenizer | None = None) -> None:
         """Make this editor's device/dtype match the underlying models."""
         mt = self.mt if mt is None else mt
         self.to(
-            device=model_utils.determine_device(mt),
-            dtype=model_utils.determine_dtype(mt),
+            device=models.determine_device(mt),
+            dtype=models.determine_dtype(mt),
         )
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
@@ -501,7 +499,7 @@ class Editor(nn.Module):
             device: Run editor and model on this device.
 
         """
-        dataset = dataset_utils.maybe_train_test_split(dataset, test_size=hold_out)
+        dataset = datasets.maybe_train_test_split(dataset, test_size=hold_out)
 
         self.mt.model.to(device)
         self.to(device)
@@ -514,7 +512,7 @@ class Editor(nn.Module):
         # used by Adam or we'll immediately get NaNs everywhere. It's because the
         # default eps gets rounded to 0 in half precision.
         optimizer_kwargs: dict = dict(lr=lr)
-        if model_utils.determine_dtype(self.mt) is torch.float16:
+        if models.determine_dtype(self.mt) is torch.float16:
             optimizer_kwargs["eps"] = 1e-4
 
         optimizer = optim.AdamW(self.parameters(), **optimizer_kwargs)
@@ -618,7 +616,7 @@ class Editor(nn.Module):
                 current_batch_size = len(prompts)
 
                 # Need padding side to be left for batch generate.
-                with model_utils.set_padding_side(self.mt, padding_side="left"):
+                with models.set_padding_side(self.mt, padding_side="left"):
                     inputs, _ = precompute.inputs_from_batch(
                         self.mt, prompts, device=device
                     )
@@ -640,7 +638,7 @@ class Editor(nn.Module):
                     "sample": [
                         {
                             key: batch[key][bi]
-                            for key in dataset_utils.ContextMediationSample.__required_keys__
+                            for key in datasets.ContextMediationSample.__required_keys__
                         }
                         for bi in range(current_batch_size)
                     ]
@@ -715,7 +713,7 @@ class Editor(nn.Module):
         key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
         key_m = f"context.attribute.hiddens.{self.layer}.average"
 
-        eps = 1e-5 if model_utils.determine_dtype(self.mt) is torch.float16 else 1e-8
+        eps = 1e-5 if models.determine_dtype(self.mt) is torch.float16 else 1e-8
         sim = nn.CosineSimilarity(eps=eps)
 
         results = []
@@ -731,7 +729,7 @@ class Editor(nn.Module):
 
                 # Determine model completions.
                 prompts = batch["prompt"]
-                with model_utils.set_padding_side(self.mt, padding_side="left"):
+                with models.set_padding_side(self.mt, padding_side="left"):
                     inputs, _ = precompute.inputs_from_batch(
                         self.mt, prompts, device=device
                     )
@@ -762,7 +760,7 @@ class Editor(nn.Module):
                         EditorClassificationResult(
                             sample={
                                 key: batch[key][bi]
-                                for key in dataset_utils.ContextMediationSample.__required_keys__
+                                for key in datasets.ContextMediationSample.__required_keys__
                             },
                             generation=generations[bi],
                             score_editor_mediated=scores_editor_m[bi].item(),
@@ -781,7 +779,7 @@ class RandomEditor(Editor):
     def __init__(
         self,
         *,
-        mt: model_utils.ModelAndTokenizer,
+        mt: models.ModelAndTokenizer,
         layer: int,
         mean: torch.Tensor | None = None,
         covariance: torch.Tensor | None = None,
@@ -790,8 +788,8 @@ class RandomEditor(Editor):
         """Initialize the editor."""
         super().__init__(mt=mt, layer=layer, **kwargs)
 
-        hidden_size = model_utils.determine_hidden_size(mt)
-        device = model_utils.determine_device(mt)
+        hidden_size = models.determine_hidden_size(mt)
+        device = models.determine_device(mt)
 
         if mean is None:
             mean = torch.zeros(hidden_size)
@@ -823,7 +821,7 @@ class RandomEditor(Editor):
         **_: Any,
     ) -> EditorTrainingRun:
         """Estimate mean and variance of entity representations."""
-        dataset = dataset_utils.maybe_train_test_split(dataset, test_size=hold_out)
+        dataset = datasets.maybe_train_test_split(dataset, test_size=hold_out)
 
         self.mt.model.to(device)
         self.to(device)
@@ -851,7 +849,7 @@ class LinearEditor(Editor):
     def __init__(
         self,
         *,
-        mt: model_utils.ModelAndTokenizer,
+        mt: models.ModelAndTokenizer,
         layer: int,
         rank: Optional[int] = None,
         use_entity: bool = False,
@@ -875,7 +873,7 @@ class LinearEditor(Editor):
         self.use_entity = use_entity
         self.use_attribute = use_attribute
 
-        hidden_size = model_utils.determine_hidden_size(mt)
+        hidden_size = models.determine_hidden_size(mt)
         input_size = hidden_size * sum([use_entity, use_attribute])
 
         self.w: nn.Linear | nn.Sequential
@@ -905,10 +903,10 @@ class LinearEditor(Editor):
 class BiaffineEditor(Editor):
     """Biaffine model that takes entity to edit rep and attribute rep as input."""
 
-    def __init__(self, *, mt: model_utils.ModelAndTokenizer, layer: int, **kwargs: Any):
+    def __init__(self, *, mt: models.ModelAndTokenizer, layer: int, **kwargs: Any):
         """Initialize the editor."""
         super().__init__(mt=mt, layer=layer, **kwargs)
-        hidden_size = model_utils.determine_hidden_size(mt)
+        hidden_size = models.determine_hidden_size(mt)
         self.w_entity = nn.Linear(hidden_size, hidden_size)
         self.w_attribute = nn.Linear(hidden_size, hidden_size)
         self.to_(mt)
@@ -924,7 +922,7 @@ class MlpEditor(Editor):
     def __init__(
         self,
         *,
-        mt: model_utils.ModelAndTokenizer,
+        mt: models.ModelAndTokenizer,
         layer: int,
         use_entity: bool = True,
         use_attribute: bool = True,
@@ -939,7 +937,7 @@ class MlpEditor(Editor):
         self.use_entity = use_entity
         self.use_attribute = use_attribute
 
-        hidden_size = model_utils.determine_hidden_size(mt)
+        hidden_size = models.determine_hidden_size(mt)
         input_size = hidden_size * sum([use_entity, use_attribute])
 
         self.mlp = nn.Sequential(
