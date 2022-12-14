@@ -6,7 +6,7 @@ import random
 import shutil
 from pathlib import Path
 
-from src.utils import env
+from src.utils import env_utils
 from src.utils.typing import PathLike
 
 import numpy
@@ -44,7 +44,7 @@ def create_results_dir(
 
     """
     if root is None:
-        root = env.results_dir()
+        root = env_utils.determine_results_dir()
     root = Path(root)
 
     results_dir = root / experiment_name

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Any, TypedDict
 
-from src.utils import env, io_utils
+from src.utils import env_utils, io_utils
 from src.utils.typing import Dataset, PathLike, StrSequence
 
 import datasets
@@ -43,7 +43,7 @@ def _determine_file(file: PathLike | None, url: str) -> Path:
     if file is None:
         name = url.split("/")[-1]
         stem = name.split(".")[0]
-        file = env.data_dir() / stem / name
+        file = env_utils.determine_data_dir() / stem / name
     return Path(file).resolve()
 
 

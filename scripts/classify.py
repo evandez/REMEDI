@@ -3,8 +3,8 @@ import argparse
 import logging
 from pathlib import Path
 
-from src import datasets, editors, models, precompute
-from src.utils import env, experiment_utils
+from src import data, editors, models, precompute
+from src.utils import env_utils, experiment_utils
 
 import torch
 import torch.utils.data
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def main(args: argparse.Namespace) -> None:
     """Run the classification."""
     experiment_utils.set_seed(args.seed)
-    datasets.disable_caching()
+    data.disable_caching()
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
@@ -30,7 +30,7 @@ def main(args: argparse.Namespace) -> None:
 
     editors_dir = args.editors
     if editors_dir is None:
-        editors_dir = env.results_dir() / "editors"
+        editors_dir = env_utils.determine_results_dir() / "editors"
     if not editors_dir.exists():
         raise ValueError(f"editors not found at {editors_dir}; maybe pass the -e flag")
 
@@ -38,8 +38,8 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
     # TODO(evandez): Just make a dedicated train/test split for counterfact.
-    train = datasets.load_dataset(args.dataset, split="train[:5000]")
-    test = datasets.load_dataset(args.dataset, split="train[5000:10000]")
+    train = data.load_dataset(args.dataset, split="train[:5000]")
+    test = data.load_dataset(args.dataset, split="train[5000:10000]")
 
     layers = args.layers
     if layers is None:
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         "-d",
-        choices=datasets.SUPPORTED_DATASETS,
+        choices=data.SUPPORTED_DATASETS,
         default="counterfact",
         help="dataset to classify",
     )

@@ -1,8 +1,8 @@
 """Unit tests model_utils functions."""
-from src.utils import model_utils
+from src import models
 
-import torch
 import pytest
+import torch
 
 
 def assert_equals(actual, expected, path="actual"):
@@ -36,5 +36,5 @@ def assert_equals(actual, expected, path="actual"):
 )
 def test_map_to_preserves_values(value, device, dtype):
     """Test map_location returns correct value."""
-    actual = model_utils.map_to(value, device=device, dtype=dtype)
+    actual = models.map_to(value, device=device, dtype=dtype)
     assert_equals(actual, value)

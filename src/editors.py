@@ -3,7 +3,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, cast, overload
 
-from src import datasets, models, precompute
+from src import data, models, precompute
 from src.utils import tokenizer_utils, training_utils
 from src.utils.typing import (
     Dataset,
@@ -114,14 +114,14 @@ class EditedModel(nn.Module):
         self.device = device
 
     def maybe_compute_editor_inputs(
-        self, batch: datasets.ContextMediationInput | dict
+        self, batch: data.ContextMediationInput | dict
     ) -> dict:
         """Maybe compute hidden states for batch, if not already present."""
         precomputed = {**batch}
         if not precompute.has_editor_inputs(precomputed):
             precomputed = precompute.editor_inputs_from_batch(
                 self.mt,
-                cast(datasets.ContextMediationInput, batch),
+                cast(data.ContextMediationInput, batch),
                 layers=[self.editor.layer],
                 device=self.device,
                 return_target_token_ids=False,
@@ -154,7 +154,7 @@ class EditedModel(nn.Module):
     @overload
     def compute_model_outputs(
         self,
-        batch: datasets.ContextMediationInput,
+        batch: data.ContextMediationInput,
         generate: Literal[False] = ...,
         inputs: Optional[transformers.BatchEncoding] = ...,
         padding_side: Optional[str] = ...,
@@ -165,7 +165,7 @@ class EditedModel(nn.Module):
     @overload
     def compute_model_outputs(
         self,
-        batch: datasets.ContextMediationInput,
+        batch: data.ContextMediationInput,
         generate: Literal[True],
         inputs: Optional[transformers.BatchEncoding] = ...,
         padding_side: Optional[str] = ...,
@@ -175,7 +175,7 @@ class EditedModel(nn.Module):
 
     def compute_model_outputs(
         self,
-        batch: datasets.ContextMediationInput | dict,
+        batch: data.ContextMediationInput | dict,
         generate: bool = False,
         inputs: Optional[transformers.BatchEncoding] = None,
         padding_side: Optional[str] = None,
@@ -225,7 +225,7 @@ class EditedModel(nn.Module):
 
     def forward(
         self,
-        batch: datasets.ContextMediationInput,
+        batch: data.ContextMediationInput,
         inputs: Optional[transformers.BatchEncoding] = None,
         **kwargs: Any,
     ) -> ModelOutput:
@@ -246,7 +246,7 @@ class EditedModel(nn.Module):
 
     def generate(
         self,
-        batch: datasets.ContextMediationInput,
+        batch: data.ContextMediationInput,
         inputs: Optional[transformers.BatchEncoding] = None,
         **kwargs: Any,
     ) -> ModelGenerateOutput:
@@ -499,7 +499,7 @@ class Editor(nn.Module):
             device: Run editor and model on this device.
 
         """
-        dataset = datasets.maybe_train_test_split(dataset, test_size=hold_out)
+        dataset = data.maybe_train_test_split(dataset, test_size=hold_out)
 
         self.mt.model.to(device)
         self.to(device)
@@ -638,7 +638,7 @@ class Editor(nn.Module):
                     "sample": [
                         {
                             key: batch[key][bi]
-                            for key in datasets.ContextMediationSample.__required_keys__
+                            for key in data.ContextMediationSample.__required_keys__
                         }
                         for bi in range(current_batch_size)
                     ]
@@ -760,7 +760,7 @@ class Editor(nn.Module):
                         EditorClassificationResult(
                             sample={
                                 key: batch[key][bi]
-                                for key in datasets.ContextMediationSample.__required_keys__
+                                for key in data.ContextMediationSample.__required_keys__
                             },
                             generation=generations[bi],
                             score_editor_mediated=scores_editor_m[bi].item(),
@@ -821,7 +821,7 @@ class RandomEditor(Editor):
         **_: Any,
     ) -> EditorTrainingRun:
         """Estimate mean and variance of entity representations."""
-        dataset = datasets.maybe_train_test_split(dataset, test_size=hold_out)
+        dataset = data.maybe_train_test_split(dataset, test_size=hold_out)
 
         self.mt.model.to(device)
         self.to(device)

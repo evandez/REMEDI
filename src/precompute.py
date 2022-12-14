@@ -2,7 +2,7 @@
 from functools import partial
 from typing import Any, Optional, Sequence, cast
 
-from src import datasets, models
+from src import data, models
 from src.utils import tokenizer_utils
 from src.utils.typing import (
     Dataset,
@@ -191,7 +191,7 @@ def average_hiddens_from_batch(
 
 def editor_inputs_from_batch(
     mt: models.ModelAndTokenizer,
-    batch: datasets.ContextMediationInput,
+    batch: data.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     return_token_ranges: bool = True,
@@ -365,7 +365,7 @@ def has_editor_inputs(batch: dict) -> bool:
 
 def entity_deltas_from_batch(
     mt: models.ModelAndTokenizer,
-    batch: datasets.ContextMediationInput,
+    batch: data.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     fp32: bool = False,
@@ -476,7 +476,7 @@ def has_entity_deltas(batch: dict) -> bool:
 
 def classification_inputs_from_batch(
     mt: models.ModelAndTokenizer,
-    batch: datasets.ContextMediationInput,
+    batch: data.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     fp32: bool = False,

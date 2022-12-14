@@ -3,7 +3,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from src import datasets, editors, models, precompute
+from src import data, editors, models, precompute
 from src.utils import experiment_utils
 
 import torch
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def main(args: argparse.Namespace) -> None:
     """Train the editors."""
     experiment_utils.set_seed(args.seed)
-    datasets.disable_caching()
+    data.disable_caching()
 
     experiment_name = args.experiment_name or "editors"
     results_dir = experiment_utils.create_results_dir(
@@ -39,13 +39,13 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
-    dataset = datasets.load_dataset(args.dataset, split="train[:5000]")
+    dataset = data.load_dataset(args.dataset, split="train[:5000]")
 
     layers = args.layers
     if layers is None:
         layers = models.determine_layers(mt)
 
-    dataset = datasets.maybe_train_test_split(dataset, test_size=args.hold_out)
+    dataset = data.maybe_train_test_split(dataset, test_size=args.hold_out)
     for editor_type in args.editor_types:
         editor_factory = EDITOR_FACTORIES[editor_type]
         editor_kwargs = dict(
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         "-d",
-        choices=datasets.SUPPORTED_DATASETS,
+        choices=data.SUPPORTED_DATASETS,
         default="counterfact",
         help="dataset to train on",
     )
