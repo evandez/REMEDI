@@ -1,5 +1,6 @@
 """Datasets for evaluating context mediation in LMs."""
 import json
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -7,10 +8,17 @@ from src.utils import env_utils, io_utils
 from src.utils.typing import Dataset, PathLike, StrSequence
 
 import datasets
+import numpy
+import scipy.sparse
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 SUPPORTED_DATASETS = ("counterfact",)
 
-COUNTERFACT_URL = "https://rome.baulab.info/data/dsets/counterfact.json"
+ROME_BASE_URL = "https://rome.baulab.info/data/dsets"
+COUNTERFACT_URL = f"{ROME_BASE_URL}/counterfact.json"
+ATTRIBUTE_SNIPPETS_URL = f"{ROME_BASE_URL}/attribute_snippets.json"
+TFIDF_IDF_URL = f"{ROME_BASE_URL}/idf.npy"
+TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 
 
 class ContextMediationSample(TypedDict):
@@ -42,8 +50,7 @@ def _determine_file(file: PathLike | None, url: str) -> Path:
     """Default the (maybe null) file to something sensible based on the URL."""
     if file is None:
         name = url.split("/")[-1]
-        stem = name.split(".")[0]
-        file = env_utils.determine_data_dir() / stem / name
+        file = env_utils.determine_data_dir() / name
     return Path(file).resolve()
 
 
@@ -109,6 +116,75 @@ def load_dataset(name: str, **kwargs: Any) -> Dataset:
         return _load_counterfact(**kwargs)
     else:
         raise ValueError(f"unknown dataset: {name}")
+
+
+AttributeSnippets = dict[str, dict[str, list[dict]]]
+
+
+def load_attribute_snippets(
+    file: Path | None = None, url: str = ATTRIBUTE_SNIPPETS_URL, overwrite: bool = False
+) -> AttributeSnippets:
+    """Load attribute snippets for different Wikipedia relations/entities.
+
+    This dataset is taken directly from the ROME evaluation. It is not loaded from
+    `load_dataset` because it is a mapping, not a sequence. Specifically, it is a
+    mapping from Wikidata relation IDs and entity IDs to Wikipedia articles about
+    those entities, where the article includes text relevant to the relation. This is
+    used to measure consistency of generations with other plausible facts about an
+    entity satisfying some relation.
+
+    Args:
+        file: Look for attribute snippets at this file. Downloaded otherwise.
+        url: Download snippets from this URL.
+        overwrite: Overwrite an existing download.
+
+    Returns:
+        Mapping from relation ID and entity ID to Wikipedia text.
+
+    """
+    file = _determine_file(file, url)
+    if not file.exists() or overwrite:
+        io_utils.download_file(url, file, overwrite=True)
+    with file.open("r") as handle:
+        snippets_list = json.load(handle)
+
+    attribute_snippets: AttributeSnippets = defaultdict(lambda: defaultdict(list))
+    for snippets in snippets_list:
+        relation_id = snippets["relation_id"]
+        target_id = snippets["target_id"]
+        for sample in snippets["samples"]:
+            attribute_snippets[relation_id][target_id].append(sample)
+
+    return attribute_snippets
+
+
+def load_tfidf_vectorizer(
+    idf_file: Path | None = None,
+    vocab_file: Path | None = None,
+    idf_url: str = TFIDF_IDF_URL,
+    vocab_url: str = TFIDF_VOCAB_URL,
+    overwrite: bool = False,
+) -> TfidfVectorizer:
+    """Load precomputed TF-IDF statistics."""
+    idf_file = _determine_file(idf_file, idf_url)
+    vocab_file = _determine_file(vocab_file, vocab_url)
+    for file, url in ((idf_file, idf_url), (vocab_file, vocab_url)):
+        if not file.exists() or overwrite:
+            io_utils.download_file(url, file, overwrite=True)
+
+    idf = numpy.load(str(idf_file))
+    with vocab_file.open("r") as handle:
+        vocab = json.load(handle)
+
+    # Hack borrowed from ROME:
+    # https://github.com/kmeng01/rome/blob/0874014cd9837e4365f3e6f3c71400ef11509e04/dsets/tfidf_stats.py#L17
+    class ModifiedTfidfVectorizer(TfidfVectorizer):
+        TfidfVectorizer.idf_ = idf
+
+    vec = ModifiedTfidfVectorizer()
+    vec.vocabulary_ = vocab
+    vec._tfidf._idf_diag = scipy.sparse.spdiags(idf, diags=0, m=len(idf), n=len(idf))
+    return vec
 
 
 def maybe_train_test_split(
