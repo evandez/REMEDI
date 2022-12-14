@@ -4,10 +4,7 @@ dataclasses_json
 datasets
 jupyter
 jupyter_http_over_ws
-qwikidata
 requests
-names-dataset
-retry
 spacy
 tqdm
 transformers
@@ -19,4 +16,3 @@ isort
 mypy
 pytest
 types-requests
-types-retry
