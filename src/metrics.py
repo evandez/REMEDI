@@ -13,8 +13,68 @@ import nltk
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Metric:
+    """An aggregate metric."""
+
+    mean: float
+    std: float
+
+    @staticmethod
+    def aggregate(values: ArrayLike) -> "Metric":
+        return Metric(np.mean(values), np.std(values))
+
+
+@dataclass(frozen=True)
+class EfficacyMetrics:
+    """Efficacy metrics."""
+
+    score: Metric
+    magnitude: Metric
+
+
+def efficacy(samples: Sequence[dict], key: str = "prompt") -> EfficacyMetrics:
+    """Compute efficacy on metrics."""
+    scores, magnitudes = [], []
+    for sample in samples:
+        p_med = sample[key]["p_mediated"]
+        p_unmed = sample[key]["p_unmediated"]
+        scores.append(p_med > p_unmed)
+        magnitudes.append(p_med - p_unmed)
+    score = sum(scores) / len(scores)
+    magnitude = sum(magnitudes) / len(magnitudes)
+    return EfficacyMetrics(score=score, magnitude=magnitude)
+
+
+def consistency(
+    generations: Sequence[StrSequence],
+    references: Sequence[StrSequence],
+    vectorizer: TfidfVectorizer,
+) -> Metric:
+    """Compute consistency score."""
+    _validate_same_length(generations=generations, references=references)
+    similarities = [
+        _tfidf_similarity(gs, rs, vectorizer) for gs, rs in zip(generations, references)
+    ]
+    return Metric.aggregate(similarities)
+
+
+def fluency(generations: Sequence[StrSequence], **kwargs: Any) -> Metric:
+    """Compute fluency score.
+
+    Args:
+        generations: Any number of generated strings from the model.
+
+    Returns:
+        Average n-gram entropy across generations. Can specify multiple ns by
+        setting the ns= kwarg. By default, uses 2-grams and 3-grams.
+
+    """
+    entropies = [_aggregate_n_gram_entropy(texts, **kwargs) for texts in generations]
+    return Metric.aggregate(entropies)
 
 
 def _validate_same_length(**kwargs: Sequence) -> None:
@@ -67,69 +127,3 @@ def _tfidf_similarity(
         reference = [reference]
     sv, rv = vectorizer.transform([" ".join(source), " ".join(reference)]).A
     return np.dot(sv, rv) / np.linalg.norm(sv) / np.linalg.norm(rv)
-
-
-@dataclass(frozen=True)
-class Metric:
-    """An aggregate metric."""
-
-    mean: float
-    std: float
-
-    @staticmethod
-    def aggregate(values: ArrayLike) -> "Metric":
-        return Metric(np.mean(values), np.std(values))
-
-
-@dataclass(frozen=True)
-class EfficacyMetrics:
-    """Efficacy metrics."""
-
-    score: Metric
-    magnitude: Metric
-
-
-def efficacy(samples: Sequence[dict], key: str = "prompt") -> EfficacyMetrics:
-    """Compute efficacy on metrics."""
-    scores, magnitudes = [], []
-    for sample in samples:
-        p_med = sample[key]["prob"]["mediated"]
-        p_unmed = sample[key]["prob"]["unmediated"]
-        scores.append(p_med > p_unmed)
-        magnitudes.append(p_med - p_unmed)
-    score = sum(scores) / len(scores)
-    magnitude = sum(magnitudes) / len(magnitudes)
-    return EfficacyMetrics(score=score, magnitude=magnitude)
-
-
-def paraphrase(sample: Sequence[dict]) -> EfficacyMetrics:
-    """Computer paraphrase efficacy."""
-    return efficacy(sample, key="paraphrase_prompts")
-
-
-def consistency(
-    generations: Sequence[StrSequence],
-    references: Sequence[StrSequence],
-    vectorizer: TfidfVectorizer,
-) -> Metric:
-    """Compute consistency score."""
-    _validate_same_length(generations=generations, references=references)
-    similarities = [
-        _tfidf_similarity(gs, rs, vectorizer) for gs, rs in zip(generations, references)
-    ]
-    return Metric.aggregate(similarities)
-
-
-def fluency(generations: Sequence[StrSequence], **kwargs: Any) -> Metric:
-    """Compute fluency score.
-
-    Args:
-        generations: Any number of generated strings from the model.
-
-    Returns:
-        Average n-gram entropy across generations. Can specify multiple ns by
-        setting the ns= kwarg. By default, uses 2-grams and 3-grams.
-
-    """
-    entropies = [_aggregate_n_gram_entropy(texts, **kwargs) for texts in generations]
-    return Metric.aggregate(entropies)
