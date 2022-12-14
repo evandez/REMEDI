@@ -503,12 +503,15 @@ def classification_inputs_from_batch(
             mt, batch, layers=layers, device=device, fp32=fp32, **kwargs
         )
 
-    contexts_m = batch["context"]
-    attributes_m = batch["attribute"]
+    contexts_m = _maybe_batch(batch["context"])
+    attributes_m = _maybe_batch(batch["attribute"])
+
     targets_m = batch["target_mediated"]
     targets_u = batch["target_unmediated"]
     if targets_m is None or targets_u is None:
         raise ValueError("batch missing target words")
+    targets_m = _maybe_batch(targets_m)
+    targets_u = _maybe_batch(targets_u)
 
     precomputed["context_unmediated"] = contexts_u = [
         context.replace(target_m, target_u)

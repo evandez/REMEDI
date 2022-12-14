@@ -4,12 +4,11 @@ import logging
 from pathlib import Path
 
 from src import editors, precompute
-from src.utils import dataset_utils, experiment_utils, env, model_utils
+from src.utils import dataset_utils, env, experiment_utils, model_utils
 
 import datasets
 import torch
 import torch.utils.data
-
 
 logger = logging.getLogger(__name__)
 
