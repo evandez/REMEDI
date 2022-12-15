@@ -49,6 +49,9 @@ def efficacy(samples: Sequence[dict], key: str = "prompt") -> EfficacyMetrics:
     return EfficacyMetrics(score=score, magnitude=magnitude)
 
 
+# TODO(evandez): Move all the TF-IDF stuff to this file.
+
+
 def consistency(
     generations: Sequence[StrSequence],
     references: Sequence[StrSequence],
