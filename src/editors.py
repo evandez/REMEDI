@@ -572,6 +572,11 @@ class Editor(nn.Module):
     ) -> EditorEvaluateRun:
         """Evaluate the editor on a held out set.
 
+        Note this function does *not* compute metrics for the editor. For those, see
+        `scripts/benchmark.py`. Instead, this function computes post-edit generations
+        on the given dataset. Useful for visualizing edit results during and after
+        training while not committing to running the whole benchmark.
+
         Args:
             dataset: Dataset to evaluate on.
             batch_size: Model batch size.
@@ -641,8 +646,7 @@ class Editor(nn.Module):
 
                     batched_results[f"{key}_top_logps"] = top_logps.tolist()
                     batched_results[f"{key}_top_tokens"] = top_tokens
-                    # TODO(evandez): Fix typing here, should be list of lists.
-                    batched_results[f"{key}_generations"] = generations
+                    batched_results[f"{key}_generations"] = [[g] for g in generations]
 
                     if include_target_probs:
                         batch_indices = torch.arange(current_batch_size)
