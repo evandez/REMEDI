@@ -58,7 +58,7 @@ def main(args: argparse.Namespace) -> None:
 
         for split, subset in (("train", train), ("test", test)):
             results_file = results_dir / "linear" / str(layer) / f"{split}-class.json"
-            if results_file.exists() and not args.rerun:
+            if results_file.exists():
                 logger.info(f"found {split} results at {results_file}; skipping")
                 continue
 
@@ -106,9 +106,9 @@ if __name__ == "__main__":
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
     parser.add_argument("--device", help="device to run model on")
     parser.add_argument(
-        "--rerun",
+        "--clear-results-dir",
         action="store_true",
-        help="rerun classification for layers with results",
+        help="clear old results and start anew",
     )
     args = parser.parse_args()
     main(args)
