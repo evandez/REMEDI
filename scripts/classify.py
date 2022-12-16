@@ -80,7 +80,7 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="classify entity attributes as t/f")
-    parser.add_argument("--name", "-n", help="experiment name")
+    parser.add_argument("--experiment-name", "-n", help="experiment name")
     parser.add_argument("--editors", "-e", type=Path, help="path to editor experiment")
     parser.add_argument("--layers", "-l", nargs="+", type=int, help="layers to probe")
     parser.add_argument(

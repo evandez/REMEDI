@@ -191,7 +191,7 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="run full counterfact benchmark")
-    parser.add_argument("--name", "-n", help="experiment name")
+    parser.add_argument("--experiment-name", "-n", help="experiment name")
     parser.add_argument("--editors", "-e", type=Path, help="path to editor experiment")
     parser.add_argument(
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
