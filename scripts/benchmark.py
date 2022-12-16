@@ -1,17 +1,54 @@
 """Evaluate editors on the CounterFact benchmark."""
 import argparse
+import json
 import logging
-from collections import cast, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 from src import data, editors, metrics, models
 from src.utils import env_utils, experiment_utils
+from src.utils.typing import Dataset
 
 import torch
 import torch.utils.data
-from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
+
+
+def select_dedupe_flatten(dataset: Dataset, column: str) -> Dataset:
+    """Select the given column and flatten it."""
+
+    def _select_dedupe_flatten(row: dict) -> dict:
+        prompts = list(
+            {
+                text
+                for text in row[column]
+                # Don't include prompts that were used to create the context.
+                if text.lower() not in row["context"].lower()
+            }
+        )
+        result = {"prompt": prompts}
+        for key in data.ContextMediationSample.__required_keys__:
+            result[key] = [row[key]] * len(prompts)
+        return result
+
+    column_names = dataset.column_names
+    assert isinstance(column_names, list), column_names
+
+    return dataset.map(
+        _select_dedupe_flatten,
+        batched=True,
+        remove_columns=column_names,
+        desc=f"select, dedupe, and flatten {column}",
+    )
+
+
+def group_by_id(results: editors.EditorEvaluateRun) -> dict:
+    """Group results by sample ID."""
+    grouped = defaultdict(list)
+    for result in results.results:
+        grouped[result.sample["id"]].append(result)
+    return grouped
 
 
 def main(args: argparse.Namespace) -> None:
@@ -33,9 +70,14 @@ def main(args: argparse.Namespace) -> None:
     editors_dir = args.editors
     if editors_dir is None:
         editors_dir = env_utils.determine_results_dir() / "editors"
+    editors_dir /= "linear"
     logger.info(f"will look for editors in {editors_dir}")
     if not editors_dir.exists():
         raise ValueError(f"editors not found at {editors_dir}; maybe pass the -e flag")
+
+    layers = args.layers
+    if layers is None:
+        layers = [str(layer_dir) for layer_dir in editors_dir.iterdir()]
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
@@ -43,18 +85,111 @@ def main(args: argparse.Namespace) -> None:
     logger.info("loading several data sources")
     # TODO(evandez): Use full counterfact after splitting properly.
     dataset = data.load_dataset("counterfact", split="train[5000:10000]")
-    snippets = data.load_attribute_snippets()
-    vectorizer = data.load_tfidf_vectorizer()
+    attribute_snippets = data.load_attribute_snippets()
+    tfidf_vectorizer = data.load_tfidf_vectorizer()
+    paraphrase_prompts = select_dedupe_flatten(dataset, "paraphrase_prompts")
+    generation_prompts = select_dedupe_flatten(dataset, "generation_prompts")
 
-    probs = defaultdict(list)
-    generations = defaultdict(list)
-    with dataset.formatted_as("torch"):
-        loader = torch.utils.data.DataLoader(
-            cast(torch.utils.data.Dataset, dataset), batch_size=args.batch_size
+    for layer in layers:
+        editor = editors.LinearEditor(mt=mt, layer=layer).to(device)
+        weights_file = editors_dir / "linear" / str(layer) / "weights.pth"
+        if not weights_file.exists():
+            logger.warn(f"weights file for layer {layer} not found; skipping")
+            continue
+        logger.info(f"loaded layer {layer} editor from {weights_file}")
+        state_dict = torch.load(weights_file, map_location=device)
+        editor.load_state_dict(state_dict)
+
+        results: dict[str, editors.EditorEvaluateRun] = {}
+        for key, subset, kwargs in (
+            ("prompts", dataset, dict(n_generate=1)),
+            ("paraphrase_prompts", paraphrase_prompts, dict(n_generate=1)),
+            (
+                "generation_prompts",
+                generation_prompts,
+                dict(n_generate=args.n_generate),
+            ),
+        ):
+            results_file = results_dir / f"{key}_results.json"
+            if results_file.exists():
+                logger.info(f"found existing {key} generations at {results_file}")
+                with results_file.open("r") as handle:
+                    results[key] = editors.EditorEvaluateRun.from_json(handle.read())
+                continue
+
+            results[key] = generations = editor.evaluate(
+                subset,
+                batch_size=args.batch_size,
+                device=device,
+                desc=f"{key} (layer {layer})",
+                **kwargs,
+            )
+
+            logger.info(f"writing {key} generations to {results_file}")
+            with results_file.open("w") as handle:
+                handle.write(generations.to_json())
+
+        # Efficacy
+        efficacy = metrics.efficacy(
+            [
+                sample.after_target_mediated_score
+                for sample in results["prompt"].results
+            ],
+            [
+                sample.after_target_unmediated_score
+                for sample in results["prompt"].results
+            ],
         )
-        for batch in tqdm(loader, desc="generate text"):
-            # TODO(evandez): Implement.
-            pass
+
+        # Paraphrase efficacy
+        # TODO(evandez): Average within sample to make equivalent to ROME eval
+        paraphrase_efficacy = metrics.efficacy(
+            [
+                sample.after_target_mediated_score
+                for sample in results["paraprase_prompts"].results
+            ],
+            [
+                sample.after_target_unmediated_score
+                for sample in results["paraprase_prompts"].results
+            ],
+        )
+
+        # Consistency
+        generation_prompts_results_by_id = group_by_id(results["generation_prompts"])
+        generation_prompts_outputs = [
+            [sample.after_generations[0] for sample in samples]
+            for samples in generation_prompts_results_by_id.values()
+        ]
+
+        references_by_id = []
+        for samples in generation_prompts_results_by_id.values():
+            sample = next(iter(samples))
+            relation_id = sample.sample["requested_rewrite"]["relation_id"]
+            target_id = sample.sample["requested_rewrite"]["target_new"]["target_id"]
+            references = [
+                snippet["text"]
+                for snippet in attribute_snippets[relation_id][target_id]
+            ]
+            references_by_id.append(references)
+
+        consistency = metrics.consistency(
+            generation_prompts_outputs,
+            references_by_id,
+            tfidf_vectorizer,
+        )
+
+        # Fluency
+        fluency = metrics.fluency(generation_prompts_outputs)
+
+        scores = {
+            "efficacy": efficacy.to_dict(),
+            "paraphrase_efficacy": paraphrase_efficacy.to_dict(),
+            "consistency": consistency.to_dict(),
+            "fluency": fluency.to_dict(),
+        }
+        scores_file = results_dir / "scores.json"
+        with scores_file.open("r") as handle:
+            json.dump(scores, handle)
 
 
 if __name__ == "__main__":
@@ -76,6 +211,12 @@ if __name__ == "__main__":
         type=int,
         default=editors.DEFAULT_BATCH_SIZE,
         help="model batch size",
+    )
+    parser.add_argument(
+        "--n-generate",
+        type=int,
+        default=editors.DEFAULT_N_GENERATE,
+        help="number of tokens to generate",
     )
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
     parser.add_argument("--device", help="device to run model on")

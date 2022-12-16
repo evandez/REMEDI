@@ -2,7 +2,7 @@
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Sequence, TypedDict
 
 from src.utils import env_utils, io_utils
 from src.utils.typing import Dataset, PathLike, StrSequence
@@ -24,6 +24,7 @@ TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 class ContextMediationSample(TypedDict):
     """Single sample that can be used for context mediation analysis."""
 
+    id: int  # Identifier
     entity: str  # "Barack Obama"
     attribute: str  # "invented the iPhone"
     context: str  # "Everyone knows that Barack Obama invented the iPhone."
@@ -35,6 +36,7 @@ class ContextMediationSample(TypedDict):
 class ContextMediationBatch(TypedDict):
     """Batch of context mediation samples."""
 
+    id: Sequence[int]
     entity: StrSequence
     attribute: StrSequence
     context: StrSequence
@@ -65,6 +67,7 @@ def _reformat_counterfact_file(file: Path) -> None:
 
 def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
     """Reformat the counterfact sample."""
+    cf_case_id = cf_sample["case_id"]
     cf_requested_rewrite = cf_sample["requested_rewrite"]
     cf_subject = cf_requested_rewrite["subject"]
     cf_target_new = cf_requested_rewrite["target_new"]["str"]
@@ -80,6 +83,7 @@ def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
     target_unmediated = cf_target_true
 
     return ContextMediationSample(
+        id=cf_case_id,
         entity=entity,
         prompt=prompt,
         context=context,

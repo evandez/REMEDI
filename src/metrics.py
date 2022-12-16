@@ -11,13 +11,14 @@ from src.utils.typing import ArrayLike, StrSequence
 
 import nltk
 import numpy as np
+from dataclasses_json import DataClassJsonMixin
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class Metric:
+class Metric(DataClassJsonMixin):
     """An aggregate metric."""
 
     mean: float
@@ -29,24 +30,24 @@ class Metric:
 
 
 @dataclass(frozen=True)
-class EfficacyMetrics:
+class EfficacyMetrics(DataClassJsonMixin):
     """Efficacy metrics."""
 
     score: Metric
     magnitude: Metric
 
 
-def efficacy(samples: Sequence[dict], key: str = "prompt") -> EfficacyMetrics:
+def efficacy(p_true: ArrayLike, p_new: ArrayLike) -> EfficacyMetrics:
     """Compute efficacy on metrics."""
-    scores, magnitudes = [], []
-    for sample in samples:
-        p_med = sample[key]["p_mediated"]
-        p_unmed = sample[key]["p_unmediated"]
-        scores.append(p_med > p_unmed)
-        magnitudes.append(p_med - p_unmed)
-    score = sum(scores) / len(scores)
-    magnitude = sum(magnitudes) / len(magnitudes)
-    return EfficacyMetrics(score=score, magnitude=magnitude)
+    _validate_same_length(p_true=p_true, p_new=p_new)
+    p_true = np.array(p_true)
+    p_new = np.array(p_new)
+    scores = p_true > p_new
+    magnitudes = p_true - p_new
+    return EfficacyMetrics(
+        score=Metric.aggregate(scores),
+        magnitude=Metric.aggregate(magnitudes),
+    )
 
 
 # TODO(evandez): Move all the TF-IDF stuff to this file.
@@ -80,7 +81,7 @@ def fluency(generations: Sequence[StrSequence], **kwargs: Any) -> Metric:
     return Metric.aggregate(entropies)
 
 
-def _validate_same_length(**kwargs: Sequence) -> None:
+def _validate_same_length(**kwargs: Sequence | ArrayLike) -> None:
     """Validate all batch sizes are the same."""
     lengths = {key: len(seq) for key, seq in kwargs.items()}
     if len(lengths) > 1:

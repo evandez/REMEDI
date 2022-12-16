@@ -375,7 +375,7 @@ class EditorTrainingRun:
 class EditorEvaluationResult(DataClassJsonMixin):
     """Result for single sample from `Editor.evaluate`."""
 
-    sample: dict[str, str]
+    sample: dict
 
     # Note: Need explicit types here so DataClassJsonMixin works.
     before_top_tokens: list[str]
@@ -568,6 +568,7 @@ class Editor(nn.Module):
         n_top: int = DEFAULT_N_TOP,
         n_generate: int = DEFAULT_N_GENERATE,
         alpha: float = DEFAULT_ALPHA,
+        desc: Optional[str] = None,
         device: Optional[Device] = None,
     ) -> EditorEvaluateRun:
         """Evaluate the editor on a held out set.
@@ -583,6 +584,7 @@ class Editor(nn.Module):
             n_top: Number of top words/probs to return.
             n_generate: Number of tokens to generate.
             alpha: Step size for applying edit directions.
+            desc: The tqdm description.
             device: Send all data to this device. Defaults to None.
 
         Returns:
@@ -593,13 +595,15 @@ class Editor(nn.Module):
         self.mt.to_(device)
         self.eval().to(device)
         include_target_probs = "target_mediated" in dataset.column_names
+        if desc is None:
+            desc = f"evaluate editor (layer={self.layer})"
 
         results = []
         with dataset.formatted_as("torch"):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
-            for batch in tqdm(loader, desc=f"evaluate editor (layer={self.layer})"):
+            for batch in tqdm(loader, desc=desc):
                 prompts = batch["prompt"]
                 current_batch_size = len(prompts)
 
