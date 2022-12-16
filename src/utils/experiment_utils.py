@@ -56,6 +56,7 @@ def create_results_dir(
             logger.info(f"clearing previous results from {results_dir}")
             shutil.rmtree(results_dir)
 
+    results_dir.mkdir(exist_ok=True, parents=True)
     if args is not None:
         if args_file is None:
             args_file = results_dir / "args.json"
