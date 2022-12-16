@@ -338,6 +338,7 @@ def editor_inputs_from_dataset(
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     batch_size: int = 64,
+    desc: str | None = "precompute editor inputs",
     **kwargs: Any,
 ) -> Dataset:
     """Precompute everything the editor model needs to train and run."""
@@ -354,7 +355,7 @@ def editor_inputs_from_dataset(
         ),
         batched=True,
         batch_size=batch_size,
-        desc="precompute editor inputs",
+        desc=desc,
     )
 
 
@@ -451,6 +452,7 @@ def entity_deltas_from_dataset(
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     batch_size: int = 64,
+    desc: str | None = "precompute entity deltas",
     **kwargs: Any,
 ) -> Dataset:
     """Precompute entity deltas in context for the whole dataset."""
@@ -465,7 +467,7 @@ def entity_deltas_from_dataset(
         ),
         batched=True,
         batch_size=batch_size,
-        desc="precompute entity deltas",
+        desc=desc,
     )
 
 
@@ -544,6 +546,7 @@ def classification_inputs_from_dataset(
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
     batch_size: int = 64,
+    desc: str | None = "precompute classification inputs",
     **kwargs: Any,
 ) -> Dataset:
     """Precompute classification inputs for the whole dataset."""
@@ -558,7 +561,7 @@ def classification_inputs_from_dataset(
         ),
         batched=True,
         batch_size=batch_size,
-        desc="precompute classification inputs",
+        desc=desc,
     )
 
 

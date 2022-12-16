@@ -70,6 +70,7 @@ def main(args: argparse.Namespace) -> None:
                 layers=[editor.layer],
                 device=device,
                 batch_size=args.batch_size,
+                desc=f"precompute {split} directions"
             )
             results = editor.classify(
                 dataset=precomputed, batch_size=args.batch_size, device=device
