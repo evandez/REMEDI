@@ -694,11 +694,16 @@ class Editor(nn.Module):
             The classification results for each sample.
 
         """
+        self.mt.eval_()
+        self.mt.to_(device)
+        self.eval().to(device)
+
         key_e = f"entity.entity.hiddens.{self.layer}.last"
         key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
         key_m = f"context.attribute.hiddens.{self.layer}.average"
 
-        eps = 1e-5 if models.determine_dtype(self.mt) is torch.float16 else 1e-8
+        dtype = models.determine_dtype(self.mt)
+        eps = 1e-5 if dtype is torch.float16 else 1e-8
         sim = nn.CosineSimilarity(eps=eps)
 
         results = []
@@ -728,9 +733,9 @@ class Editor(nn.Module):
                 )
 
                 # Determine similarity between entity rep and attribute/direction reps.
-                entities = batch[key_e]
-                attributes_u = batch[key_u]
-                attributes_m = batch[key_m]
+                entities = batch[key_e].to(device, dtype)
+                attributes_u = batch[key_u].to(device, dtype)
+                attributes_m = batch[key_m].to(device, dtype)
 
                 directions_u = self(entity=entities, attribute=attributes_u)
                 directions_m = self(entity=entities, attribute=attributes_m)
