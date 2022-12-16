@@ -4,7 +4,7 @@ import logging
 import sys
 from typing import Any
 
-DEFAULT_FORMAT = "%(asctime)s %(levelname)-8s (%(name)s): %(message)s"
+DEFAULT_FORMAT = "%(asctime)s %(name)s %(levelname)-8s: %(message)s"
 DEFAULT_DATEFMT = "%Y-%m-%d %H:%M:%S"
 DEFAULT_LEVEL = logging.INFO
 
