@@ -728,6 +728,7 @@ class Editor(nn.Module):
                     max_new_tokens=n_generate,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
+                # TODO(evandez): Remove need for this by reusing gens from training.
                 generations = self.mt.tokenizer.batch_decode(
                     outputs, skip_special_tokens=True
                 )
