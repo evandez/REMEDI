@@ -1,9 +1,10 @@
-"""Utilities for managing experiments and results."""
+"""Utilities for managing experiment runtimes and results."""
 import argparse
 import json
 import logging
 import random
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 from src.utils import env_utils
@@ -13,6 +14,17 @@ import numpy
 import torch
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SEED = 123456
+
+
+@dataclass(frozen=True)
+class Experiment:
+    """A configured experiment."""
+
+    name: str
+    results_dir: Path
+    seed: int
 
 
 def set_seed(seed: int) -> None:
@@ -61,8 +73,59 @@ def create_results_dir(
         if args_file is None:
             args_file = results_dir / "args.json"
         args_file = Path(args_file)
-        logger.info(f"saving results to {args_file}")
+        logger.info(f"saving args to {args_file}")
         with args_file.open("w") as handle:
             json.dump({key: str(value) for key, value in vars(args).items()}, handle)
 
     return results_dir
+
+
+def add_experiment_args(parser: argparse.ArgumentParser) -> None:
+    """Add args common to all experiments.
+
+    The args include:
+        --experiment-name (-n): Requied, unique identifier for this experiment.
+        --results-dir: Root directory containing all experiment folders.
+        --clear-results-dir: If set, experiment-specific results directory is cleared.
+        --seed: Random seed.
+
+    """
+    parser.add_argument(
+        "--experiment-name",
+        "-n",
+        action="store_true",
+        default=False,
+        required=True,
+        help="unique name for the experiment",
+    )
+    parser.add_argument(
+        "--results-dir", type=Path, help="root directory containing experiment results"
+    )
+    parser.add_argument(
+        "--clear-results-dir",
+        action="store_true",
+        default=False,
+        help="clear any old results and start anew",
+    )
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="random seed")
+
+
+def setup_experiment(args: argparse.Namespace) -> Experiment:
+    """Configure experiment from the args."""
+    experiment_name = args.experiment_name
+    seed = args.seed
+
+    set_seed(seed)
+
+    results_dir = create_results_dir(
+        experiment_name,
+        root=args.results_dir,
+        args=args,
+        clear_if_exists=args.clear_results_dir,
+    )
+
+    return Experiment(
+        name=experiment_name,
+        results_dir=results_dir,
+        seed=seed,
+    )

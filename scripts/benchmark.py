@@ -53,20 +53,12 @@ def group_by_id(results: editors.EditorEvaluateRun) -> OrderedDict:
 
 def main(args: argparse.Namespace) -> None:
     """Run the benchmark."""
-    experiment_utils.set_seed(args.seed)
-    logging_utils.configure()
+    experiment = experiment_utils.setup_experiment(args)
+    logging_utils.configure(args=args)
     data.disable_caching()
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
-
-    experiment_name = args.experiment_name or "benchmark"
-    results_dir = experiment_utils.create_results_dir(
-        experiment_name,
-        root=args.results_dir,
-        args=args,
-        clear_if_exists=args.clear_results_dir,
-    )
 
     editors_dir = args.editors
     if editors_dir is None:
@@ -111,7 +103,7 @@ def main(args: argparse.Namespace) -> None:
                 dict(n_generate=args.n_generate),
             ),
         ):
-            results_file = results_dir / f"{key}_results.json"
+            results_file = experiment.results_dir / f"{key}_results.json"
             if results_file.exists():
                 logger.info(f"found existing {key} generations at {results_file}")
                 with results_file.open("r") as handle:
@@ -185,14 +177,13 @@ def main(args: argparse.Namespace) -> None:
             "consistency": consistency.to_dict(),
             "fluency": fluency.to_dict(),
         }
-        scores_file = results_dir / "scores.json"
+        scores_file = experiment.results_dir / "scores.json"
         with scores_file.open("r") as handle:
             json.dump(scores, handle)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="run full counterfact benchmark")
-    parser.add_argument("--experiment-name", "-n", help="experiment name")
     parser.add_argument("--editors", "-e", type=Path, help="path to editor experiment")
     parser.add_argument(
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
@@ -216,14 +207,9 @@ if __name__ == "__main__":
         default=editors.DEFAULT_N_GENERATE,
         help="number of tokens to generate",
     )
-    parser.add_argument("--results-dir", type=Path, help="write trained probes here")
-    parser.add_argument(
-        "--clear-results-dir",
-        action="store_true",
-        help="clear old results and start anew",
-    )
-    parser.add_argument("--seed", type=int, default=123456, help="random seed")
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
     parser.add_argument("--device", help="device to run model on")
+    experiment_utils.add_experiment_args(parser)
+    logging_utils.add_logging_args(parser)
     args = parser.parse_args()
     main(args)

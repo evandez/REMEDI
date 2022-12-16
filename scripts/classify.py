@@ -14,20 +14,12 @@ logger = logging.getLogger(__name__)
 
 def main(args: argparse.Namespace) -> None:
     """Run the classification."""
-    experiment_utils.set_seed(args.seed)
-    logging_utils.configure()
+    experiment = experiment_utils.setup_experiment(args)
+    logging_utils.configure(args=args)
     data.disable_caching()
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
-
-    experiment_name = args.experiment_name or "classification"
-    results_dir = experiment_utils.create_results_dir(
-        experiment_name,
-        root=args.results_dir,
-        args=args,
-        clear_if_exists=args.clear_results_dir,
-    )
 
     editors_dir = args.editors
     if editors_dir is None:
@@ -44,10 +36,10 @@ def main(args: argparse.Namespace) -> None:
 
     layers = args.layers
     if layers is None:
-        layers = [str(layer_dir) for layer_dir in editors_dir.iterdir()]
+        layers = [int(layer_dir) for layer_dir in editors_dir.iterdir()]
 
     for layer in layers:
-        logger.info("begin layer %d", layer)
+        logger.info(f"begin layer {layer}")
         weights_file = editors_dir / "linear" / str(layer) / "weights.pth"
         if not weights_file.exists():
             logger.info(f"no trained editor found; skipping")
@@ -58,7 +50,9 @@ def main(args: argparse.Namespace) -> None:
         editor.load_state_dict(state_dict)
 
         for split, subset in (("train", train), ("test", test)):
-            results_file = results_dir / "linear" / str(layer) / f"{split}-class.json"
+            results_file = (
+                experiment.results_dir / "linear" / str(layer) / f"{split}-class.json"
+            )
             if results_file.exists():
                 logger.info(f"found {split} results at {results_file}; skipping")
                 continue
@@ -81,7 +75,6 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="classify entity attributes as t/f")
-    parser.add_argument("--experiment-name", "-n", help="experiment name")
     parser.add_argument("--editors", "-e", type=Path, help="path to editor experiment")
     parser.add_argument("--layers", "-l", nargs="+", type=int, help="layers to probe")
     parser.add_argument(
@@ -104,14 +97,9 @@ if __name__ == "__main__":
         default=editors.DEFAULT_BATCH_SIZE,
         help="model batch size",
     )
-    parser.add_argument("--results-dir", type=Path, help="write trained probes here")
-    parser.add_argument(
-        "--clear-results-dir",
-        action="store_true",
-        help="clear old results and start anew",
-    )
-    parser.add_argument("--seed", type=int, default=123456, help="random seed")
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
     parser.add_argument("--device", help="device to run model on")
+    experiment_utils.add_experiment_args(parser)
+    logging_utils.add_logging_args(parser)
     args = parser.parse_args()
     main(args)

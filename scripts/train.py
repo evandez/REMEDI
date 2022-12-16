@@ -20,17 +20,9 @@ logger = logging.getLogger(__name__)
 
 def main(args: argparse.Namespace) -> None:
     """Train the editors."""
-    experiment_utils.set_seed(args.seed)
-    logging_utils.configure()
+    experiment = experiment_utils.setup_experiment(args)
+    logging_utils.configure(args=args)
     data.disable_caching()
-
-    experiment_name = args.experiment_name or "editors"
-    results_dir = experiment_utils.create_results_dir(
-        experiment_name,
-        root=args.results_dir,
-        args=args,
-        clear_if_exists=args.clear_results_dir,
-    )
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
@@ -60,7 +52,7 @@ def main(args: argparse.Namespace) -> None:
         for layer in layers:
             logger.info(f"begin: editor={editor_type}, layer={layer}")
 
-            editor_results_dir = results_dir / editor_type / str(layer)
+            editor_results_dir = experiment.results_dir / editor_type / str(layer)
             editor_results_dir.mkdir(exist_ok=True, parents=True)
 
             editor: editors.Editor = editor_factory(layer=layer, **editor_kwargs)
@@ -112,7 +104,6 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train one editor per layer")
-    parser.add_argument("--experiment-name", "-n", help="experiment name")
     parser.add_argument(
         "--editor-types",
         "-e",
@@ -189,12 +180,6 @@ if __name__ == "__main__":
         default=editors.DEFAULT_N_GENERATE,
         help="number of tokens to generate in eval",
     )
-    parser.add_argument("--results-dir", type=Path, help="write trained probes here")
-    parser.add_argument(
-        "--clear-results-dir",
-        action="store_true",
-        help="clear old results and start anew",
-    )
     parser.add_argument(
         "--use-entity",
         action="store_true",
@@ -207,7 +192,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument("--device", help="device to train on")
-    parser.add_argument("--seed", type=int, default=123456, help="random seed")
     parser.add_argument("--fp16", action="store_true", help="use fp16")
+    experiment_utils.add_experiment_args(parser)
+    logging_utils.add_logging_args(parser)
     args = parser.parse_args()
     main(args)
