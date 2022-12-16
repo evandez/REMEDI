@@ -63,6 +63,6 @@ def create_results_dir(
         args_file = Path(args_file)
         logger.info(f"saving results to {args_file}")
         with args_file.open("w") as handle:
-            json.dump(vars(args), handle)
+            json.dump({key: str(value) for key, value in vars(args).items()}, handle)
 
     return results_dir
