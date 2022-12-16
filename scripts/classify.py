@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from src import data, editors, models, precompute
-from src.utils import env_utils, experiment_utils
+from src.utils import env_utils, experiment_utils, logging_utils
 
 import torch
 import torch.utils.data
@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 def main(args: argparse.Namespace) -> None:
     """Run the classification."""
     experiment_utils.set_seed(args.seed)
+    logging_utils.configure()
     data.disable_caching()
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"

@@ -6,7 +6,7 @@ from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 from src import data, editors, metrics, models
-from src.utils import env_utils, experiment_utils
+from src.utils import env_utils, experiment_utils, logging_utils
 from src.utils.typing import Dataset
 
 import torch
@@ -54,6 +54,7 @@ def group_by_id(results: editors.EditorEvaluateRun) -> OrderedDict:
 def main(args: argparse.Namespace) -> None:
     """Run the benchmark."""
     experiment_utils.set_seed(args.seed)
+    logging_utils.configure()
     data.disable_caching()
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"

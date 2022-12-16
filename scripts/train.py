@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from src import data, editors, models, precompute
-from src.utils import experiment_utils
+from src.utils import experiment_utils, logging_utils
 
 import torch
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 def main(args: argparse.Namespace) -> None:
     """Train the editors."""
     experiment_utils.set_seed(args.seed)
+    logging_utils.configure()
     data.disable_caching()
 
     experiment_name = args.experiment_name or "editors"
