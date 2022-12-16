@@ -57,6 +57,7 @@ def main(args: argparse.Namespace) -> None:
     logging_utils.configure(args=args)
     data.disable_caching()
 
+    # TODO(evandez): Commonize next few blocks of code.
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
 
@@ -70,7 +71,13 @@ def main(args: argparse.Namespace) -> None:
 
     layers = args.layers
     if layers is None:
-        layers = [str(layer_dir) for layer_dir in editors_dir.iterdir()]
+        layers = sorted(
+            [
+                int(layer_dir.name)
+                for layer_dir in editors_dir.iterdir()
+                if layer_dir.is_dir()
+            ]
+        )
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
