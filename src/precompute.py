@@ -537,6 +537,9 @@ def classification_inputs_from_batch(
         precomputed[f"{key}.average"] = average_hiddens_from_batch(hiddens, trs_all)
         precomputed[f"{key}.last"] = average_hiddens_from_batch(hiddens, trs_last)
 
+    if fp32:
+        precomputed = _as_fp32(precomputed)
+
     return precomputed
 
 
