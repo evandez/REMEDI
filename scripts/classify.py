@@ -36,7 +36,11 @@ def main(args: argparse.Namespace) -> None:
 
     layers = args.layers
     if layers is None:
-        layers = [int(layer_dir.name) for layer_dir in editors_dir.iterdir()]
+        layers = [
+            int(layer_dir.name)
+            for layer_dir in editors_dir.iterdir()
+            if layer_dir.is_dir()
+        ]
 
     for layer in layers:
         logger.info(f"begin layer {layer}")
