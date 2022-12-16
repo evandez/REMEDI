@@ -694,14 +694,6 @@ class Editor(nn.Module):
             The classification results for each sample.
 
         """
-        precomputed = precompute.classification_inputs_from_dataset(
-            mt=self.mt,
-            dataset=dataset,
-            layers=[self.layer],
-            batch_size=batch_size,
-            device=device,
-        )
-
         key_e = f"entity.entity.hiddens.{self.layer}.last"
         key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
         key_m = f"context.attribute.hiddens.{self.layer}.average"
@@ -710,9 +702,9 @@ class Editor(nn.Module):
         sim = nn.CosineSimilarity(eps=eps)
 
         results = []
-        with precomputed.formatted_as("torch"):
+        with dataset.formatted_as("torch"):
             loader = torch.utils.data.DataLoader(
-                cast(torch.utils.data.Dataset, precomputed), batch_size=batch_size
+                cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
             for batch in tqdm(loader, desc=desc):
                 if not precompute.has_classification_inputs(batch):
