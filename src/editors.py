@@ -676,6 +676,7 @@ class Editor(nn.Module):
         batch_size: int = DEFAULT_BATCH_SIZE,
         n_generate: int = DEFAULT_N_GENERATE,
         device: Device | None = None,
+        desc: str | None = "classify",
     ) -> EditorClassifyRun:
         """Determine whether model believes unmediated/mediated attr is true of entity.
 
@@ -687,6 +688,7 @@ class Editor(nn.Module):
             batch_size: Model batch size.
             n_generate: Number of tokens to generate from prompt (before edit).
             device: Send model and data to this device.
+            desc: Progress bar description.
 
         Returns:
             The classification results for each sample.
@@ -712,7 +714,7 @@ class Editor(nn.Module):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, precomputed), batch_size=batch_size
             )
-            for batch in tqdm(loader):
+            for batch in tqdm(loader, desc=desc):
                 if not precompute.has_classification_inputs(batch):
                     batch = precompute.classification_inputs_from_batch(
                         self.mt, batch, layers=[self.layer], device=device
