@@ -26,6 +26,7 @@ def main(args: argparse.Namespace) -> None:
         editors_dir = env_utils.determine_results_dir() / "editors"
     if not editors_dir.exists():
         raise ValueError(f"editors not found at {editors_dir}; maybe pass the -e flag")
+    editors_dir /= "linear"
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
@@ -44,7 +45,7 @@ def main(args: argparse.Namespace) -> None:
 
     for layer in layers:
         logger.info(f"begin layer {layer}")
-        weights_file = editors_dir / "linear" / str(layer) / "weights.pth"
+        weights_file = editors_dir / str(layer) / "weights.pth"
         if not weights_file.exists():
             logger.info(f"no trained editor found; skipping")
             continue
