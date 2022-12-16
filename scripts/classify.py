@@ -103,6 +103,7 @@ if __name__ == "__main__":
         default=editors.DEFAULT_BATCH_SIZE,
         help="model batch size",
     )
+    parser.add_argument("--seed", type=int, default=123456, help="random seed")
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
     parser.add_argument("--device", help="device to run model on")
     parser.add_argument(
