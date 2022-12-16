@@ -93,8 +93,6 @@ def add_experiment_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--experiment-name",
         "-n",
-        action="store_true",
-        default=False,
         required=True,
         help="unique name for the experiment",
     )
