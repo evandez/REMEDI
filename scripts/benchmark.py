@@ -2,7 +2,7 @@
 import argparse
 import json
 import logging
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 from src import data, editors, metrics, models
@@ -43,12 +43,12 @@ def select_dedupe_flatten(dataset: Dataset, column: str) -> Dataset:
     )
 
 
-def group_by_id(results: editors.EditorEvaluateRun) -> dict:
+def group_by_id(results: editors.EditorEvaluateRun) -> OrderedDict:
     """Group results by sample ID."""
     grouped = defaultdict(list)
     for result in results.results:
         grouped[result.sample["id"]].append(result)
-    return grouped
+    return OrderedDict(grouped)
 
 
 def main(args: argparse.Namespace) -> None:
@@ -129,39 +129,37 @@ def main(args: argparse.Namespace) -> None:
             with results_file.open("w") as handle:
                 handle.write(generations.to_json())
 
-        # Efficacy
+        prompts_results_by_id = group_by_id(results["prompts"])
         efficacy = metrics.efficacy(
             [
-                sample.after_target_mediated_score
-                for sample in results["prompt"].results
+                [sample.after_target_mediated_score]
+                for sample in prompts_results_by_id.values()
             ],
             [
-                sample.after_target_unmediated_score
-                for sample in results["prompt"].results
+                [sample.after_target_unmediated_score]
+                for sample in prompts_results_by_id.values()
             ],
         )
 
-        # Paraphrase efficacy
-        # TODO(evandez): Average within sample to make equivalent to ROME eval
+        paraphrase_prompts_results_by_id = group_by_id(results["paraphrase_prompts"])
         paraphrase_efficacy = metrics.efficacy(
             [
-                sample.after_target_mediated_score
-                for sample in results["paraprase_prompts"].results
+                [sample.after_target_mediated_score for sample in samples]
+                for samples in paraphrase_prompts_results_by_id.values()
             ],
             [
-                sample.after_target_unmediated_score
-                for sample in results["paraprase_prompts"].results
+                [sample.after_target_unmediated_score for sample in samples]
+                for samples in paraphrase_prompts_results_by_id.values()
             ],
         )
 
-        # Consistency
         generation_prompts_results_by_id = group_by_id(results["generation_prompts"])
         generation_prompts_outputs = [
             [sample.after_generations[0] for sample in samples]
             for samples in generation_prompts_results_by_id.values()
         ]
 
-        references_by_id = []
+        consistency_references = []
         for samples in generation_prompts_results_by_id.values():
             sample = next(iter(samples))
             relation_id = sample.sample["requested_rewrite"]["relation_id"]
@@ -170,15 +168,14 @@ def main(args: argparse.Namespace) -> None:
                 snippet["text"]
                 for snippet in attribute_snippets[relation_id][target_id]
             ]
-            references_by_id.append(references)
+            consistency_references.append(references)
 
         consistency = metrics.consistency(
             generation_prompts_outputs,
-            references_by_id,
+            consistency_references,
             tfidf_vectorizer,
         )
 
-        # Fluency
         fluency = metrics.fluency(generation_prompts_outputs)
 
         scores = {

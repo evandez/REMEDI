@@ -43,7 +43,7 @@ def main(args: argparse.Namespace) -> None:
 
     layers = args.layers
     if layers is None:
-        layers = models.determine_layers(mt)
+        layers = [str(layer_dir) for layer_dir in editors_dir.iterdir()]
 
     for layer in layers:
         logger.info("begin layer %d", layer)

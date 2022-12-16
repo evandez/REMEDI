@@ -37,16 +37,43 @@ class EfficacyMetrics(DataClassJsonMixin):
     magnitude: Metric
 
 
-def efficacy(p_true: ArrayLike, p_new: ArrayLike) -> EfficacyMetrics:
-    """Compute efficacy on metrics."""
-    _validate_same_length(p_true=p_true, p_new=p_new)
-    p_true = np.array(p_true)
-    p_new = np.array(p_new)
-    scores = p_true > p_new
-    magnitudes = p_true - p_new
+def efficacy(
+    p_targets: Sequence[ArrayLike],
+    p_comparators: Sequence[ArrayLike],
+    assume_log_probs: bool = True,
+) -> EfficacyMetrics:
+    """Compute efficacy on metrics.
+
+    Efficacy is determined by a score and a magnitude. The score is how often
+    p(target) > p(comparator). The magnitude is the average p(target) - p(comparator).
+
+    Inputs are two sequences. Each element should be one or more measurements of
+    the probability (for e.g. different prompts). This function will first average
+    across those inner lists, then average across the whole list.
+    """
+    _validate_same_length(p_targets=p_targets, p_comparators=p_comparators)
+
+    scores, magnitudes = [], []
+    for i, (p_target, p_comparator) in enumerate(zip(p_targets, p_comparators)):
+        _validate_same_length(
+            **{f"p_target_{i}": p_target, f"p_comparator_{i}": p_comparator}
+        )
+
+        if assume_log_probs:
+            p_target = np.exp(p_target)
+            p_comparator = np.exp(p_comparator)
+        else:
+            p_target = np.array(p_target)
+            p_comparator = np.array(p_comparator)
+
+        score = np.mean(p_target > p_comparator)
+        scores.append(score)
+
+        magnitude = np.mean(p_target - p_comparator)
+        magnitudes.append(magnitude)
+
     return EfficacyMetrics(
-        score=Metric.aggregate(scores),
-        magnitude=Metric.aggregate(magnitudes),
+        score=Metric.aggregate(scores), magnitude=Metric.aggregate(magnitudes)
     )
 
 
