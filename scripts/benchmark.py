@@ -215,13 +215,14 @@ if __name__ == "__main__":
         default=editors.DEFAULT_N_GENERATE,
         help="number of tokens to generate",
     )
-    parser.add_argument("--seed", type=int, default=123456, help="random seed")
-    parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
-    parser.add_argument("--device", help="device to run model on")
+    parser.add_argument("--results-dir", type=Path, help="write trained probes here")
     parser.add_argument(
         "--clear-results-dir",
         action="store_true",
         help="clear old results and start anew",
     )
+    parser.add_argument("--seed", type=int, default=123456, help="random seed")
+    parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
+    parser.add_argument("--device", help="device to run model on")
     args = parser.parse_args()
     main(args)
