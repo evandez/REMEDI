@@ -179,7 +179,7 @@ def main(args: argparse.Namespace) -> None:
             "consistency": consistency.to_dict(),
             "fluency": fluency.to_dict(),
         }
-        logging.info("benchmark complete! results:\n%s", json.dumps(scores, index=1))
+        logging.info("benchmark complete! results:\n%s", json.dumps(scores, indent=1))
         scores_file = experiment.results_dir / "scores.json"
         with scores_file.open("w") as handle:
             json.dump(scores, handle)
