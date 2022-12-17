@@ -93,7 +93,9 @@ def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
         attribute=attribute,
         target_mediated=target_mediated,
         target_unmediated=target_unmediated,
-        source=cf_sample,
+        # NOTE(evandez): Need to copy or else remove_columns will directly
+        # delete keys on the original dict, causing source to be empty dict.
+        source={**cf_sample},
     )
 
 
