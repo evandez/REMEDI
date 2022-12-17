@@ -600,9 +600,7 @@ class Editor(nn.Module):
             desc = f"evaluate editor (layer={self.layer})"
 
         results = []
-        with dataset.formatted_as(
-            "torch", columns=data.column_names(dataset, exclude=["source"])
-        ):
+        with dataset.formatted_as("torch"):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
