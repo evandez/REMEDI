@@ -17,9 +17,7 @@ logger = logging.getLogger(__name__)
 
 def select_and_flatten_counterfact(dataset: Dataset, column: str) -> Dataset:
     """Select the given column in counterfact and flatten it."""
-    column_names = dataset.column_names
-    assert isinstance(column_names, list), column_names
-    assert column in column_names, f"{column} not in {column_names}"
+    column_names = data.column_names(dataset)
 
     def _select_and_flatten_counterfact(row: dict) -> dict:
         prompts = list([texts[0] for texts in row["source"][column]])
