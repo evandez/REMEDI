@@ -110,6 +110,7 @@ def main(args: argparse.Namespace) -> None:
                     results[key] = editors.EditorEvaluateRun.from_json(handle.read())
                 continue
 
+            logger.info(f"{key}: found {len(subset)} entries")
             results[key] = generations = editor.evaluate(
                 subset,
                 batch_size=args.batch_size,
