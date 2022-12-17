@@ -201,13 +201,17 @@ def load_tfidf_vectorizer(
     return vec
 
 
-def column_names(dataset: Dataset) -> list[str]:
+def column_names(dataset: Dataset, exclude: StrSequence | None = None) -> list[str]:
     """Get all column names for the dataset."""
     if isinstance(dataset, datasets.arrow_dataset.Dataset):
         column_names = dataset.column_names
     else:
         assert isinstance(dataset, datasets.dataset_dict.DatasetDict), type(dataset)
-        column_names = sorted(set(chain(*dataset.column_names.values())))
+        column_names = list(set(chain(*dataset.column_names.values())))
+
+    if exclude is not None:
+        column_names = list(set(column_names) - set(exclude))
+
     return column_names
 
 

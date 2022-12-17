@@ -600,11 +600,13 @@ class Editor(nn.Module):
             desc = f"evaluate editor (layer={self.layer})"
 
         results = []
-        with dataset.formatted_as("torch"):
+        with dataset.formatted_as(
+            "torch", columns=data.column_names(dataset, exclude=["source"])
+        ):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
-            for batch in tqdm(loader, desc=desc):
+            for batch_index, batch in enumerate(tqdm(loader, desc=desc)):
                 if not precompute.has_editor_inputs(batch):
                     batch.update(
                         precompute.editor_inputs_from_batch(
@@ -634,18 +636,7 @@ class Editor(nn.Module):
                         batch, inputs=inputs, padding_side="left", **generate_kwargs
                     )
 
-                batched_results: dict = {
-                    "sample": [
-                        {
-                            key: batch[key][bi]
-                            for key in (
-                                *data.ContextMediationSample.__required_keys__,
-                                "requested_rewrite",
-                            )
-                        }
-                        for bi in range(current_batch_size)
-                    ]
-                }
+                batched_results: dict = {}
                 for key, outputs in (
                     ("before", outputs_before),
                     ("after", outputs_after),
@@ -671,10 +662,19 @@ class Editor(nn.Module):
                             target_prob_key = f"{key}_target_{target_key}_score"
                             batched_results[target_prob_key] = target_probs.tolist()
 
-                # Flatten results.
-                for bi in range(current_batch_size):
-                    result_kwargs: dict
-                    result_kwargs = {k: vs[bi] for k, vs in batched_results.items()}
+                # Annoyingly, we have to flatten the results of the evaluation while
+                # preserving the inputs for downstream uses. Hence the indexing.
+                for index_in_batch in range(current_batch_size):
+                    index_in_dataset = batch_index * batch_size + index_in_batch
+                    result_kwargs: dict = {
+                        "sample": {
+                            key: dataset[index_in_dataset][key]
+                            for key in data.ContextMediationSample.__required_keys__
+                        }
+                    }
+                    result_kwargs.update(
+                        {k: vs[index_in_batch] for k, vs in batched_results.items()}
+                    )
                     result = EditorEvaluationResult(**result_kwargs)
                     results.append(result)
 
