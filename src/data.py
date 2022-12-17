@@ -1,6 +1,7 @@
 """Datasets for evaluating context mediation in LMs."""
 import json
 from collections import defaultdict
+from itertools import chain
 from pathlib import Path
 from typing import Any, Sequence, TypedDict
 
@@ -31,6 +32,7 @@ class ContextMediationSample(TypedDict):
     prompt: str  # "Barack Obama received a degree in"
     target_mediated: str | None  # "computer science" or not set for generation
     target_unmediated: str | None  # "law" or not set for generation
+    source: dict | None  # Where this sample was derived from, e.g. counterfact sample.
 
 
 class ContextMediationBatch(TypedDict):
@@ -43,6 +45,7 @@ class ContextMediationBatch(TypedDict):
     prompt: StrSequence
     target_mediated: StrSequence | None
     target_unmediated: StrSequence | None
+    source: Sequence[dict] | None
 
 
 ContextMediationInput = ContextMediationSample | ContextMediationBatch
@@ -90,6 +93,7 @@ def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
         attribute=attribute,
         target_mediated=target_mediated,
         target_unmediated=target_unmediated,
+        source=cf_sample,
     )
 
 
@@ -110,7 +114,11 @@ def _load_counterfact(
         dataset, datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
     ), type(dataset)
 
-    dataset = dataset.map(_reformat_counterfact_sample, desc="reformat counterfact")
+    dataset = dataset.map(
+        _reformat_counterfact_sample,
+        remove_columns=column_names(dataset),
+        desc="reformat counterfact",
+    )
     return dataset
 
 
@@ -189,6 +197,16 @@ def load_tfidf_vectorizer(
     vec.vocabulary_ = vocab
     vec._tfidf._idf_diag = scipy.sparse.spdiags(idf, diags=0, m=len(idf), n=len(idf))
     return vec
+
+
+def column_names(dataset: Dataset) -> list[str]:
+    """Get all column names for the dataset."""
+    if isinstance(dataset, datasets.arrow_dataset.Dataset):
+        column_names = dataset.column_names
+    else:
+        assert isinstance(dataset, datasets.dataset_dict.DatasetDict), type(dataset)
+        column_names = sorted(set(chain(*dataset.column_names.values())))
+    return column_names
 
 
 def maybe_train_test_split(

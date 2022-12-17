@@ -11,6 +11,7 @@ from src.utils.typing import (
     Model,
     ModelGenerateOutput,
     ModelOutput,
+    StrSequence,
     Tokenizer,
 )
 
@@ -637,7 +638,10 @@ class Editor(nn.Module):
                     "sample": [
                         {
                             key: batch[key][bi]
-                            for key in data.ContextMediationSample.__required_keys__
+                            for key in (
+                                *data.ContextMediationSample.__required_keys__,
+                                "requested_rewrite",
+                            )
                         }
                         for bi in range(current_batch_size)
                     ]

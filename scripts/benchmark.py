@@ -20,11 +20,10 @@ def select_and_flatten_counterfact(dataset: Dataset, column: str) -> Dataset:
     column_names = dataset.column_names
     assert isinstance(column_names, list), column_names
     assert column in column_names, f"{column} not in {column_names}"
-    assert "requested_rewrite" in column_names, column_names
 
     def _select_and_flatten_counterfact(row: dict) -> dict:
-        prompts = list([texts[0] for texts in row[column]])
-        result = {"prompt": prompts, "requested_rewrite": row["requested_rewrite"]}
+        prompts = list([texts[0] for texts in row["source"][column]])
+        result = {"prompt": prompts}
         for key in data.ContextMediationSample.__required_keys__:
             if key not in result:
                 result[key] = [row[key][0]] * len(prompts)
@@ -113,19 +112,11 @@ def main(args: argparse.Namespace) -> None:
                     results[key] = editors.EditorEvaluateRun.from_json(handle.read())
                 continue
 
-            # precomputed = precompute.editor_inputs_from_dataset(
-            #     mt=mt,
-            #     dataset=subset,
-            #     layers=[layer],
-            #     device=device,
-            #     desc=f"precompute {key} inputs",
-            #     batch_size=args.batch_size,
-            # )
             results[key] = generations = editor.evaluate(
                 subset,
                 batch_size=args.batch_size,
                 device=device,
-                desc=f"evluate on {key} (layer {layer})",
+                desc=f"evaluate on {key} (layer {layer})",
                 **kwargs,
             )
 
@@ -166,8 +157,9 @@ def main(args: argparse.Namespace) -> None:
         consistency_references = []
         for samples in generation_prompts_results_by_id.values():
             sample = next(iter(samples))
-            relation_id = sample.sample["requested_rewrite"]["relation_id"]
-            target_id = sample.sample["requested_rewrite"]["target_new"]["target_id"]
+            cf_requested_rewrite = sample.sample["source"]["requested_rewrite"]
+            relation_id = cf_requested_rewrite["relation_id"]
+            target_id = cf_requested_rewrite["target_new"]["target_id"]
             references = [
                 snippet["text"]
                 for snippet in attribute_snippets[relation_id][target_id]
