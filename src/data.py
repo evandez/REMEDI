@@ -24,7 +24,7 @@ TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 class ContextMediationSample(TypedDict):
     """Single sample that can be used for context mediation analysis."""
 
-    id: int  # Identifier
+    id: str  # Identifier
     entity: str  # "Barack Obama"
     attribute: str  # "invented the iPhone"
     context: str  # "Everyone knows that Barack Obama invented the iPhone."
@@ -36,7 +36,7 @@ class ContextMediationSample(TypedDict):
 class ContextMediationBatch(TypedDict):
     """Batch of context mediation samples."""
 
-    id: Sequence[int]
+    id: StrSequence
     entity: StrSequence
     attribute: StrSequence
     context: StrSequence
@@ -83,7 +83,7 @@ def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
     target_unmediated = cf_target_true
 
     return ContextMediationSample(
-        id=cf_case_id,
+        id=str(cf_case_id),
         entity=entity,
         prompt=prompt,
         context=context,
