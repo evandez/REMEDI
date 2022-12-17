@@ -144,11 +144,11 @@ def main(args: argparse.Namespace) -> None:
         efficacy = metrics.efficacy(
             [
                 [sample.after_target_mediated_score]
-                for sample in prompts_results_by_id.values()
+                for [sample] in prompts_results_by_id.values()
             ],
             [
                 [sample.after_target_unmediated_score]
-                for sample in prompts_results_by_id.values()
+                for [sample] in prompts_results_by_id.values()
             ],
         )
 
