@@ -30,7 +30,7 @@ def select_dedupe_flatten(dataset: Dataset, column: str) -> Dataset:
         result = {"prompt": prompts}
         for key in data.ContextMediationSample.__required_keys__:
             if key not in result:
-                result[key] = [row[key]] * len(prompts)
+                result[key] = [row[key][0]] * len(prompts)
         return result
 
     column_names = dataset.column_names
