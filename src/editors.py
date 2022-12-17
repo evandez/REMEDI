@@ -604,7 +604,7 @@ class Editor(nn.Module):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
-            for batch_index, batch in enumerate(tqdm(loader, desc=desc)):
+            for batch in tqdm(loader, desc=desc):
                 if not precompute.has_editor_inputs(batch):
                     batch.update(
                         precompute.editor_inputs_from_batch(
@@ -660,23 +660,21 @@ class Editor(nn.Module):
                             target_prob_key = f"{key}_target_{target_key}_score"
                             batched_results[target_prob_key] = target_probs.tolist()
 
-                # Annoyingly, we have to flatten the results of the evaluation while
-                # preserving the inputs for downstream uses. Hence the indexing.
-                for index_in_batch in range(current_batch_size):
-                    index_in_dataset = batch_index * batch_size + index_in_batch
-                    result_kwargs: dict = {
-                        "sample": {
-                            key: dataset[index_in_dataset][key]
-                            for key in data.ContextMediationSample.__required_keys__
-                        }
-                    }
-                    result_kwargs.update(
-                        {k: vs[index_in_batch] for k, vs in batched_results.items()}
-                    )
-                    result = EditorEvaluationResult(**result_kwargs)
+                for bi in range(current_batch_size):
+                    result: dict = {k: vs[bi] for k, vs in batched_results.items()}
                     results.append(result)
 
-            return EditorEvaluateRun(results)
+        # Finally, decorate results with original sample data.
+        assert len(results) == len(dataset)
+        for sample, result in zip(dataset, results):
+            result.update(
+                sample={
+                    key: sample[key]
+                    for key in data.ContextMediationSample.__required_keys__
+                }
+            )
+
+        return EditorEvaluateRun([EditorEvaluationResult(**r) for r in results])
 
     def classify(
         self,
