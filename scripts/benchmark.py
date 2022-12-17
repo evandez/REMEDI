@@ -103,7 +103,7 @@ def main(args: argparse.Namespace) -> None:
                 dict(n_generate=args.n_generate),
             ),
         ):
-            results_file = experiment.results_dir / f"{key}_results.json"
+            results_file = experiment.results_dir / str(layer) / f"{key}_results.json"
             if results_file.exists():
                 logger.info(f"found existing {key} generations at {results_file}")
                 with results_file.open("r") as handle:
