@@ -126,12 +126,13 @@ def main(args: argparse.Namespace) -> None:
                 layers=[layer],
                 device=device,
                 desc=f"precompute {key} inputs",
+                batch_size=args.batch_size,
             )
             results[key] = generations = editor.evaluate(
                 precomputed,
                 batch_size=args.batch_size,
                 device=device,
-                desc=f"{key} (layer {layer})",
+                desc=f"evluate on {key} (layer {layer})",
                 **kwargs,
             )
 
