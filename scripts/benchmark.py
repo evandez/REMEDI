@@ -1,4 +1,4 @@
-"""Evaluate editors on the CounterFact benchmark."""
+"""Evaluate editors on the Counterfact benchmark."""
 import argparse
 import json
 import logging
@@ -15,33 +15,27 @@ import torch.utils.data
 logger = logging.getLogger(__name__)
 
 
-def select_dedupe_flatten(dataset: Dataset, column: str) -> Dataset:
-    """Select the given column and flatten it."""
+def select_and_flatten_counterfact(dataset: Dataset, column: str) -> Dataset:
+    """Select the given column in counterfact and flatten it."""
+    column_names = dataset.column_names
+    assert isinstance(column_names, list), column_names
+    assert column in column_names, f"{column} not in {column_names}"
+    assert "requested_rewrite" in column_names, column_names
 
-    def _select_dedupe_flatten(row: dict) -> dict:
-        prompts = list(
-            {
-                texts[0]
-                for texts in row[column]
-                # Don't include prompts that were used to create the context.
-                if texts[0].lower() not in row["context"][0].lower()
-            }
-        )
-        result = {"prompt": prompts}
+    def _select_and_flatten_counterfact(row: dict) -> dict:
+        prompts = list([texts[0] for texts in row[column]])
+        result = {"prompt": prompts, "requested_rewrite": row["requested_rewrite"]}
         for key in data.ContextMediationSample.__required_keys__:
             if key not in result:
                 result[key] = [row[key][0]] * len(prompts)
         return result
 
-    column_names = dataset.column_names
-    assert isinstance(column_names, list), column_names
-
     return dataset.map(
-        _select_dedupe_flatten,
+        _select_and_flatten_counterfact,
         batched=True,
         batch_size=1,
         remove_columns=column_names,
-        desc=f"select, dedupe, and flatten {column}",
+        desc=f"select and flatten {column}",
     )
 
 
@@ -89,8 +83,8 @@ def main(args: argparse.Namespace) -> None:
     dataset = data.load_dataset("counterfact", split="train[5000:10000]")
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_tfidf_vectorizer()
-    paraphrase_prompts = select_dedupe_flatten(dataset, "paraphrase_prompts")
-    generation_prompts = select_dedupe_flatten(dataset, "generation_prompts")
+    paraphrase_prompts = select_and_flatten_counterfact(dataset, "paraphrase_prompts")
+    generation_prompts = select_and_flatten_counterfact(dataset, "generation_prompts")
 
     for layer in layers:
         editor = editors.LinearEditor(mt=mt, layer=layer).to(device)
@@ -119,17 +113,16 @@ def main(args: argparse.Namespace) -> None:
                     results[key] = editors.EditorEvaluateRun.from_json(handle.read())
                 continue
 
-            # TODO(evandez): Have evaluate auto-precompute stuff?
-            precomputed = precompute.editor_inputs_from_dataset(
-                mt=mt,
-                dataset=subset,
-                layers=[layer],
-                device=device,
-                desc=f"precompute {key} inputs",
-                batch_size=args.batch_size,
-            )
+            # precomputed = precompute.editor_inputs_from_dataset(
+            #     mt=mt,
+            #     dataset=subset,
+            #     layers=[layer],
+            #     device=device,
+            #     desc=f"precompute {key} inputs",
+            #     batch_size=args.batch_size,
+            # )
             results[key] = generations = editor.evaluate(
-                precomputed,
+                subset,
                 batch_size=args.batch_size,
                 device=device,
                 desc=f"evluate on {key} (layer {layer})",

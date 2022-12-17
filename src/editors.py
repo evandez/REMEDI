@@ -604,6 +604,11 @@ class Editor(nn.Module):
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
             for batch in tqdm(loader, desc=desc):
+                if not precompute.has_editor_inputs(batch):
+                    batch = precompute.editor_inputs_from_batch(
+                        mt=self.mt, batch=batch, layers=[self.layer], device=device
+                    )
+
                 prompts = batch["prompt"]
                 current_batch_size = len(prompts)
 
