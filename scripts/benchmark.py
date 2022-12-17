@@ -109,6 +109,7 @@ def main(args: argparse.Namespace) -> None:
                 with results_file.open("r") as handle:
                     results[key] = editors.EditorEvaluateRun.from_json(handle.read())
                 continue
+            results_file.parent.mkdir(exist_ok=True, parents=True)
 
             logger.info(f"{key}: found {len(subset)} entries")
             results[key] = generations = editor.evaluate(
