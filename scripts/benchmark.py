@@ -93,9 +93,9 @@ def main(args: argparse.Namespace) -> None:
 
     for layer in layers:
         editor = editors.LinearEditor(mt=mt, layer=layer).to(device)
-        weights_file = editors_dir / "linear" / str(layer) / "weights.pth"
+        weights_file = editors_dir / str(layer) / "weights.pth"
         if not weights_file.exists():
-            logger.warn(f"weights file for layer {layer} not found; skipping")
+            logger.warning(f"weights file for layer {layer} not found; skipping")
             continue
         logger.info(f"loaded layer {layer} editor from {weights_file}")
         state_dict = torch.load(weights_file, map_location=device)
