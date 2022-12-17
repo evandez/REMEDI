@@ -119,7 +119,7 @@ def _validate_same_length(**kwargs: Sequence | ArrayLike) -> None:
 
 def _n_gram_counts(text: str, n: int) -> dict[tuple[str, ...], int]:
     """Return the n-gram counts for the text."""
-    tokens = nltk.word_tokenizer(text)
+    tokens = nltk.word_tokenize(text)
     ngrams = nltk.ngrams(tokens, n)
     return nltk.FreqDist(ngrams)
 
@@ -127,7 +127,7 @@ def _n_gram_counts(text: str, n: int) -> dict[tuple[str, ...], int]:
 def _n_gram_entropy(text: str, n: int) -> float:
     """Return entropy of n-gram distribution in text."""
     counts = _n_gram_counts(text, n)
-    dist = np.array([count for _, count in counts.items()])
+    dist = np.array([count for _, count in counts.items()], dtype=np.float32)
     dist /= dist.sum()
     entropy = np.sum(-dist * np.log(dist) / np.log(2))
     return entropy.item()
