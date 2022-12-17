@@ -20,7 +20,7 @@ def select_and_flatten_counterfact(dataset: Dataset, column: str) -> Dataset:
     column_names = data.column_names(dataset)
 
     def _select_and_flatten_counterfact(row: dict) -> dict:
-        prompts = list([texts[0] for texts in row["source"][0][column]])
+        prompts = [texts[0] for texts in row["source"][0][column]]
         result = {"prompt": prompts}
         for key in data.ContextMediationSample.__required_keys__:
             if key not in result:
