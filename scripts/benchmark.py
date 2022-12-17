@@ -21,10 +21,10 @@ def select_dedupe_flatten(dataset: Dataset, column: str) -> Dataset:
     def _select_dedupe_flatten(row: dict) -> dict:
         prompts = list(
             {
-                text
-                for text in row[column]
+                texts[0]
+                for texts in row[column]
                 # Don't include prompts that were used to create the context.
-                if text.lower() not in row["context"].lower()
+                if texts[0].lower() not in row["context"][0].lower()
             }
         )
         result = {"prompt": prompts}
@@ -38,6 +38,7 @@ def select_dedupe_flatten(dataset: Dataset, column: str) -> Dataset:
     return dataset.map(
         _select_dedupe_flatten,
         batched=True,
+        batch_size=1,
         remove_columns=column_names,
         desc=f"select, dedupe, and flatten {column}",
     )
