@@ -158,7 +158,7 @@ def main(args: argparse.Namespace) -> None:
             sample = next(iter(samples))
             cf_requested_rewrite = sample.sample["source"]["requested_rewrite"]
             relation_id = cf_requested_rewrite["relation_id"]
-            target_id = cf_requested_rewrite["target_new"]["target_id"]
+            target_id = cf_requested_rewrite["target_new"]["id"]
             references = [
                 snippet["text"]
                 for snippet in attribute_snippets[relation_id][target_id]
