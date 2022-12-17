@@ -5,7 +5,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from pathlib import Path
 
-from src import data, editors, metrics, models
+from src import data, editors, metrics, models, precompute
 from src.utils import env_utils, experiment_utils, logging_utils
 from src.utils.typing import Dataset
 
@@ -118,8 +118,16 @@ def main(args: argparse.Namespace) -> None:
                     results[key] = editors.EditorEvaluateRun.from_json(handle.read())
                 continue
 
+            # TODO(evandez): Have evaluate auto-precompute stuff?
+            precomputed = precompute.editor_inputs_from_dataset(
+                mt=mt,
+                dataset=subset,
+                layers=[layer],
+                device=device,
+                desc=f"precompute {key} inputs",
+            )
             results[key] = generations = editor.evaluate(
-                subset,
+                precomputed,
                 batch_size=args.batch_size,
                 device=device,
                 desc=f"{key} (layer {layer})",
