@@ -605,8 +605,10 @@ class Editor(nn.Module):
             )
             for batch in tqdm(loader, desc=desc):
                 if not precompute.has_editor_inputs(batch):
-                    batch = precompute.editor_inputs_from_batch(
-                        mt=self.mt, batch=batch, layers=[self.layer], device=device
+                    batch.update(
+                        precompute.editor_inputs_from_batch(
+                            mt=self.mt, batch=batch, layers=[self.layer], device=device
+                        )
                     )
 
                 prompts = batch["prompt"]
@@ -718,8 +720,10 @@ class Editor(nn.Module):
             )
             for batch in tqdm(loader, desc=desc):
                 if not precompute.has_classification_inputs(batch):
-                    batch = precompute.classification_inputs_from_batch(
-                        self.mt, batch, layers=[self.layer], device=device
+                    batch.update(
+                        precompute.classification_inputs_from_batch(
+                            self.mt, batch, layers=[self.layer], device=device
+                        )
                     )
 
                 # Determine model completions.
@@ -829,8 +833,10 @@ class RandomEditor(Editor):
             )
             for batch in tqdm(loader, desc="estimate mean/cov"):
                 if not precompute.has_entity_deltas(batch):
-                    batch = precompute.entity_deltas_from_batch(
-                        self.mt, batch, layers=[self.layer], device=device
+                    batch.update(
+                        precompute.entity_deltas_from_batch(
+                            self.mt, batch, layers=[self.layer], device=device
+                        )
                     )
                 rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"])
 
