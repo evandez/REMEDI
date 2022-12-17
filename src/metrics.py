@@ -111,9 +111,9 @@ def fluency(generations: Sequence[StrSequence], **kwargs: Any) -> Metric:
 def _validate_same_length(**kwargs: Sequence | ArrayLike) -> None:
     """Validate all batch sizes are the same."""
     lengths = {key: len(seq) for key, seq in kwargs.items()}
-    if len(lengths) > 1:
-        message = f"inconsistent batch sizes:" + "\n"
-        message += "\n".join(f"{key}={length}" for key, length in lengths.items())
+    if len(set(lengths.values())) > 1:
+        message = f"inconsistent batch sizes:" + "\n\t"
+        message += "\n\t".join(f"{key}={length}" for key, length in lengths.items())
         raise ValueError(message)
 
 
