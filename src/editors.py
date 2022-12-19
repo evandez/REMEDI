@@ -676,6 +676,7 @@ class Editor(nn.Module):
 
         return EditorEvaluateRun([EditorEvaluationResult(**r) for r in results])
 
+    @torch.inference_mode()
     def classify(
         self,
         *,
