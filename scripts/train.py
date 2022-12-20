@@ -116,7 +116,7 @@ if __name__ == "__main__":
         "--model",
         "-m",
         choices=models.SUPPORTED_MODELS,
-        default="gpt2-xl",
+        default=models.GPT_J_NAME,
         help="model to edit",
     )
     parser.add_argument(
