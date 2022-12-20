@@ -760,11 +760,7 @@ class Editor(nn.Module):
 
                 for bi in range(len(entities)):
                     results.append(
-                        EditorClassificationResult(
-                            sample={
-                                key: batch[key][bi]
-                                for key in data.ContextMediationSample.__required_keys__
-                            },
+                        dict(
                             generation=generations[bi],
                             score_editor_mediated=scores_editor_m[bi].item(),
                             score_editor_unmediated=scores_editor_u[bi].item(),
@@ -773,7 +769,17 @@ class Editor(nn.Module):
                         )
                     )
 
-        return EditorClassifyRun(results=results)
+        # Finally, decorate results with original sample data.
+        assert len(results) == len(dataset)
+        for sample, result in zip(dataset, results):
+            result.update(
+                sample={
+                    key: sample[key]
+                    for key in data.ContextMediationSample.__required_keys__
+                }
+            )
+
+        return EditorClassifyRun([EditorClassificationResult(**r) for r in results])
 
 
 class RandomEditor(Editor):
