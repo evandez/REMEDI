@@ -1,6 +1,7 @@
 """Utilities for training models."""
 from typing import Sequence, Sized, cast
 
+import torch
 from torch.utils import data
 
 
@@ -103,3 +104,16 @@ def fixed_split(dataset: data.Dataset, indices: Sequence[int]) -> TrainValSplit:
         raise ValueError("indices cover entire dataset; nothing to split!")
 
     return data.Subset(dataset, others), data.Subset(dataset, indices)
+
+
+def cosine_similarity_float16(
+    x1: torch.Tensor, x2: torch.Tensor, dim: int = -1, eps: float = 1e-5
+) -> torch.Tensor:
+    """Cosine similarity that is slightly more stable for float16 inputs.
+
+    Prenormalizes each vector, which removes risk of overflow in numerator
+    when norms are large.
+    """
+    x1 = x1 / x1.norm(dim=dim, keepdim=True)
+    x2 = x2 / x2.norm(dim=dim, keepdim=True)
+    return torch.nn.functional.cosine_similarity(x1, x2, dim=dim, eps=eps)

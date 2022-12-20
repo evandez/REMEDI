@@ -11,7 +11,6 @@ from src.utils.typing import (
     Model,
     ModelGenerateOutput,
     ModelOutput,
-    StrSequence,
     Tokenizer,
 )
 
@@ -711,8 +710,11 @@ class Editor(nn.Module):
         key_m = f"context.attribute.hiddens.{self.layer}.average"
 
         dtype = models.determine_dtype(self.mt)
-        eps = 1e-5 if dtype is torch.float16 else 1e-8
-        sim = nn.CosineSimilarity(eps=eps)
+
+        if dtype is torch.float16:
+            sim = training_utils.cosine_similarity_float16
+        else:
+            sim = torch.nn.functional.cosine_similarity
 
         results = []
         with dataset.formatted_as("torch"):
