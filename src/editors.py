@@ -462,6 +462,7 @@ class Editor(nn.Module):
         lr: float = DEFAULT_LR,
         lam_adv: float | None = DEFAULT_LAM_ADV,
         lam_kl: float | None = None,
+        lam_norm: float | None = None,
         patience: int = DEFAULT_PATIENCE,
         device: Optional[Device] = None,
     ) -> EditorTrainingRun:
@@ -479,6 +480,7 @@ class Editor(nn.Module):
             lam_adv: Loss weight for adversarial log[1 - p(unmediated)] term.
             lam_kl: Loss weight for KL div on token distributions between entity
                 and attribute ine prompt.
+            lam_norm: Loss weight for norm of predicted directions.
             patience: Stop after val loss does not improve for this many epochs.
             device: Run editor and model on this device.
 
@@ -522,6 +524,7 @@ class Editor(nn.Module):
                         batch=batch,
                         lam_adv=lam_adv,
                         lam_kl=lam_kl,
+                        lam_norm=lam_norm,
                         device=device,
                     )
                     if epoch > 0:
@@ -543,6 +546,7 @@ class Editor(nn.Module):
                             batch=batch,
                             lam_adv=lam_adv,
                             lam_kl=lam_kl,
+                            lam_norm=lam_norm,
                             device=device,
                         )
                     val_loss += loss.item()
@@ -965,12 +969,3 @@ class MlpEditor(Editor):
         if self.use_attribute:
             inputs.append(attribute)
         return self.mlp(torch.cat(inputs, dim=-1))
-
-
-# TODO(evandez): Small fixes needed for this file:
-# - Need a way to have evaluation results point back to original dataset.
-# - Consistency in counterfact splits (set seed)
-# - Show running average loss in progress bar, not batch loss.
-# - This currently tokenizes the prompt twice, can we avoid?
-# - Precompute does everything on GPU, even averaging.
-# - Set hyperparameter defaults by editor type.
