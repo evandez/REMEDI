@@ -21,12 +21,13 @@ logger = logging.getLogger(__name__)
 class Metric(DataClassJsonMixin):
     """An aggregate metric."""
 
+    values: ArrayLike
     mean: float
     std: float
 
     @staticmethod
     def aggregate(values: ArrayLike) -> "Metric":
-        return Metric(np.mean(values), np.std(values))
+        return Metric(values, np.mean(values), np.std(values))
 
 
 @dataclass(frozen=True)
