@@ -181,7 +181,7 @@ def main(args: argparse.Namespace) -> None:
             "fluency": fluency.to_dict(),
         }
         logging.info("benchmark complete! results:\n%s", json.dumps(scores, indent=1))
-        scores_file = experiment.results_dir / "scores.json"
+        scores_file = experiment.results_dir / str(layer) / "scores.json"
         with scores_file.open("w") as handle:
             json.dump(scores, handle)
 
