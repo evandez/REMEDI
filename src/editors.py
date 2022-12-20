@@ -92,6 +92,15 @@ class apply_direction(contextlib.AbstractContextManager):
         return None
 
 
+@dataclass(frozen=True)
+class EditedModelOutput:
+    """Wrapper around a run of an edited model."""
+
+    direction: torch.Tensor
+    token_range: torch.Tensor
+    output: ModelOutput | ModelGenerateOutput
+
+
 class EditedModel(nn.Module):
     """Wrapper around an LM which knows how to automatically apply mediation.
 
@@ -151,28 +160,6 @@ class EditedModel(nn.Module):
 
         return directions
 
-    @overload
-    def compute_model_outputs(
-        self,
-        batch: data.ContextMediationInput,
-        generate: Literal[False] = ...,
-        inputs: Optional[transformers.BatchEncoding] = ...,
-        padding_side: Optional[str] = ...,
-        **kwargs: Any,
-    ) -> ModelOutput:
-        ...
-
-    @overload
-    def compute_model_outputs(
-        self,
-        batch: data.ContextMediationInput,
-        generate: Literal[True],
-        inputs: Optional[transformers.BatchEncoding] = ...,
-        padding_side: Optional[str] = ...,
-        **kwargs: Any,
-    ) -> ModelGenerateOutput:
-        ...
-
     def compute_model_outputs(
         self,
         batch: data.ContextMediationInput | dict,
@@ -180,7 +167,7 @@ class EditedModel(nn.Module):
         inputs: Optional[transformers.BatchEncoding] = None,
         padding_side: Optional[str] = None,
         **kwargs: Any,
-    ) -> ModelOutput | ModelGenerateOutput:
+    ) -> EditedModelOutput:
         """Run the model on the inputs, editing its hidden reps in the process."""
         precomputed = self.maybe_compute_editor_inputs(batch)
         directions = self.compute_edit_directions(precomputed)
@@ -221,7 +208,11 @@ class EditedModel(nn.Module):
             else:
                 outputs = model(**inputs, **kwargs)
 
-        return outputs
+        return EditedModelOutput(
+            direction=directions,
+            token_range=entity_ij,
+            output=outputs,
+        )
 
     def forward(
         self,
@@ -240,9 +231,10 @@ class EditedModel(nn.Module):
             Standard huggingface outputs, but for the edited model.
 
         """
-        return self.compute_model_outputs(
+        edit = self.compute_model_outputs(
             batch, inputs=inputs, generate=False, **kwargs
         )
+        return cast(ModelOutput, edit.output)
 
     def generate(
         self,
@@ -251,7 +243,8 @@ class EditedModel(nn.Module):
         **kwargs: Any,
     ) -> ModelGenerateOutput:
         """Forwards to `mt.model.generate`, but still applies editor."""
-        return self.compute_model_outputs(batch, inputs=inputs, generate=True, **kwargs)
+        edit = self.compute_model_outputs(batch, inputs=inputs, generate=True, **kwargs)
+        return cast(ModelGenerateOutput, edit.output)
 
 
 @dataclass(frozen=True)
@@ -309,6 +302,7 @@ def editing_loss(
     batch: dict,
     lam_adv: float | None = DEFAULT_LAM_ADV,
     lam_kl: float | None = DEFAULT_LAM_KL,
+    lam_norm: float | None = None,
     device: Optional[Device] = None,
 ) -> torch.Tensor:
     """Apply the edit to the representat
@@ -322,8 +316,9 @@ def editing_loss(
 
     inputs, _ = precompute.inputs_from_batch(editor.mt, prompt, device=device)
     with apply(editor, device=device) as mt_edit:
-        outputs_edit = mt_edit.model(batch, inputs=inputs)
-        logp_edit = torch.log_softmax(outputs_edit.logits, dim=-1)
+        edit = mt_edit.model.compute_model_outputs(batch, inputs=inputs)
+    outputs_edit = edit.output
+    logp_edit = torch.log_softmax(outputs_edit.logits, dim=-1)
 
     batch_idx = torch.arange(batch_size)
     last_idx = precompute.last_token_index_from_batch(inputs)
@@ -360,6 +355,10 @@ def editing_loss(
             )
         loss_kl /= batch_size
         loss += lam_kl * loss_kl
+
+    # If requested, penalize the norm of the resulting directions.
+    if lam_norm is not None:
+        loss += lam_norm * edit.direction.norm(p=2, dim=-1)
 
     return loss
 
