@@ -358,7 +358,7 @@ def editing_loss(
 
     # If requested, penalize the norm of the resulting directions.
     if lam_norm is not None:
-        loss += lam_norm * edit.direction.norm(p=2, dim=-1)
+        loss += lam_norm * edit.direction.norm(p=2, dim=-1).mean()
 
     return loss
 
