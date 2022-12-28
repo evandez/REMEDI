@@ -14,7 +14,7 @@ Device = str | torch.device
 
 # Throughout this codebase, we use HuggingFace model implementations
 # as well as HuggingFace datasets.
-Model = transformers.GPT2Model | transformers.GPTNeoModel
+Model = transformers.GPT2Model | transformers.GPTNeoModel | transformers.GPTJForCausalLM
 Tokenizer = transformers.PreTrainedTokenizerFast
 TokenizerOffsetMapping = Sequence[tuple[int, int]]
 Dataset = datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict

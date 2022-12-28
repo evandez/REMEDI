@@ -15,6 +15,7 @@ import transformers
 
 GPT_J_NAME = "EleutherAI/gpt-j-6B"
 SUPPORTED_MODELS = ("gpt2-small", "gpt2", "gpt2-xl", GPT_J_NAME)
+EMBEDDING_LAYER = -1
 
 
 @dataclass(frozen=True)
@@ -84,10 +85,8 @@ def load_model(
 def determine_layers(model: ModelAndTokenizer | Model) -> tuple[int, ...]:
     """Return all hidden layer names for the given model."""
     model = unwrap_model(model)
-    if isinstance(model, (transformers.GPT2LMHeadModel, transformers.GPTJForCausalLM)):
-        return tuple(range(model.config.n_layer))
-    else:
-        raise ValueError(f"unknown model type: {model.__class__.__name__}")
+    assert isinstance(model, Model)
+    return (EMBEDDING_LAYER, *range(model.config.n_layer))
 
 
 @overload
@@ -135,10 +134,15 @@ def determine_layer_paths(
     if layers is None:
         layers = determine_layers(model)
 
-    if isinstance(model, (transformers.GPT2LMHeadModel, transformers.GPTJForCausalLM)):
-        layer_paths = {layer: f"transformer.h.{layer}" for layer in layers}
-    else:
-        raise ValueError(f"unknown model type: {model.__class__.__name__}")
+    assert isinstance(model, Model), type(model)
+
+    layer_paths = {}
+    for layer in layers:
+        if layer == EMBEDDING_LAYER:
+            layer_path = "transformer.wte"
+        else:
+            layer_path = f"transformer.h.{layer}"
+        layer_paths[layer] = layer_path
 
     return layer_paths if return_dict else tuple(layer_paths[la] for la in layers)
 
