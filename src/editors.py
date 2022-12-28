@@ -202,7 +202,7 @@ class EditedModel(nn.Module):
             alpha=self.alpha,
         ) as model:
             if generate:
-                kwargs.setdefault("max_new_tokens", DEFAULT_N_GENERATE)
+                kwargs.setdefault("max_length", DEFAULT_N_GENERATE)
                 kwargs.setdefault("pad_token_id", self.mt.tokenizer.eos_token_id)
                 outputs = model.generate(**inputs, **kwargs)
             else:
@@ -625,7 +625,7 @@ class Editor(nn.Module):
 
                 generate_kwargs = dict(
                     do_sample=False,
-                    max_new_tokens=n_generate,
+                    max_length=n_generate,
                     return_dict_in_generate=True,
                     output_scores=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
@@ -740,7 +740,7 @@ class Editor(nn.Module):
                     )
                 outputs = self.mt.model.generate(
                     **inputs,
-                    max_new_tokens=n_generate,
+                    max_length=n_generate,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
                 # TODO(evandez): Remove need for this by reusing gens from training.
