@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, Literal, Optional, Sequence, overload
 
+from src.utils import tokenizer_utils
 from src.utils.typing import Device, Model, Tokenizer
 
 import torch
@@ -175,24 +176,10 @@ def any_parameter(model: ModelAndTokenizer | Model) -> torch.nn.Parameter | None
 def set_padding_side(
     tokenizer: Tokenizer | ModelAndTokenizer, padding_side: str = "right"
 ) -> Iterator[None]:
-    """Temporarily set padding side for tokenizer.
-
-    Useful for when you want to batch generate with causal LMs like GPT, as these
-    require the padding to be on the left side in such settings but are much easier
-    to mess around with when the padding, by default, is on the right.
-
-    Example usage:
-        mt = model_utils.load_model("gpt2-x")
-        with model_utils.set_padding_side(mt, "left"):
-            inputs = mt.tokenizer(...)
-        mt.model.generate(**inputs)
-
-    """
+    """Convenience wrapper for `tokenizer_utils.set_padding_side`."""
     tokenizer = unwrap_tokenizer(tokenizer)
-    _padding_side = tokenizer.padding_side
-    tokenizer.padding_side = padding_side
-    yield
-    tokenizer.padding_side = _padding_side
+    with tokenizer_utils.set_padding_side(tokenizer, padding_side=padding_side):
+        yield
 
 
 def map_to(
