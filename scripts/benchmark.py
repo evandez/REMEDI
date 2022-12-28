@@ -5,7 +5,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from pathlib import Path
 
-from src import data, editors, metrics, models, precompute
+from src import data, editors, metrics, models
 from src.utils import env_utils, experiment_utils, logging_utils
 from src.utils.typing import Dataset
 
@@ -50,7 +50,6 @@ def main(args: argparse.Namespace) -> None:
     logging_utils.configure(args=args)
     data.disable_caching()
 
-    # TODO(evandez): Commonize next few blocks of code.
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
 
