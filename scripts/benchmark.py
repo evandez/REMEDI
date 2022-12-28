@@ -207,7 +207,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n-generate",
         type=int,
-        default=editors.DEFAULT_N_GENERATE,
+        default=100,
         help="number of tokens to generate",
     )
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
