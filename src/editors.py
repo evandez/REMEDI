@@ -785,78 +785,6 @@ class Editor(nn.Module):
         return EditorClassifyRun([EditorClassificationResult(**r) for r in results])
 
 
-class RandomEditor(Editor):
-    """An editor that just picks a random edit direction."""
-
-    def __init__(
-        self,
-        *,
-        mt: models.ModelAndTokenizer,
-        layer: int,
-        mean: torch.Tensor | None = None,
-        covariance: torch.Tensor | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize the editor."""
-        super().__init__(mt=mt, layer=layer, **kwargs)
-
-        hidden_size = models.determine_hidden_size(mt)
-        device = models.determine_device(mt)
-
-        if mean is None:
-            mean = torch.zeros(hidden_size)
-        if covariance is None:
-            covariance = torch.ones(hidden_size)
-
-        self.mean: torch.Tensor
-        self.register_buffer("mean", mean.to(device))
-
-        self.covariance: torch.Tensor
-        self.register_buffer("covariance", covariance.to(device))
-
-        self.to_(mt)
-
-    def forward(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
-        """Select a random direction."""
-        distribution = torch.distributions.MultivariateNormal(
-            self.mean, self.covariance
-        )
-        return distribution.sample((len(attribute),))
-
-    def fit(
-        self,
-        *,
-        dataset: Dataset,
-        batch_size: int = DEFAULT_BATCH_SIZE,
-        hold_out: float = DEFAULT_HOLD_OUT,
-        device: Optional[Device] = None,
-        **_: Any,
-    ) -> EditorTrainingRun:
-        """Estimate mean and variance of entity representations."""
-        dataset = data.maybe_train_test_split(dataset, test_size=hold_out)
-
-        self.mt.model.to(device)
-        self.to(device)
-
-        rc = runningstats.Covariance()
-        with dataset.formatted_as("torch"):
-            loader = torch.utils.data.DataLoader(
-                cast(torch.utils.data.Dataset, dataset["train"]), batch_size=batch_size
-            )
-            for batch in tqdm(loader, desc="estimate mean/cov"):
-                if not precompute.has_entity_deltas(batch):
-                    batch.update(
-                        precompute.entity_deltas_from_batch(
-                            self.mt, batch, layers=[self.layer], device=device
-                        )
-                    )
-                rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"])
-
-        self.mean[:] = rc.mean()
-        self.covariance[:] = rc.covariance()
-        return EditorTrainingRun(dataset)
-
-
 class LinearEditor(Editor):
     """A simple linear model, optionally with a rank constraint."""
 
@@ -969,3 +897,100 @@ class MlpEditor(Editor):
         if self.use_attribute:
             inputs.append(attribute)
         return self.mlp(torch.cat(inputs, dim=-1))
+
+
+class RandomEditor(Editor):
+    """An editor that just picks a random edit direction."""
+
+    def __init__(
+        self,
+        *,
+        mt: models.ModelAndTokenizer,
+        layer: int,
+        mean: torch.Tensor | None = None,
+        covariance: torch.Tensor | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the editor."""
+        super().__init__(mt=mt, layer=layer, **kwargs)
+
+        hidden_size = models.determine_hidden_size(mt)
+        device = models.determine_device(mt)
+
+        if mean is None:
+            mean = torch.zeros(hidden_size)
+        if covariance is None:
+            covariance = torch.ones(hidden_size)
+
+        self.mean: torch.Tensor
+        self.register_buffer("mean", mean.to(device))
+
+        self.covariance: torch.Tensor
+        self.register_buffer("covariance", covariance.to(device))
+
+        self.to_(mt)
+
+    def forward(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
+        """Select a random direction."""
+        distribution = torch.distributions.MultivariateNormal(
+            self.mean, self.covariance
+        )
+        return distribution.sample((len(attribute),))
+
+    def fit(
+        self,
+        *,
+        dataset: Dataset,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        hold_out: float = DEFAULT_HOLD_OUT,
+        device: Optional[Device] = None,
+        **_: Any,
+    ) -> EditorTrainingRun:
+        """Estimate mean and variance of entity representations."""
+        dataset = data.maybe_train_test_split(dataset, test_size=hold_out)
+
+        self.mt.model.to(device)
+        self.to(device)
+
+        rc = runningstats.Covariance()
+        with dataset.formatted_as("torch"):
+            loader = torch.utils.data.DataLoader(
+                cast(torch.utils.data.Dataset, dataset["train"]), batch_size=batch_size
+            )
+            for batch in tqdm(loader, desc="estimate mean/cov"):
+                if not precompute.has_entity_deltas(batch):
+                    batch.update(
+                        precompute.entity_deltas_from_batch(
+                            self.mt, batch, layers=[self.layer], device=device
+                        )
+                    )
+                rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"])
+
+        self.mean[:] = rc.mean()
+        self.covariance[:] = rc.covariance()
+        return EditorTrainingRun(dataset)
+
+
+class ScalarMultipleEditor(Editor):
+    """Editor that returns scalar multiple of attribute rep.
+
+    Scalar is determined by linear function of entity and attribute.
+    """
+
+    def __init__(self, *, mt: models.ModelAndTokenizer, **kwargs: Any):
+        super().__init__(mt=mt, **kwargs)
+        hidden_size = models.determine_hidden_size(mt)
+        self.alpha = nn.Linear(2 * hidden_size, 1)
+
+    def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
+        """Return multiple of attribute."""
+        inputs = torch.cat([entity, attribute], dim=-1)
+        alpha = self.alpha(inputs)
+        return alpha * attribute
+
+
+class IdentityEditor(Editor):
+    """Editor that just returns zero direction."""
+
+    def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
+        return torch.zeros_like(entity)
