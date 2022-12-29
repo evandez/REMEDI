@@ -79,7 +79,7 @@ def main(args: argparse.Namespace) -> None:
                 logger.info(f"saving editor to {editor_file}")
                 torch.save(editor.state_dict(), editor_file)
 
-            for split in ("train", "test"):
+            for split in args.eval_on:
                 eval_file = editor_results_dir / f"{split}-eval.json"
                 if eval_file.exists() and not args.rerun_eval:
                     logger.info(f"found existing {split} eval results at {eval_file}")
@@ -187,6 +187,12 @@ if __name__ == "__main__":
         help="edit all entity tokens instead of just last",
     )
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
+    parser.add_argument(
+        "--eval-on",
+        choices=("train", "test"),
+        default=("test",),
+        help="which sets to eval on",
+    )
     parser.add_argument("--device", help="device to train on")
     parser.add_argument("--fp16", action="store_true", help="use fp16")
     experiment_utils.add_experiment_args(parser)
