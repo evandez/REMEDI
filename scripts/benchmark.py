@@ -116,6 +116,8 @@ def main(args: argparse.Namespace) -> None:
                 batch_size=args.batch_size,
                 device=device,
                 desc=f"evaluate on {key} (layer {layer})",
+                return_before=False,
+                return_after=True,
                 **kwargs,
             )
 
