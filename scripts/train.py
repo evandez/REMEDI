@@ -189,6 +189,7 @@ if __name__ == "__main__":
     parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
     parser.add_argument(
         "--eval-on",
+        nargs="+",
         choices=("train", "test"),
         default=("test",),
         help="which sets to eval on",
