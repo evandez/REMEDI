@@ -4,6 +4,7 @@ import json
 import logging
 from collections import OrderedDict, defaultdict
 from pathlib import Path
+from typing import Any
 
 from src import data, editors, metrics, models
 from src.utils import experiment_utils, logging_utils
@@ -16,10 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 def load_editor(
-    editors_dir: Path,
     editor_type: str,
     mt: models.ModelAndTokenizer,
     layer: int,
+    editors_dir: Path | None = None,
     device: Device | None = None,
 ) -> editors.Editor | None:
     """Load editor of given type from the directory, assuming default options."""
@@ -28,10 +29,15 @@ def load_editor(
     editor.to(device)
 
     if editor_type != "identity":
+        if editors_dir is None:
+            logger.warning("editors_dir not specified for non-identity editor")
+            return None
+
         weights_file = editors_dir / editor_type / str(layer) / "weights.pth"
         if not weights_file.exists():
             logger.warning(f"weights expected at {weights_file} but not found")
             return None
+
         logger.info(f"loading editor weights from {weights_file}")
         state_dict = torch.load(weights_file, map_location=device)
         editor.load_state_dict(state_dict)
@@ -43,7 +49,7 @@ def select_and_flatten_counterfact(dataset: Dataset, column: str) -> Dataset:
     """Select the given column in counterfact and flatten it."""
     column_names = data.column_names(dataset)
 
-    def _select_and_flatten_counterfact(row: dict) -> dict:
+    def select_and_flatten_counterfact_row(row: dict) -> dict:
         prompts = list(set(row["source"][0][column]))
         result = {"prompt": prompts}
         for key in data.ContextMediationSample.__required_keys__:
@@ -52,12 +58,26 @@ def select_and_flatten_counterfact(dataset: Dataset, column: str) -> Dataset:
         return result
 
     return dataset.map(
-        _select_and_flatten_counterfact,
+        select_and_flatten_counterfact_row,
         batched=True,
         batch_size=1,
         remove_columns=column_names,
         desc=f"select and flatten {column}",
     )
+
+
+def prepend_context(dataset: Dataset, **kwargs: Any) -> Dataset:
+    """Prepend context to the prompt."""
+
+    def prepend_context_for_fow(row: dict) -> dict:
+        entity = row["entity"]
+        prompt = row["prompt"]
+        context = row["context"]
+        if not context.startswith(entity):
+            context = context[0].lower() + context[1:].rstrip(". ")
+        return {"prompt": f"Suppose {context}. {prompt}"}
+
+    return dataset.map(prepend_context_for_fow, **kwargs)
 
 
 def group_by_id(results: editors.EditorEvaluateRun) -> OrderedDict:
@@ -79,9 +99,10 @@ def main(args: argparse.Namespace) -> None:
 
     editors_dir = args.editors
     editor_type = args.editor_type
-    logger.info(f"will look for {editor_type} editors in {editors_dir}")
-    if not Path(editors_dir, editor_type).exists():
-        raise ValueError(f"editors not found at {editors_dir}")
+    if editor_type != "identity":
+        logger.info(f"will look for {editor_type} editors in {editors_dir}")
+        if not Path(editors_dir, editor_type).exists():
+            raise ValueError(f"editors not found at {editors_dir}")
 
     layers = args.layers
     if layers is None:
@@ -101,17 +122,29 @@ def main(args: argparse.Namespace) -> None:
     dataset = data.load_dataset("counterfact", split="train[5000:10000]")
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_tfidf_vectorizer()
+
+    prompts = dataset
     paraphrase_prompts = select_and_flatten_counterfact(dataset, "paraphrase_prompts")
     generation_prompts = select_and_flatten_counterfact(dataset, "generation_prompts")
 
+    if args.prepend_context:
+        prompts = prepend_context(dataset, desc="prepend context: prompts")
+        paraphrase_prompts = prepend_context(
+            paraphrase_prompts, desc="prepend context: paraphrase prompts"
+        )
+        generation_prompts = prepend_context(
+            generation_prompts, desc="prepend context: generation prompts"
+        )
+
     for layer in layers:
-        editor = load_editor(editors_dir, editor_type, mt, layer, device=device)
+        editor = load_editor(editor_type, mt, layer, editors_dir=editors_dir, device=device)
         if editor is None:
+            logger.warning(f"skipping benchmark for layer {layer}")
             continue
 
         results: dict[str, editors.EditorEvaluateRun] = {}
         for key, subset, kwargs in (
-            ("prompts", dataset, dict(n_generate=1)),
+            ("prompts", prompts, dict(n_generate=1)),
             ("paraphrase_prompts", paraphrase_prompts, dict(n_generate=1)),
             (
                 "generation_prompts",
@@ -206,15 +239,12 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="run full counterfact benchmark")
+    parser.add_argument("--editor-type", "-t", help="editor type, inferred by default")
     parser.add_argument(
         "--editors-dir",
         "-e",
         type=Path,
-        required=True,
         help="path to editor experiment",
-    )
-    parser.add_argument(
-        "--editors-type", "-t", required=True, help="editor type, inferred by default"
     )
     parser.add_argument(
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
@@ -225,6 +255,9 @@ if __name__ == "__main__":
         choices=models.SUPPORTED_MODELS,
         default=models.GPT_J_NAME,
         help="model to classify on",
+    )
+    parser.add_argument(
+        "--prepend-context", "-p", action="store_true", help="prepend context to prompt"
     )
     parser.add_argument(
         "--batch-size",
