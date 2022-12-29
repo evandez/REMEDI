@@ -50,13 +50,15 @@ def main(args: argparse.Namespace) -> None:
 
             editor: editors.Editor = editor_factory(layer=layer, **editor_kwargs)
 
-            precomputed = precompute.editor_inputs_from_dataset(
-                mt=mt,
-                dataset=dataset,
-                layers=[layer],
-                device=device,
-                batch_size=args.batch_size,
-            )
+            precomputed = dataset
+            if editor_type != "random":
+                precomputed = precompute.editor_inputs_from_dataset(
+                    mt=mt,
+                    dataset=dataset,
+                    layers=[layer],
+                    device=device,
+                    batch_size=args.batch_size,
+                )
 
             editor_file = editor_results_dir / f"weights.pth"
             if editor_file.exists():
