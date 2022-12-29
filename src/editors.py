@@ -977,7 +977,7 @@ class RandomEditor(Editor):
                             self.mt, batch, layers=[self.layer], device=device
                         )
                     )
-                rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"])
+                rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"].float())
 
         self.mean[:] = rc.mean()
         self.covariance[:] = rc.covariance()
