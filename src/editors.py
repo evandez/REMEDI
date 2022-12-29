@@ -423,7 +423,7 @@ class EditorClassifyRun(DataClassJsonMixin):
 
 
 class Editor(nn.Module):
-    """A simple linear editing model."""
+    """Abstract base clase for editing models."""
 
     def __init__(
         self,
