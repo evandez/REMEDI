@@ -6,13 +6,37 @@ from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 from src import data, editors, metrics, models
-from src.utils import env_utils, experiment_utils, logging_utils
-from src.utils.typing import Dataset
+from src.utils import experiment_utils, logging_utils
+from src.utils.typing import Dataset, Device
 
 import torch
 import torch.utils.data
 
 logger = logging.getLogger(__name__)
+
+
+def load_editor(
+    editors_dir: Path,
+    editor_type: str,
+    mt: models.ModelAndTokenizer,
+    layer: int,
+    device: Device | None = None,
+) -> editors.Editor | None:
+    """Load editor of given type from the directory, assuming default options."""
+    editor_factory = editors.SUPPORTED_EDITORS[editor_type]
+    editor = editor_factory(mt=mt, layer=layer)
+    editor.to(device)
+
+    if editor_type != "identity":
+        weights_file = editors_dir / editor_type / str(layer) / "weights.pth"
+        if not weights_file.exists():
+            logger.warning(f"weights expected at {weights_file} but not found")
+            return None
+        logger.info(f"loading editor weights from {weights_file}")
+        state_dict = torch.load(weights_file, map_location=device)
+        editor.load_state_dict(state_dict)
+
+    return editor
 
 
 def select_and_flatten_counterfact(dataset: Dataset, column: str) -> Dataset:
@@ -54,12 +78,10 @@ def main(args: argparse.Namespace) -> None:
     fp16 = args.fp16
 
     editors_dir = args.editors
-    if editors_dir is None:
-        editors_dir = env_utils.determine_results_dir() / "editors"
-    editors_dir /= "linear"
-    logger.info(f"will look for editors in {editors_dir}")
-    if not editors_dir.exists():
-        raise ValueError(f"editors not found at {editors_dir}; maybe pass the -e flag")
+    editor_type = args.editor_type
+    logger.info(f"will look for {editor_type} editors in {editors_dir}")
+    if not Path(editors_dir, editor_type).exists():
+        raise ValueError(f"editors not found at {editors_dir}")
 
     layers = args.layers
     if layers is None:
@@ -83,14 +105,9 @@ def main(args: argparse.Namespace) -> None:
     generation_prompts = select_and_flatten_counterfact(dataset, "generation_prompts")
 
     for layer in layers:
-        editor = editors.LinearEditor(mt=mt, layer=layer).to(device)
-        weights_file = editors_dir / str(layer) / "weights.pth"
-        if not weights_file.exists():
-            logger.warning(f"weights file for layer {layer} not found; skipping")
+        editor = load_editor(editors_dir, editor_type, mt, layer, device=device)
+        if editor is None:
             continue
-        logger.info(f"loaded layer {layer} editor from {weights_file}")
-        state_dict = torch.load(weights_file, map_location=device)
-        editor.load_state_dict(state_dict)
 
         results: dict[str, editors.EditorEvaluateRun] = {}
         for key, subset, kwargs in (
@@ -189,7 +206,16 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="run full counterfact benchmark")
-    parser.add_argument("--editors", "-e", type=Path, help="path to editor experiment")
+    parser.add_argument(
+        "--editors-dir",
+        "-e",
+        type=Path,
+        required=True,
+        help="path to editor experiment",
+    )
+    parser.add_argument(
+        "--editors-type", "-t", required=True, help="editor type, inferred by default"
+    )
     parser.add_argument(
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
     )
@@ -209,7 +235,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n-generate",
         type=int,
-        default=100,
+        default=editors.DEFAULT_N_GENERATE,
         help="number of tokens to generate",
     )
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")

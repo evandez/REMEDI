@@ -1007,3 +1007,13 @@ class IdentityEditor(Editor):
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         return torch.zeros_like(entity)
+
+
+SUPPORTED_EDITORS = {
+    "linear": LinearEditor,
+    "biaffine": BiaffineEditor,
+    "mlp": MlpEditor,
+    "random": RandomEditor,
+    "scalar": ScalarMultipleEditor,
+    "identity": IdentityEditor,
+}

@@ -8,13 +8,6 @@ from src.utils import experiment_utils, logging_utils
 
 import torch
 
-EDITOR_FACTORIES = {
-    "linear": editors.LinearEditor,
-    "biaffine": editors.BiaffineEditor,
-    "mlp": editors.MlpEditor,
-    "random": editors.RandomEditor,
-}
-
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +33,7 @@ def main(args: argparse.Namespace) -> None:
 
     dataset = data.maybe_train_test_split(dataset, test_size=args.hold_out)
     for editor_type in args.editor_types:
-        editor_factory = EDITOR_FACTORIES[editor_type]
+        editor_factory = editors.SUPPORTED_EDITORS[editor_type]
         editor_kwargs = dict(
             mt=mt,
             input_last_entity_token=input_last_entity_token,
@@ -106,9 +99,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train one editor per layer")
     parser.add_argument(
         "--editor-types",
-        "-e",
+        "-t",
         nargs="+",
-        choices=EDITOR_FACTORIES.keys(),
+        choices=editors.SUPPORTED_EDITORS,
         default=("linear",),
         help="editor type to train",
     )
