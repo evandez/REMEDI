@@ -1,10 +1,11 @@
 """Train editors."""
 import argparse
 import logging
-from pathlib import Path
+from typing import cast
 
 from src import data, editors, models, precompute
 from src.utils import experiment_utils, logging_utils
+from src.utils.typing import Dataset
 
 import torch
 
@@ -25,7 +26,7 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
-    dataset = data.load_dataset(args.dataset, split="train[:5000]")
+    dataset: Dataset = data.load_dataset(args.dataset, split="train[:5000]")
 
     layers = args.layers
     if layers is None:
@@ -50,7 +51,7 @@ def main(args: argparse.Namespace) -> None:
 
             editor: editors.Editor = editor_factory(layer=layer, **editor_kwargs)
 
-            precomputed = dataset
+            precomputed = cast(Dataset, dataset)
             if editor_type != "random":
                 precomputed = precompute.editor_inputs_from_dataset(
                     mt=mt,
