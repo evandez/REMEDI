@@ -933,7 +933,7 @@ class RandomEditor(Editor):
         if mean is None:
             mean = torch.zeros(hidden_size)
         if covariance is None:
-            covariance = torch.ones(hidden_size)
+            covariance = torch.ones(hidden_size, hidden_size)
 
         self.mean: torch.Tensor
         self.register_buffer("mean", mean.to(device))
