@@ -407,10 +407,10 @@ def entity_deltas_from_batch(
                 mt, prompts_in_context, device=device
             )
         first_entity_token_ranges = token_ranges_from_batch(
-            inputs, entities, offset_mapping
+            prompts_in_context, entities, offset_mapping
         )
         last_entity_token_ranges = token_ranges_from_batch(
-            inputs, entities, offset_mapping, occurrence=1
+            prompts_in_context, entities, offset_mapping, occurrence=1
         )
 
     if return_token_ranges:
