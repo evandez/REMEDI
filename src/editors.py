@@ -376,20 +376,20 @@ class EditorEvaluationResult(DataClassJsonMixin):
 
     sample: dict
 
-    # Note: Need explicit types here so DataClassJsonMixin works.
-    before_top_tokens: list[str]
-    before_top_logps: list[float]
-    before_generations: list[str]
+    # NOTE(evandez): Need explicit types here so DataClassJsonMixin works.
+    before_top_tokens: list[str] | None = None
+    before_top_logps: list[float] | None = None
+    before_generations: list[str] | None = None
 
-    after_top_tokens: list[str]
-    after_top_logps: list[float]
-    after_generations: list[str]
+    after_top_tokens: list[str] | None = None
+    after_top_logps: list[float] | None = None
+    after_generations: list[str] | None = None
 
-    before_target_mediated_score: Optional[float] = None
-    before_target_unmediated_score: Optional[float] = None
+    before_target_mediated_score: float | None = None
+    before_target_unmediated_score: float | None = None
 
-    after_target_mediated_score: Optional[float] = None
-    after_target_unmediated_score: Optional[float] = None
+    after_target_mediated_score: float | None = None
+    after_target_unmediated_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -573,6 +573,8 @@ class Editor(nn.Module):
         alpha: float = DEFAULT_ALPHA,
         desc: Optional[str] = None,
         device: Optional[Device] = None,
+        return_before: bool = True,
+        return_after: bool = True,
     ) -> EditorEvaluateRun:
         """Evaluate the editor on a held out set.
 
@@ -589,6 +591,8 @@ class Editor(nn.Module):
             alpha: Step size for applying edit directions.
             desc: The tqdm description.
             device: Send all data to this device. Defaults to None.
+            return_before: Return model predictions before edit.
+            return_after: Return model predictions after edit.
 
         Returns:
             The evaluation results, one per entry in the dataset.
@@ -630,17 +634,26 @@ class Editor(nn.Module):
                     output_scores=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
-                outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
-                with apply(self, alpha=alpha, device=device) as edited_mt:
-                    outputs_after = edited_mt.model.generate(
-                        batch, inputs=inputs, padding_side="left", **generate_kwargs
-                    )
+
+                outputs_before = None
+                if return_before:
+                    outputs_before = self.mt.model.generate(**inputs, **generate_kwargs)
+
+                outputs_after = None
+                if return_after:
+                    with apply(self, alpha=alpha, device=device) as edited_mt:
+                        outputs_after = edited_mt.model.generate(
+                            batch, inputs=inputs, padding_side="left", **generate_kwargs
+                        )
 
                 batched_results: dict = {}
                 for key, outputs in (
                     ("before", outputs_before),
                     ("after", outputs_after),
                 ):
+                    if outputs is None:
+                        continue
+
                     first_token_logps = torch.log_softmax(outputs.scores[0], dim=-1)
                     top_logps, top_token_ids = first_token_logps.topk(k=n_top, dim=-1)
                     top_tokens = tokenizer_utils.batch_convert_ids_to_tokens(
