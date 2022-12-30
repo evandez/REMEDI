@@ -304,6 +304,7 @@ def editing_loss(
     lam_adv: float | None = DEFAULT_LAM_ADV,
     lam_kl: float | None = DEFAULT_LAM_KL,
     lam_norm: float | None = None,
+    lam_ess: float | None = None,
     device: Optional[Device] = None,
 ) -> torch.Tensor:
     """Apply the edit to the representat
@@ -360,6 +361,41 @@ def editing_loss(
     # If requested, penalize the norm of the resulting directions.
     if lam_norm is not None:
         loss += lam_norm * edit.direction.norm(p=2, dim=-1).mean()
+
+    # If requested, penalize changes to an essence prompt.
+    if lam_ess is not None:
+        entities = batch["entity"]
+        prompts_ess = [f"{entity} is a" for entity in entities]
+
+        inputs_ess, _ = precompute.inputs_from_batch(
+            editor.mt, prompts_ess, device=device
+        )
+        with torch.inference_mode():
+            outputs_before = editor.mt.model(**inputs_ess)
+        with apply(editor, device=device) as mt_edit:
+            outputs_after = mt_edit.model(
+                {
+                    "prompt": prompts_ess,
+                    "entity": entities,
+                    "context": batch["context"],
+                    "attribute": batch["attribute"],
+                }
+            )
+
+        last_idx_ess = precompute.last_token_index_from_batch(inputs_ess)
+        logits_edit_ess: torch.Tensor = outputs_after.logits[batch_idx, last_idx_ess]
+        logits_orig_ess: torch.Tensor = outputs_before.logits[batch_idx, last_idx_ess]
+
+        logp_edit_ess = torch.log_softmax(logits_edit_ess, dim=-1)
+        logp_edit_orig = torch.log_softmax(logits_orig_ess, dim=-1)
+
+        loss_ess = nn.functional.kl_div(
+            logp_edit_ess,
+            logp_edit_orig,
+            log_target=True,
+            reduction="batchmean",
+        )
+        loss += lam_ess * loss_ess
 
     return loss
 
@@ -464,6 +500,7 @@ class Editor(nn.Module):
         lam_adv: float | None = DEFAULT_LAM_ADV,
         lam_kl: float | None = None,
         lam_norm: float | None = None,
+        lam_ess: float | None = None,
         patience: int = DEFAULT_PATIENCE,
         device: Optional[Device] = None,
     ) -> EditorTrainingRun:
@@ -482,6 +519,7 @@ class Editor(nn.Module):
             lam_kl: Loss weight for KL div on token distributions between entity
                 and attribute ine prompt.
             lam_norm: Loss weight for norm of predicted directions.
+            lam_ess: Loss weight for essence penalty.
             patience: Stop after val loss does not improve for this many epochs.
             device: Run editor and model on this device.
 
@@ -526,6 +564,7 @@ class Editor(nn.Module):
                         lam_adv=lam_adv,
                         lam_kl=lam_kl,
                         lam_norm=lam_norm,
+                        lam_ess=lam_ess,
                         device=device,
                     )
                     if epoch > 0:
@@ -548,6 +587,7 @@ class Editor(nn.Module):
                             lam_adv=lam_adv,
                             lam_kl=lam_kl,
                             lam_norm=lam_norm,
+                            lam_ess=lam_ess,
                             device=device,
                         )
                     val_loss += loss.item()

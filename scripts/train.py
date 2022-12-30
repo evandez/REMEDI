@@ -74,6 +74,8 @@ def main(args: argparse.Namespace) -> None:
                     lr=args.lr,
                     lam_kl=args.lam_kl,
                     lam_adv=args.lam_adv,
+                    lam_norm=args.lam_norm,
+                    lam_ess=args.lam_ess,
                     device=device,
                 )
                 logger.info(f"saving editor to {editor_file}")
@@ -151,6 +153,16 @@ if __name__ == "__main__":
         type=float,
         default=editors.DEFAULT_LAM_ADV,
         help="adversarial term loss weight",
+    )
+    parser.add_argument(
+        "--lam-norm",
+        type=float,
+        help="direction norm loss weight (not used by default)",
+    )
+    parser.add_argument(
+        "--lam-ess",
+        type=float,
+        help="essence penalty loss weight (not used by default)",
     )
     parser.add_argument(
         "--hold-out",
