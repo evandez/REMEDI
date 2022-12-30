@@ -26,7 +26,8 @@ DEFAULT_ALPHA = 1.0
 DEFAULT_LAM_ADV = 1.0
 DEFAULT_LAM_KL = 10
 DEFAULT_N_TOP = 10
-DEFAULT_N_GENERATE = 100
+DEFAULT_MAX_LENGTH = 100
+DEFAULT_MAX_NEW_TOKENS = DEFAULT_MAX_LENGTH
 DEFAULT_BATCH_SIZE = 16
 DEFAULT_MAX_EPOCHS = 20
 DEFAULT_PATIENCE = 2
@@ -202,7 +203,8 @@ class EditedModel(nn.Module):
             alpha=self.alpha,
         ) as model:
             if generate:
-                kwargs.setdefault("max_length", DEFAULT_N_GENERATE)
+                kwargs.setdefault("max_length", DEFAULT_MAX_LENGTH)
+                kwargs.setdefault("max_new_tokens", DEFAULT_MAX_LENGTH)
                 kwargs.setdefault("pad_token_id", self.mt.tokenizer.eos_token_id)
                 outputs = model.generate(**inputs, **kwargs)
             else:
@@ -569,7 +571,8 @@ class Editor(nn.Module):
         dataset: Dataset,
         batch_size: int = DEFAULT_BATCH_SIZE,
         n_top: int = DEFAULT_N_TOP,
-        n_generate: int = DEFAULT_N_GENERATE,
+        max_length: int = DEFAULT_MAX_LENGTH,
+        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         alpha: float = DEFAULT_ALPHA,
         desc: Optional[str] = None,
         device: Optional[Device] = None,
@@ -587,7 +590,8 @@ class Editor(nn.Module):
             dataset: Dataset to evaluate on.
             batch_size: Model batch size.
             n_top: Number of top words/probs to return.
-            n_generate: Number of tokens to generate.
+            max_length: Number of tokens to generate including prompt.
+            max_new_tokens: Number of tokens to generate not including prompt.
             alpha: Step size for applying edit directions.
             desc: The tqdm description.
             device: Send all data to this device. Defaults to None.
@@ -629,7 +633,8 @@ class Editor(nn.Module):
 
                 generate_kwargs = dict(
                     do_sample=False,
-                    max_length=n_generate,
+                    max_length=max_length,
+                    max_new_tokens=max_new_tokens,
                     return_dict_in_generate=True,
                     output_scores=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
@@ -697,7 +702,8 @@ class Editor(nn.Module):
         *,
         dataset: Dataset,
         batch_size: int = DEFAULT_BATCH_SIZE,
-        n_generate: int = DEFAULT_N_GENERATE,
+        max_length: int = DEFAULT_MAX_LENGTH,
+        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         device: Device | None = None,
         desc: str | None = "classify",
     ) -> EditorClassifyRun:
@@ -709,7 +715,9 @@ class Editor(nn.Module):
         Args:
             dataset: The datast to run on.
             batch_size: Model batch size.
-            n_generate: Number of tokens to generate from prompt (before edit).
+            max_tokens: Max length of generated text including prompt (before edit).
+            max_new_tokens: Max length of generated text not including prompt
+                (before edit).
             device: Send model and data to this device.
             desc: Progress bar description.
 
@@ -753,7 +761,8 @@ class Editor(nn.Module):
                     )
                 outputs = self.mt.model.generate(
                     **inputs,
-                    max_length=n_generate,
+                    max_length=max_length,
+                    max_new_tokens=max_new_tokens,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
                 # TODO(evandez): Remove need for this by reusing gens from training.

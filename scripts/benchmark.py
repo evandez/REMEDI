@@ -146,12 +146,12 @@ def main(args: argparse.Namespace) -> None:
 
         results: dict[str, editors.EditorEvaluateRun] = {}
         for key, subset, kwargs in (
-            ("prompts", prompts, dict(n_generate=1)),
-            ("paraphrase_prompts", paraphrase_prompts, dict(n_generate=1)),
+            ("prompts", prompts, dict(max_new_tokens=1)),
+            ("paraphrase_prompts", paraphrase_prompts, dict(max_new_tokens=1)),
             (
                 "generation_prompts",
                 generation_prompts,
-                dict(n_generate=args.n_generate),
+                dict(max_length=args.max_length),
             ),
         ):
             results_file = experiment.results_dir / str(layer) / f"{key}_results.json"
@@ -268,10 +268,10 @@ if __name__ == "__main__":
         help="model batch size",
     )
     parser.add_argument(
-        "--n-generate",
+        "--max-length",
         type=int,
-        default=editors.DEFAULT_N_GENERATE,
-        help="number of tokens to generate",
+        default=editors.DEFAULT_MAX_LENGTH,
+        help="number of tokens to generate including prompt",
     )
     parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
     parser.add_argument("--device", help="device to run model on")
