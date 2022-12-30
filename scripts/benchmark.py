@@ -97,7 +97,7 @@ def main(args: argparse.Namespace) -> None:
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
 
-    editors_dir = args.editors
+    editors_dir = args.editors_dir
     editor_type = args.editor_type
     if editor_type != "identity":
         logger.info(f"will look for {editor_type} editors in {editors_dir}")
