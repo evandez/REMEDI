@@ -703,8 +703,8 @@ class Editor(nn.Module):
         *,
         dataset: Dataset,
         batch_size: int = DEFAULT_BATCH_SIZE,
-        max_length: int = DEFAULT_MAX_LENGTH,
-        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
+        max_length: int | None = None,
+        max_new_tokens: int | None = None,
         device: Device | None = None,
         desc: str | None = "classify",
     ) -> EditorClassifyRun:
@@ -729,6 +729,9 @@ class Editor(nn.Module):
         self.mt.eval_()
         self.mt.to_(device)
         self.eval().to(device)
+
+        if max_new_tokens is None and max_length is None:
+            max_length = DEFAULT_MAX_LENGTH
 
         key_e = f"entity.entity.hiddens.{self.layer}.last"
         key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
