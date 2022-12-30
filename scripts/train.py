@@ -92,7 +92,6 @@ def main(args: argparse.Namespace) -> None:
                     alpha=args.eval_alpha,
                     n_top=args.eval_n_top,
                     max_length=args.eval_max_length,
-                    max_new_tokens=args.eval_max_new_tokens,
                 )
                 logger.info(f"saving {split} eval to {eval_file}")
                 with eval_file.open("w") as handle:
@@ -176,12 +175,6 @@ if __name__ == "__main__":
         type=int,
         default=editors.DEFAULT_MAX_LENGTH,
         help="max length of generations in eval",
-    )
-    parser.add_argument(
-        "--eval-max-new-tokens",
-        type=int,
-        default=editors.DEFAULT_MAX_NEW_TOKENS,
-        help="max number of new tokens to generate in eval",
     )
     parser.add_argument(
         "--use-entity",

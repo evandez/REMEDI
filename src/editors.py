@@ -27,7 +27,6 @@ DEFAULT_LAM_ADV = 1.0
 DEFAULT_LAM_KL = 10
 DEFAULT_N_TOP = 10
 DEFAULT_MAX_LENGTH = 100
-DEFAULT_MAX_NEW_TOKENS = DEFAULT_MAX_LENGTH
 DEFAULT_BATCH_SIZE = 16
 DEFAULT_MAX_EPOCHS = 20
 DEFAULT_PATIENCE = 2
@@ -571,8 +570,8 @@ class Editor(nn.Module):
         dataset: Dataset,
         batch_size: int = DEFAULT_BATCH_SIZE,
         n_top: int = DEFAULT_N_TOP,
-        max_length: int = DEFAULT_MAX_LENGTH,
-        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
+        max_length: int | None = None,
+        max_new_tokens: int | None = None,
         alpha: float = DEFAULT_ALPHA,
         desc: Optional[str] = None,
         device: Optional[Device] = None,
@@ -608,6 +607,8 @@ class Editor(nn.Module):
         include_target_probs = "target_mediated" in dataset.column_names
         if desc is None:
             desc = f"evaluate editor (layer={self.layer})"
+        if max_length is None and max_new_tokens is None:
+            max_length = DEFAULT_MAX_LENGTH
 
         results = []
         with dataset.formatted_as("torch"):
