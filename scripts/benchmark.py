@@ -119,7 +119,7 @@ def main(args: argparse.Namespace) -> None:
 
     logger.info("loading several data sources")
     # TODO(evandez): Use full counterfact after splitting properly.
-    dataset = data.load_dataset("counterfact", split="train[5000:10000]")
+    dataset = data.load_dataset("counterfact", split="train[5000:6000]")
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_tfidf_vectorizer()
 
@@ -137,7 +137,9 @@ def main(args: argparse.Namespace) -> None:
         )
 
     for layer in layers:
-        editor = load_editor(editor_type, mt, layer, editors_dir=editors_dir, device=device)
+        editor = load_editor(
+            editor_type, mt, layer, editors_dir=editors_dir, device=device
+        )
         if editor is None:
             logger.warning(f"skipping benchmark for layer {layer}")
             continue
