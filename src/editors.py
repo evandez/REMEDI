@@ -23,7 +23,8 @@ from torch import nn, optim
 from tqdm.auto import tqdm
 
 DEFAULT_ALPHA = 1.0
-DEFAULT_LAM_ADV = 1.0
+DEFAULT_LAM_M = 1.0
+DEFAULT_LAM_U = 1.0
 DEFAULT_LAM_KL = 10
 DEFAULT_N_TOP = 10
 DEFAULT_MAX_LENGTH = 100
@@ -301,7 +302,8 @@ def editing_loss(
     *,
     editor: "Editor",
     batch: dict,
-    lam_adv: float | None = DEFAULT_LAM_ADV,
+    lam_m: float | None = DEFAULT_LAM_M,
+    lam_u: float | None = DEFAULT_LAM_U,
     lam_kl: float | None = DEFAULT_LAM_KL,
     lam_norm: float | None = None,
     lam_ess: float | None = None,
@@ -325,15 +327,19 @@ def editing_loss(
     batch_idx = torch.arange(batch_size)
     last_idx = precompute.last_token_index_from_batch(inputs)
 
-    # Compute simple loss: the probability of the target token post-edit.
-    loss = -logp_edit[batch_idx, last_idx, mediated_token_ids].mean()
+    # Loss is a sum of different terms. Which terms depends on the experiment.
+    loss = logp_edit.new_zeros(1)
+
+    # Most basic term, almost always included: probability of the target token.
+    if lam_m is not None:
+        loss -= lam_m * logp_edit[batch_idx, last_idx, mediated_token_ids].mean()
 
     # If requested, penalize probability mass on the unmediated token.
-    if lam_adv is not None:
+    if lam_u is not None:
         logp_edit_unmediated = logp_edit[batch_idx, last_idx, unmediated_token_ids]
         p_edit_unmediated = torch.exp(logp_edit_unmediated)
-        loss_adv = torch.log(1 - p_edit_unmediated).mean()
-        loss -= lam_adv * loss_adv
+        loss_unmediated = torch.log(1 - p_edit_unmediated).mean()
+        loss -= lam_u * loss_unmediated
 
     # If requested, apply KL term to tokens between entity and next token.
     if lam_kl is not None:
@@ -497,7 +503,8 @@ class Editor(nn.Module):
         batch_size: int = DEFAULT_BATCH_SIZE,
         hold_out: float = DEFAULT_HOLD_OUT,
         lr: float = DEFAULT_LR,
-        lam_adv: float | None = DEFAULT_LAM_ADV,
+        lam_m: float | None = DEFAULT_LAM_M,
+        lam_u: float | None = DEFAULT_LAM_U,
         lam_kl: float | None = None,
         lam_norm: float | None = None,
         lam_ess: float | None = None,
@@ -515,7 +522,8 @@ class Editor(nn.Module):
                 by how many sentences the model can process at once!
             hold_out: Hold out this fraction of data for validation.
             lr: Learning rate.
-            lam_adv: Loss weight for adversarial log[1 - p(unmediated)] term.
+            lam_m: Loss weight for p(mediated) term.
+            lam_u: Loss weight for log[1 - p(unmediated)] term.
             lam_kl: Loss weight for KL div on token distributions between entity
                 and attribute ine prompt.
             lam_norm: Loss weight for norm of predicted directions.
@@ -561,7 +569,8 @@ class Editor(nn.Module):
                     loss = editing_loss(
                         editor=self,
                         batch=batch,
-                        lam_adv=lam_adv,
+                        lam_m=lam_m,
+                        lam_u=lam_u,
                         lam_kl=lam_kl,
                         lam_norm=lam_norm,
                         lam_ess=lam_ess,
@@ -584,7 +593,8 @@ class Editor(nn.Module):
                         loss = editing_loss(
                             editor=self,
                             batch=batch,
-                            lam_adv=lam_adv,
+                            lam_u=lam_u,
+                            lam_m=lam_m,
                             lam_kl=lam_kl,
                             lam_norm=lam_norm,
                             lam_ess=lam_ess,
