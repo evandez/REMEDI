@@ -204,7 +204,6 @@ class EditedModel(nn.Module):
         ) as model:
             if generate:
                 kwargs.setdefault("max_length", DEFAULT_MAX_LENGTH)
-                kwargs.setdefault("max_new_tokens", DEFAULT_MAX_LENGTH)
                 kwargs.setdefault("pad_token_id", self.mt.tokenizer.eos_token_id)
                 outputs = model.generate(**inputs, **kwargs)
             else:
