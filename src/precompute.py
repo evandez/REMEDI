@@ -356,6 +356,8 @@ def editor_inputs_from_dataset(
         batched=True,
         batch_size=batch_size,
         desc=desc,
+        keep_in_memory=True,
+        num_proc=1,
     )
 
 
@@ -468,6 +470,8 @@ def entity_deltas_from_dataset(
         batched=True,
         batch_size=batch_size,
         desc=desc,
+        keep_in_memory=True,
+        num_proc=1,
     )
 
 
@@ -565,6 +569,8 @@ def classification_inputs_from_dataset(
         batched=True,
         batch_size=batch_size,
         desc=desc,
+        keep_in_memory=True,
+        num_proc=1,
     )
 
 
