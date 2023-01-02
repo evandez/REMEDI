@@ -23,6 +23,7 @@ from torch import nn, optim
 from tqdm.auto import tqdm
 
 DEFAULT_ALPHA = 1.0
+DEFAULT_BETA = 1.0
 DEFAULT_LAM_M = 1.0
 DEFAULT_LAM_U = 1.0
 DEFAULT_LAM_KL = 10
@@ -43,7 +44,8 @@ class apply_direction(contextlib.AbstractContextManager):
         layer: The layer to apply the directions at.
         directions: Directions to apply. Needs shape (batch_size, hidden_size).
         token_ranges: Token ranges to apply direction at. Needs shape (batch_size, 2).
-        alpha: Step size for applying the direction.
+        alpha: Weight of edit direction when applying edit direction.
+        beta: Weight of entity token when applying edit direction.
 
     """
 
@@ -55,6 +57,7 @@ class apply_direction(contextlib.AbstractContextManager):
         directions: torch.Tensor,
         token_ranges: torch.Tensor,
         alpha: float = DEFAULT_ALPHA,
+        beta: float = DEFAULT_BETA,
     ):
         """Initialize the context manager."""
         self.model = model
@@ -62,6 +65,7 @@ class apply_direction(contextlib.AbstractContextManager):
         self.directions = directions
         self.token_ranges = token_ranges
         self.alpha = alpha
+        self.beta = beta
         self._trace = None
 
     def __enter__(self) -> Model:
@@ -76,7 +80,7 @@ class apply_direction(contextlib.AbstractContextManager):
                 return output
             for bi, (i, j) in enumerate(self.token_ranges.tolist()):
                 output[0][bi, i:j] = (
-                    output[0][bi, i:j] + self.alpha * self.directions[bi]
+                    self.beta * output[0][bi, i:j] + self.alpha * self.directions[bi]
                 )
             return (output[0], *output[1:])
 
@@ -114,6 +118,7 @@ class EditedModel(nn.Module):
         editor: "Editor",
         mt: Optional[models.ModelAndTokenizer] = None,
         alpha: float = DEFAULT_ALPHA,
+        beta: float = DEFAULT_BETA,
         device: Optional[Device] = None,
     ):
         """Wrap the model to be edited."""
@@ -121,6 +126,7 @@ class EditedModel(nn.Module):
         self.mt = mt if mt is not None else editor.mt
         self.editor = editor
         self.alpha = alpha
+        self.beta = beta
         self.device = device
 
     def maybe_compute_editor_inputs(
@@ -201,6 +207,7 @@ class EditedModel(nn.Module):
             directions=directions,
             token_ranges=entity_ij,
             alpha=self.alpha,
+            beta=self.beta,
         ) as model:
             if generate:
                 kwargs.setdefault("max_length", DEFAULT_MAX_LENGTH)
@@ -273,12 +280,14 @@ class apply(contextlib.AbstractContextManager):
         editor: "Editor",
         mt: Optional[models.ModelAndTokenizer] = None,
         alpha: float = DEFAULT_ALPHA,
+        beta: float = DEFAULT_BETA,
         device: Optional[Device] = None,
     ):
         """Initialize the context manager."""
         self.mt = mt
         self.editor = editor
         self.alpha = alpha
+        self.beta = beta
         self.device = device
         self._hooked: EditedModel | None = None
 
@@ -287,7 +296,11 @@ class apply(contextlib.AbstractContextManager):
     ) -> EditedModelAndTokenizer:
         """Wrap the model."""
         self._hooked = EditedModel(
-            self.editor, mt=self.mt, alpha=self.alpha, device=self.device
+            self.editor,
+            mt=self.mt,
+            alpha=self.alpha,
+            beta=self.beta,
+            device=self.device,
         )
         return EditedModelAndTokenizer(self._hooked, self._hooked.mt.tokenizer)
 
@@ -617,6 +630,7 @@ class Editor(nn.Module):
         max_length: int | None = None,
         max_new_tokens: int | None = None,
         alpha: float = DEFAULT_ALPHA,
+        beta: float = DEFAULT_BETA,
         desc: Optional[str] = None,
         device: Optional[Device] = None,
         return_before: bool = True,
@@ -635,7 +649,8 @@ class Editor(nn.Module):
             n_top: Number of top words/probs to return.
             max_length: Number of tokens to generate including prompt.
             max_new_tokens: Number of tokens to generate not including prompt.
-            alpha: Step size for applying edit directions.
+            alpha: Weight of edit direction when applying edit direction.
+            beta: Weight of entity token when applying edit direction.
             desc: The tqdm description.
             device: Send all data to this device. Defaults to None.
             return_before: Return model predictions before edit.
@@ -691,7 +706,9 @@ class Editor(nn.Module):
 
                 outputs_after = None
                 if return_after:
-                    with apply(self, alpha=alpha, device=device) as edited_mt:
+                    with apply(
+                        self, alpha=alpha, beta=beta, device=device
+                    ) as edited_mt:
                         outputs_after = edited_mt.model.generate(
                             batch, inputs=inputs, padding_side="left", **generate_kwargs
                         )
@@ -1051,13 +1068,13 @@ class ScalarMultipleEditor(Editor):
     def __init__(self, *, mt: models.ModelAndTokenizer, **kwargs: Any):
         super().__init__(mt=mt, **kwargs)
         hidden_size = models.determine_hidden_size(mt)
-        self.alpha = nn.Linear(2 * hidden_size, 1)
+        self.scalar = nn.Linear(2 * hidden_size, 1)
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         """Return multiple of attribute."""
         inputs = torch.cat([entity, attribute], dim=-1)
-        alpha = self.alpha(inputs)
-        return alpha * attribute
+        scalar = self.scalar(inputs)
+        return scalar * attribute
 
 
 class IdentityEditor(Editor):
