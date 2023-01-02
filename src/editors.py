@@ -1,7 +1,7 @@
 """Editing models."""
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Optional, cast
+from typing import Any, Callable, Optional, cast
 
 from src import data, models, precompute
 from src.utils import tokenizer_utils, training_utils
@@ -446,15 +446,10 @@ class EditorClassificationResult(DataClassJsonMixin):
     """Result for single sample from `Editor.classify`."""
 
     sample: dict[str, str]
-    generation: str
 
     # Scores computed with entity and editor direction.
-    score_editor_mediated: float
-    score_editor_unmediated: float
-
-    # Scores computed with entity and average hidden rep.
-    score_hidden_mediated: float
-    score_hidden_unmediated: float
+    score_mediated: float
+    score_unmediated: float
 
 
 @dataclass(frozen=True)
@@ -751,6 +746,8 @@ class Editor(nn.Module):
         self,
         *,
         dataset: Dataset,
+        normalize: bool = True,
+        cosine: bool = False,
         batch_size: int = DEFAULT_BATCH_SIZE,
         max_length: int | None = None,
         max_new_tokens: int | None = None,
@@ -764,6 +761,7 @@ class Editor(nn.Module):
 
         Args:
             dataset: The datast to run on.
+            normalize: Normalize hiddens to have 0 mean and unit variance.
             batch_size: Model batch size.
             max_tokens: Max length of generated text including prompt (before edit).
             max_new_tokens: Max length of generated text not including prompt
@@ -782,22 +780,26 @@ class Editor(nn.Module):
         if max_new_tokens is None and max_length is None:
             max_length = DEFAULT_MAX_LENGTH
 
+        sim: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
+        if cosine:
+            dtype = models.determine_dtype(self.mt)
+            if dtype is torch.float16:
+                sim = training_utils.cosine_similarity_float16
+            else:
+                sim = torch.nn.functional.cosine_similarity
+        else:
+            sim = torch.dot
+
         key_e = f"entity.entity.hiddens.{self.layer}.last"
         key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
         key_m = f"context.attribute.hiddens.{self.layer}.average"
 
-        dtype = models.determine_dtype(self.mt)
-
-        if dtype is torch.float16:
-            sim = training_utils.cosine_similarity_float16
-        else:
-            sim = torch.nn.functional.cosine_similarity
-
-        results = []
+        # First the expensive part: compute directions for all entities and attributes.
         with dataset.formatted_as("torch"):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
+            directions = []
             for batch in tqdm(loader, desc=desc):
                 if not precompute.has_classification_inputs(batch):
                     batch.update(
@@ -806,24 +808,6 @@ class Editor(nn.Module):
                         )
                     )
 
-                # Determine model completions.
-                prompts = batch["prompt"]
-                with models.set_padding_side(self.mt, padding_side="left"):
-                    inputs, _ = precompute.inputs_from_batch(
-                        self.mt, prompts, device=device
-                    )
-                outputs = self.mt.model.generate(
-                    **inputs,
-                    max_length=max_length,
-                    max_new_tokens=max_new_tokens,
-                    pad_token_id=self.mt.tokenizer.eos_token_id,
-                )
-                # TODO(evandez): Remove need for this by reusing gens from training.
-                generations = self.mt.tokenizer.batch_decode(
-                    outputs, skip_special_tokens=True
-                )
-
-                # Determine similarity between entity rep and attribute/direction reps.
                 entities = batch[key_e].to(device, dtype)
                 attributes_u = batch[key_u].to(device, dtype)
                 attributes_m = batch[key_m].to(device, dtype)
@@ -831,33 +815,45 @@ class Editor(nn.Module):
                 directions_u = self(entity=entities, attribute=attributes_u)
                 directions_m = self(entity=entities, attribute=attributes_m)
 
-                scores_editor_u = sim(entities, directions_u)
-                scores_editor_m = sim(entities, directions_m)
-                scores_hiddens_u = sim(entities, attributes_u)
-                scores_hiddens_m = sim(entities, attributes_m)
-
                 for bi in range(len(entities)):
-                    results.append(
+                    directions.append(
                         dict(
-                            generation=generations[bi],
-                            score_editor_mediated=scores_editor_m[bi].item(),
-                            score_editor_unmediated=scores_editor_u[bi].item(),
-                            score_hidden_mediated=scores_hiddens_m[bi].item(),
-                            score_hidden_unmediated=scores_hiddens_u[bi].item(),
+                            entity=entities[bi],
+                            unmediated=directions_u[bi],
+                            mediated=directions_m[bi],
                         )
                     )
 
-        # Finally, decorate results with original sample data.
-        assert len(results) == len(dataset)
-        for sample, result in zip(dataset, results):
-            result.update(
-                sample={
-                    key: sample[key]
-                    for key in data.ContextMediationSample.__required_keys__
-                }
-            )
+        # Then, if necessary, normalize the directions.
+        if normalize:
+            for key in ("entity", "unmediated", "mediated"):
+                values = torch.stack([direction[key] for direction in directions])
+                mu, std = values.mean(dim=0), values.std(dim=0)
+                for direction in directions:
+                    direction[key] = (direction[key] - mu) / std
 
-        return EditorClassifyRun([EditorClassificationResult(**r) for r in results])
+        # Finally, compute the alignment scores.
+        assert len(directions) == len(dataset)
+        results = []
+        for sample, direction in zip(dataset, directions):
+            h_e = direction["entity"]
+            h_u = direction["direction_u"]
+            h_m = direction["direction_m"]
+            scores_u = sim(h_e, h_u)
+            scores_m = sim(h_e, h_m)
+            for bi in range(len(entities)):
+                results.append(
+                    EditorClassificationResult(
+                        score_mediated=scores_m[bi].item(),
+                        score_unmediated=scores_u[bi].item(),
+                        sample={
+                            key: sample[key]
+                            for key in data.ContextMediationSample.__required_keys__
+                        },
+                    )
+                )
+
+        return EditorClassifyRun(results)
 
 
 class LinearEditor(Editor):
@@ -1065,6 +1061,14 @@ class ScalarMultipleEditor(Editor):
 
 
 class IdentityEditor(Editor):
+    """Editor that returns the attribute, unmodified."""
+
+    def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
+        """Return the attribute."""
+        return attribute
+
+
+class NullEditor(Editor):
     """Editor that just returns zero direction."""
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
@@ -1078,4 +1082,5 @@ SUPPORTED_EDITORS = {
     "random": RandomEditor,
     "scalar": ScalarMultipleEditor,
     "identity": IdentityEditor,
+    "null": NullEditor,
 }

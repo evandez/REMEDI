@@ -575,5 +575,5 @@ def classification_inputs_from_dataset(
 
 
 def has_classification_inputs(batch: dict) -> bool:
-    """Determine if batch already has precomputed entity inputs."""
+    """Determine if batch already has precomputed classification inputs."""
     return "context_unmediated" in batch
