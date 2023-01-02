@@ -72,8 +72,9 @@ def main(args: argparse.Namespace) -> None:
                     max_epochs=args.max_epochs,
                     batch_size=args.batch_size,
                     lr=args.lr,
+                    lam_m=args.lam_m,
+                    lam_u=args.lam_u,
                     lam_kl=args.lam_kl,
-                    lam_adv=args.lam_adv,
                     lam_norm=args.lam_norm,
                     lam_ess=args.lam_ess,
                     device=device,
@@ -149,10 +150,16 @@ if __name__ == "__main__":
         help="kl div loss weight",
     )
     parser.add_argument(
-        "--lam-adv",
+        "--lam-m",
         type=float,
-        default=editors.DEFAULT_LAM_ADV,
-        help="adversarial term loss weight",
+        default=editors.DEFAULT_LAM_M,
+        help="p(mediated) term loss weight",
+    )
+    parser.add_argument(
+        "--lam-u",
+        type=float,
+        default=editors.DEFAULT_LAM_U,
+        help="1 - p(unmediated) term loss weight",
     )
     parser.add_argument(
         "--lam-norm",
