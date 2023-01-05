@@ -134,3 +134,6 @@ results/
 *.json
 *.pth
 *.txt
+
+# Other
+.DS_Store
