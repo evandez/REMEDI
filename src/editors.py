@@ -117,6 +117,7 @@ class EditedModel(nn.Module):
         self,
         editor: "Editor",
         mt: Optional[models.ModelAndTokenizer] = None,
+        layer: Optional[int] = None,
         alpha: float = DEFAULT_ALPHA,
         beta: float = DEFAULT_BETA,
         device: Optional[Device] = None,
@@ -124,6 +125,7 @@ class EditedModel(nn.Module):
         """Wrap the model to be edited."""
         super().__init__()
         self.mt = mt if mt is not None else editor.mt
+        self.layer = layer if layer is not None else editor.layer
         self.editor = editor
         self.alpha = alpha
         self.beta = beta
@@ -138,7 +140,7 @@ class EditedModel(nn.Module):
             precomputed = precompute.editor_inputs_from_batch(
                 self.mt,
                 cast(data.ContextMediationInput, batch),
-                layers=[self.editor.layer],
+                layers=[self.layer],
                 device=self.device,
                 return_target_token_ids=False,
             )
@@ -203,7 +205,7 @@ class EditedModel(nn.Module):
             )
         with apply_direction(
             model=self.mt.model,
-            layer=self.editor.layer,
+            layer=self.layer,
             directions=directions,
             token_ranges=entity_ij,
             alpha=self.alpha,
@@ -280,12 +282,14 @@ class apply(contextlib.AbstractContextManager):
         self,
         editor: "Editor",
         mt: Optional[models.ModelAndTokenizer] = None,
+        layer: Optional[int] = None,
         alpha: float = DEFAULT_ALPHA,
         beta: float = DEFAULT_BETA,
         device: Optional[Device] = None,
     ):
         """Initialize the context manager."""
         self.mt = mt
+        self.layer = layer
         self.editor = editor
         self.alpha = alpha
         self.beta = beta
@@ -299,6 +303,7 @@ class apply(contextlib.AbstractContextManager):
         self._hooked = EditedModel(
             self.editor,
             mt=self.mt,
+            layer=self.layer,
             alpha=self.alpha,
             beta=self.beta,
             device=self.device,
