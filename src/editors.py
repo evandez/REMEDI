@@ -1,7 +1,7 @@
 """Editing models."""
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, cast
+from typing import Any, Callable, Literal, Optional, cast
 
 from src import data, models, precompute
 from src.utils import tokenizer_utils, training_utils
@@ -771,9 +771,8 @@ class Editor(nn.Module):
         dataset: Dataset,
         normalize: bool = True,
         cosine: bool = False,
+        take_entity_from: Literal["prompt_in_context", "prompt", "entity"] = "entity",
         batch_size: int = DEFAULT_BATCH_SIZE,
-        max_length: int | None = None,
-        max_new_tokens: int | None = None,
         device: Device | None = None,
         desc: str | None = "classify",
     ) -> EditorClassifyRun:
@@ -785,10 +784,9 @@ class Editor(nn.Module):
         Args:
             dataset: The datast to run on.
             normalize: Normalize hiddens to have 0 mean and unit variance.
+            cosine: Use cosine similarity instead of dot product.
+            take_entity_from: Which prompt to take entity representation from.
             batch_size: Model batch size.
-            max_tokens: Max length of generated text including prompt (before edit).
-            max_new_tokens: Max length of generated text not including prompt
-                (before edit).
             device: Send model and data to this device.
             desc: Progress bar description.
 
@@ -800,9 +798,6 @@ class Editor(nn.Module):
         self.mt.to_(device)
         self.eval().to(device)
 
-        if max_new_tokens is None and max_length is None:
-            max_length = DEFAULT_MAX_LENGTH
-
         sim: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
         if cosine:
             dtype = models.determine_dtype(self.mt)
@@ -813,7 +808,7 @@ class Editor(nn.Module):
         else:
             sim = torch.dot
 
-        key_e = f"entity.entity.hiddens.{self.layer}.last"
+        key_e = f"{take_entity_from}.entity.hiddens.{self.layer}.last"
         key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
         key_m = f"context.attribute.hiddens.{self.layer}.average"
 

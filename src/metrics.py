@@ -82,7 +82,7 @@ def efficacy(
 # TODO(evandez): Move all the TF-IDF stuff to this file.
 
 
-def tfidf_similarity(
+def average_tfidf_similarity(
     generations: Sequence[StrSequence],
     references: Sequence[StrSequence],
     tfidf_vectorizer: TfidfVectorizer,
@@ -94,12 +94,26 @@ def tfidf_similarity(
     """
     _validate_same_length(generations=generations, references=references)
     if desc is None:
-        desc = "tfidf similarity"
+        desc = "avg tfidf similarity"
     similarities = [
-        _tfidf_similarity(gs, rs, tfidf_vectorizer)
+        tfidf_similarity(gs, rs, tfidf_vectorizer)
         for gs, rs in tqdm(list(zip(generations, references)), desc=desc)
     ]
     return Metric.aggregate(similarities)
+
+
+def tfidf_similarity(
+    source: str | StrSequence,
+    reference: str | StrSequence,
+    tfidf_vectorizer: TfidfVectorizer,
+) -> float:
+    """Return TfIdf similarity between the texts."""
+    if isinstance(source, str):
+        source = [source]
+    if isinstance(reference, str):
+        reference = [reference]
+    sv, rv = tfidf_vectorizer.transform([" ".join(source), " ".join(reference)]).A
+    return np.dot(sv, rv) / np.linalg.norm(sv) / np.linalg.norm(rv)
 
 
 def average_n_gram_entropy(
@@ -162,15 +176,3 @@ def _average_weighted_n_gram_entropy(
         entropy = np.mean(entropies_by_n * np.array(weights))
         entropies.append(entropy)
     return np.array(entropies).mean()
-
-
-def _tfidf_similarity(
-    source: str | StrSequence, reference: str | StrSequence, tfidf_vectorizer: TfidfVectorizer
-) -> float:
-    """Return TfIdf similarity between the texts."""
-    if isinstance(source, str):
-        source = [source]
-    if isinstance(reference, str):
-        reference = [reference]
-    sv, rv = tfidf_vectorizer.transform([" ".join(source), " ".join(reference)]).A
-    return np.dot(sv, rv) / np.linalg.norm(sv) / np.linalg.norm(rv)

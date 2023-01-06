@@ -219,7 +219,7 @@ def main(args: argparse.Namespace) -> None:
             ]
             consistency_references.append(references)
 
-        consistency = metrics.tfidf_similarity(
+        consistency = metrics.average_tfidf_similarity(
             generation_prompts_outputs,
             consistency_references,
             tfidf_vectorizer,

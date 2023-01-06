@@ -1,6 +1,6 @@
 """Logic for getting and mucking with model hidden representations."""
 from functools import partial
-from typing import Any, Optional, Sequence, cast
+from typing import Any, Literal, Optional, Sequence, cast, overload
 
 from src import data, models
 from src.utils import tokenizer_utils
@@ -8,6 +8,7 @@ from src.utils.typing import (
     Dataset,
     Device,
     ModelInput,
+    ModelOutput,
     StrSequence,
     Tokenizer,
     TokenizerOffsetMapping,
@@ -76,22 +77,50 @@ def last_token_index_from_batch(inputs: ModelInput) -> Sequence[int]:
     return inputs.attention_mask.sum(dim=-1).cpu() - 1
 
 
+HiddensByLayer = dict[int, torch.Tensor]
+
+
+@overload
+def hiddens_from_batch(
+    mt: models.ModelAndTokenizer,
+    inputs: str | StrSequence | ModelInput,
+    stop: Literal[True] = True,
+    layers: Optional[Sequence[int]] = None,
+    device: Optional[Device] = None,
+) -> HiddensByLayer:
+    ...
+
+
+@overload
+def hiddens_from_batch(
+    mt: models.ModelAndTokenizer,
+    inputs: str | StrSequence | ModelInput,
+    stop: Literal[False],
+    layers: Optional[Sequence[int]] = None,
+    device: Optional[Device] = None,
+) -> tuple[HiddensByLayer, ModelOutput]:
+    ...
+
+
 @torch.inference_mode()
 def hiddens_from_batch(
     mt: models.ModelAndTokenizer,
     inputs: str | StrSequence | ModelInput,
+    stop: bool = True,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
-) -> dict[int, torch.Tensor]:
+) -> HiddensByLayer | tuple[HiddensByLayer, ModelOutput]:
     """Precomptue hidden reps.
 
     Args:
         mt: The model and tokenizer.
         inputs: The model inputs.
+        stop: Stop computation after retrieving the hiddens.
         layers: Layers to compute hiddens for. Defaults to all.
+        device: Send model and inputs to this device.
 
     Returns:
-        Hidden reps mapped by layer.
+        Hidden reps mapped by layer and model output (if stop=False).
 
     """
     mt.to_(device)
@@ -99,14 +128,15 @@ def hiddens_from_batch(
         inputs, _ = inputs_from_batch(mt, inputs, device=device)
     if device is not None:
         inputs = inputs.to(device)
+    outputs = None
     layer_paths = models.determine_layer_paths(mt, layers=layers, return_dict=True)
     with nethook.TraceDict(mt.model, layers=layer_paths.values(), stop=True) as ret:
-        mt.model(**inputs)
+        outputs = mt.model(**inputs)
     hiddens_by_layer = {
         layer: ret[layer_path].output[0].cpu()
         for layer, layer_path in layer_paths.items()
     }
-    return hiddens_by_layer
+    return hiddens_by_layer if stop else (hiddens_by_layer, outputs)
 
 
 def token_ranges_from_batch(
@@ -492,7 +522,7 @@ def classification_inputs_from_batch(
     """Precompute classification inputs for the batch.
 
     An extension of `editor_inputs_from_batch` that additionally computes attribute
-    directions for the unmediated case.
+    directions for the unmediated case and entity representations in context.
 
     Args:
         mt: Model and tokenizer.
@@ -511,6 +541,9 @@ def classification_inputs_from_batch(
             mt, batch, layers=layers, device=device, fp32=fp32, **kwargs
         )
 
+    entities = _maybe_batch(batch["entity"])
+    prompts = _maybe_batch(batch["prompt"])
+
     contexts_m = _maybe_batch(batch["context"])
     attributes_m = _maybe_batch(batch["attribute"])
 
@@ -521,6 +554,9 @@ def classification_inputs_from_batch(
     targets_m = _maybe_batch(targets_m)
     targets_u = _maybe_batch(targets_u)
 
+    targets_m_ids = precomputed["target_mediated.token_id"]
+    targets_u_ids = precomputed["target_unmediated.token_id"]
+
     precomputed["context_unmediated"] = contexts_u = [
         context.replace(target_m, target_u)
         for context, target_m, target_u in zip(contexts_m, targets_m, targets_u)
@@ -529,18 +565,80 @@ def classification_inputs_from_batch(
         attribute.replace(target_m, target_u)
         for attribute, target_m, target_u in zip(attributes_m, targets_m, targets_u)
     ]
+    precomputed["prompt_in_context"] = prompts_in_context = [
+        f"{context.rstrip('.')}. {prompt}"
+        for prompt, context in zip(prompts, contexts_m)
+    ]
 
-    with models.set_padding_side(mt, padding_side="right"):
-        inputs, offsets_mapping = inputs_from_batch(mt, contexts_u, device=device)
+    for (
+        key_string,
+        key_substring,
+        strings,
+        substrings,
+        occurrence,
+        target_ids,
+        comparator_ids,
+    ) in (
+        (
+            "context_unmediated",
+            "attribute_unmediated",
+            contexts_u,
+            attributes_u,
+            0,
+            None,
+            None,
+        ),
+        (
+            "prompt_in_context",
+            "entity",
+            prompts_in_context,
+            entities,
+            1,
+            targets_m_ids,
+            targets_u_ids,
+        ),
+        (
+            "prompt",
+            "entity",
+            prompts,
+            entities,
+            0,
+            targets_u_ids,
+            targets_m_ids,
+        ),
+    ):
+        with models.set_padding_side(mt, padding_side="left"):
+            inputs, offsets_mapping = inputs_from_batch(mt, strings, device=device)
 
-    trs_all = token_ranges_from_batch(contexts_u, attributes_u, offsets_mapping)
-    trs_last = last_token_ranges_from_batch(trs_all)
+        trs_all = token_ranges_from_batch(
+            strings, substrings, offsets_mapping, occurrence=occurrence
+        )
+        trs_last = last_token_ranges_from_batch(trs_all)
 
-    hiddens_by_layer = hiddens_from_batch(mt, inputs, layers=layers, device=device)
-    for layer, hiddens in hiddens_by_layer.items():
-        key = f"context_unmediated.attribute_unmediated.hiddens.{layer}"
-        precomputed[f"{key}.average"] = average_hiddens_from_batch(hiddens, trs_all)
-        precomputed[f"{key}.last"] = average_hiddens_from_batch(hiddens, trs_last)
+        # NOTE(evandez): This is an odd place to do this, but since we've already done
+        # the work of processing the prompt and prompt in context, we may as well
+        # record the target probabilities.
+
+        assert target_ids is None == comparator_ids is None
+        if target_ids is not None and comparator_ids is not None:
+            hiddens_by_layer, outputs = hiddens_from_batch(
+                mt, inputs, layers=layers, device=device, stop=False
+            )
+            log_probs = torch.log_softmax(outputs.logits[:, -1], dim=-1)
+            batch_idx = torch.arange(len(strings))
+            precomputed[f"{key_string}.target.logp"] = log_probs[batch_idx, target_ids]
+            precomputed[f"{key_string}.comparator.logp"] = log_probs[
+                batch_idx, comparator_ids
+            ]
+        else:
+            hiddens_by_layer = hiddens_from_batch(
+                mt, inputs, layers=layers, device=device
+            )
+
+        for layer, hiddens in hiddens_by_layer.items():
+            key = f"{key_string}.{key_substring}.hiddens.{layer}"
+            precomputed[f"{key}.average"] = average_hiddens_from_batch(hiddens, trs_all)
+            precomputed[f"{key}.last"] = average_hiddens_from_batch(hiddens, trs_last)
 
     if fp32:
         precomputed = _as_fp32(precomputed)
@@ -578,3 +676,61 @@ def classification_inputs_from_dataset(
 def has_classification_inputs(batch: dict) -> bool:
     """Determine if batch already has precomputed classification inputs."""
     return "context_unmediated" in batch
+
+
+@torch.inference_mode()
+def model_predictions_from_batch(
+    mt: models.ModelAndTokenizer,
+    batch: dict,
+    device: Device | None = None,
+    input_prompt_key: str = "prompt",
+    input_target_key: str = "target_unmediated",
+    input_comparator_key: str = "target_mediated",
+    output_correct_key: str = "model_knows",
+) -> dict:
+    """Precompute model predictions on prompt from the batch."""
+    prompts = batch[input_prompt_key]
+    targets = batch[input_target_key]
+    comparators = batch[input_comparator_key]
+
+    with models.set_padding_side(mt, padding_side="left"):
+        inputs, _ = inputs_from_batch(mt, prompts, device=device)
+    outputs = mt.model(**inputs)
+
+    batch_idx = torch.arange(len(prompts))
+    target_token_idx = first_token_ids_from_batch(mt, targets)
+    comparator_token_idx = first_token_ids_from_batch(mt, comparators)
+
+    log_probs = torch.log_softmax(outputs.logits[:, -1], dim=-1)
+    log_probs_target = log_probs[batch_idx, target_token_idx]
+    log_probs_comparator = log_probs[batch_idx, comparator_token_idx]
+
+    return {
+        output_correct_key: log_probs_target.gt(log_probs_comparator).tolist(),
+        f"logp({input_target_key})": log_probs_target.tolist(),
+        f"logp({input_comparator_key})": log_probs_comparator.tolist(),
+    }
+
+
+def model_predictions_from_dataset(
+    mt: models.ModelAndTokenizer,
+    dataset: Dataset,
+    device: Optional[Device] = None,
+    batch_size: int = 64,
+    desc: str | None = "precompute model predictions",
+    **kwargs: Any,
+) -> Dataset:
+    """Precompute model predictions for the whole dataset."""
+    return dataset.map(
+        partial(
+            model_predictions_from_batch,
+            mt,
+            device=device,
+            **kwargs,
+        ),
+        batched=True,
+        batch_size=batch_size,
+        desc=desc,
+        keep_in_memory=True,
+        num_proc=1,
+    )
