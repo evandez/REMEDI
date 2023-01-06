@@ -43,8 +43,8 @@ def tfidf_vectorizer():
 
 
 def test_consistency(tfidf_vectorizer):
-    """Test consistency does something...sensible."""
-    actual = metrics.consistency(
+    """Test average_tfidf_similarity does something...sensible."""
+    actual = metrics.average_tfidf_similarity(
         [["dog cat"]], [["dog dog dog", "cat cat cat"]], tfidf_vectorizer
     )
     assert numpy.allclose(actual.mean, 1.0, atol=1e-4)
@@ -59,7 +59,7 @@ def test_consistency(tfidf_vectorizer):
         ([["a", "b"], ["a b " * 100]], 0.5),
     ),
 )
-def test_fluency(texts, fluency):
-    """Test fluency correctly computes n-gram entropy."""
-    actual = metrics.fluency(texts)
+def test_average_weighted_n_gram_entropy(texts, fluency):
+    """Test average_weighted_n_gram_entropy correctly computes entropy."""
+    actual = metrics.average_weighted_n_gram_entropy(texts)
     assert numpy.allclose(actual.mean, fluency, atol=1e-4)

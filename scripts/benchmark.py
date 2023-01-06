@@ -225,7 +225,7 @@ def main(args: argparse.Namespace) -> None:
             tfidf_vectorizer,
         )
 
-        fluency = metrics.average_n_gram_entropy(generation_prompts_outputs)
+        fluency = metrics.average_weighted_n_gram_entropy(generation_prompts_outputs)
 
         scores = {
             "efficacy": efficacy.to_dict(),

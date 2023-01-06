@@ -22,13 +22,15 @@ logger = logging.getLogger(__name__)
 class Metric(DataClassJsonMixin):
     """An aggregate metric."""
 
-    values: ArrayLike
     mean: float
     std: float
+    values: ArrayLike | None = None
 
     @staticmethod
-    def aggregate(values: ArrayLike) -> "Metric":
-        return Metric(values, np.mean(values), np.std(values))
+    def aggregate(values: ArrayLike, store_values: bool = True) -> "Metric":
+        return Metric(
+            np.mean(values), np.std(values), values=values if store_values else None
+        )
 
 
 @dataclass(frozen=True)
@@ -75,11 +77,9 @@ def efficacy(
         magnitudes.append(magnitude)
 
     return EfficacyMetrics(
-        score=Metric.aggregate(scores), magnitude=Metric.aggregate(magnitudes)
+        score=Metric.aggregate(scores),
+        magnitude=Metric.aggregate(magnitudes),
     )
-
-
-# TODO(evandez): Move all the TF-IDF stuff to this file.
 
 
 def average_tfidf_similarity(
@@ -94,7 +94,7 @@ def average_tfidf_similarity(
     """
     _validate_same_length(generations=generations, references=references)
     if desc is None:
-        desc = "avg tfidf similarity"
+        desc = "tfidf similarity"
     similarities = [
         tfidf_similarity(gs, rs, tfidf_vectorizer)
         for gs, rs in tqdm(list(zip(generations, references)), desc=desc)
@@ -116,7 +116,7 @@ def tfidf_similarity(
     return np.dot(sv, rv) / np.linalg.norm(sv) / np.linalg.norm(rv)
 
 
-def average_n_gram_entropy(
+def average_weighted_n_gram_entropy(
     generations: Sequence[StrSequence], desc: str | None = None, **kwargs: Any
 ) -> Metric:
     """Compute fluency score.
@@ -130,12 +130,38 @@ def average_n_gram_entropy(
 
     """
     if desc is None:
-        desc = "avg n-gram entropy"
+        desc = "weighed n-gram entropy"
     entropies = [
-        _average_weighted_n_gram_entropy(texts, **kwargs)
+        np.mean([weighted_n_gram_entropy(text, **kwargs) for text in texts])
         for texts in tqdm(generations, desc=desc)
     ]
     return Metric.aggregate(entropies)
+
+
+def weighted_n_gram_entropy(
+    texts: str | StrSequence,
+    ns: Sequence[int] = (2, 3),
+    weights: Sequence[float] = (2 / 3, 4 / 3),
+) -> float:
+    """Return weighted n-gram entropy for different values of n."""
+    _validate_same_length(ns=ns, weights=weights)
+    if isinstance(texts, str):
+        texts = [texts]
+    entropies = []
+    for text in texts:
+        entropies_by_n = np.array([n_gram_entropy(text, n) for n in ns])
+        entropy = np.mean(entropies_by_n * np.array(weights))
+        entropies.append(entropy)
+    return np.mean(entropies)
+
+
+def n_gram_entropy(text: str, n: int) -> float:
+    """Return entropy of n-gram distribution in text."""
+    counts = _n_gram_counts(text, n)
+    dist = np.array([count for _, count in counts.items()], dtype=np.float32)
+    dist /= dist.sum()
+    entropy = np.sum(-dist * np.log(dist) / np.log(2))
+    return entropy.item()
 
 
 def _validate_same_length(**kwargs: Sequence | ArrayLike) -> None:
@@ -152,27 +178,3 @@ def _n_gram_counts(text: str, n: int) -> dict[tuple[str, ...], int]:
     tokens = nltk.word_tokenize(text)
     ngrams = nltk.ngrams(tokens, n)
     return nltk.FreqDist(ngrams)
-
-
-def _n_gram_entropy(text: str, n: int) -> float:
-    """Return entropy of n-gram distribution in text."""
-    counts = _n_gram_counts(text, n)
-    dist = np.array([count for _, count in counts.items()], dtype=np.float32)
-    dist /= dist.sum()
-    entropy = np.sum(-dist * np.log(dist) / np.log(2))
-    return entropy.item()
-
-
-def _average_weighted_n_gram_entropy(
-    texts: StrSequence,
-    ns: Sequence[int] = (2, 3),
-    weights: Sequence[float] = (2 / 3, 4 / 3),
-) -> float:
-    """Return average entropy across different n-gram distributions and texts."""
-    _validate_same_length(ns=ns, weights=weights)
-    entropies = []
-    for text in texts:
-        entropies_by_n = np.array([_n_gram_entropy(text, n) for n in ns])
-        entropy = np.mean(entropies_by_n * np.array(weights))
-        entropies.append(entropy)
-    return np.array(entropies).mean()
