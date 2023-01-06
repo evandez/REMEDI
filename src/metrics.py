@@ -13,6 +13,7 @@ import nltk
 import numpy as np
 from dataclasses_json import DataClassJsonMixin
 from sklearn.feature_extraction.text import TfidfVectorizer
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -81,20 +82,29 @@ def efficacy(
 # TODO(evandez): Move all the TF-IDF stuff to this file.
 
 
-def consistency(
+def tfidf_similarity(
     generations: Sequence[StrSequence],
     references: Sequence[StrSequence],
-    vectorizer: TfidfVectorizer,
+    tfidf_vectorizer: TfidfVectorizer,
+    desc: str | None = None,
 ) -> Metric:
-    """Compute consistency score."""
+    """Compute TF-IDF similarity between generated text and reference texts.
+
+    This is used downstream to compute the "consistency" and "essence" scores.
+    """
     _validate_same_length(generations=generations, references=references)
+    if desc is None:
+        desc = "tfidf similarity"
     similarities = [
-        _tfidf_similarity(gs, rs, vectorizer) for gs, rs in zip(generations, references)
+        _tfidf_similarity(gs, rs, tfidf_vectorizer)
+        for gs, rs in tqdm(list(zip(generations, references)), desc=desc)
     ]
     return Metric.aggregate(similarities)
 
 
-def fluency(generations: Sequence[StrSequence], **kwargs: Any) -> Metric:
+def average_n_gram_entropy(
+    generations: Sequence[StrSequence], desc: str | None = None, **kwargs: Any
+) -> Metric:
     """Compute fluency score.
 
     Args:
@@ -105,7 +115,12 @@ def fluency(generations: Sequence[StrSequence], **kwargs: Any) -> Metric:
         setting the ns= kwarg. By default, uses 2-grams and 3-grams.
 
     """
-    entropies = [_aggregate_n_gram_entropy(texts, **kwargs) for texts in generations]
+    if desc is None:
+        desc = "avg n-gram entropy"
+    entropies = [
+        _average_weighted_n_gram_entropy(texts, **kwargs)
+        for texts in tqdm(generations, desc=desc)
+    ]
     return Metric.aggregate(entropies)
 
 
@@ -134,7 +149,7 @@ def _n_gram_entropy(text: str, n: int) -> float:
     return entropy.item()
 
 
-def _aggregate_n_gram_entropy(
+def _average_weighted_n_gram_entropy(
     texts: StrSequence,
     ns: Sequence[int] = (2, 3),
     weights: Sequence[float] = (2 / 3, 4 / 3),
@@ -150,12 +165,12 @@ def _aggregate_n_gram_entropy(
 
 
 def _tfidf_similarity(
-    source: str | StrSequence, reference: str | StrSequence, vectorizer: TfidfVectorizer
+    source: str | StrSequence, reference: str | StrSequence, tfidf_vectorizer: TfidfVectorizer
 ) -> float:
     """Return TfIdf similarity between the texts."""
     if isinstance(source, str):
         source = [source]
     if isinstance(reference, str):
         reference = [reference]
-    sv, rv = vectorizer.transform([" ".join(source), " ".join(reference)]).A
+    sv, rv = tfidf_vectorizer.transform([" ".join(source), " ".join(reference)]).A
     return np.dot(sv, rv) / np.linalg.norm(sv) / np.linalg.norm(rv)

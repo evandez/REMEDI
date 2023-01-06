@@ -219,13 +219,13 @@ def main(args: argparse.Namespace) -> None:
             ]
             consistency_references.append(references)
 
-        consistency = metrics.consistency(
+        consistency = metrics.tfidf_similarity(
             generation_prompts_outputs,
             consistency_references,
             tfidf_vectorizer,
         )
 
-        fluency = metrics.fluency(generation_prompts_outputs)
+        fluency = metrics.average_n_gram_entropy(generation_prompts_outputs)
 
         scores = {
             "efficacy": efficacy.to_dict(),
