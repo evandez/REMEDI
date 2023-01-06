@@ -518,7 +518,7 @@ class Editor(nn.Module):
         lr: float = DEFAULT_LR,
         lam_m: float | None = DEFAULT_LAM_M,
         lam_u: float | None = DEFAULT_LAM_U,
-        lam_kl: float | None = None,
+        lam_kl: float | None = DEFAULT_LAM_KL,
         lam_norm: float | None = None,
         lam_ess: float | None = None,
         patience: int = DEFAULT_PATIENCE,
