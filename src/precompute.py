@@ -249,14 +249,15 @@ def editor_inputs_from_batch(
                 prompt_inputs,
                 prompt_offset_mapping,
             ),
-            (
-                "context",
-                "entity",
-                contexts,
-                entities,
-                context_inputs,
-                context_offset_mapping,
-            ),
+            # NOTE(evandez): Not currently used anywhere.
+            # (
+            #     "context",
+            #     "entity",
+            #     contexts,
+            #     entities,
+            #     context_inputs,
+            #     context_offset_mapping,
+            # ),
             (
                 "context",
                 "attribute",
