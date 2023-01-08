@@ -12,6 +12,7 @@ spacy
 tqdm
 transformers
 torch
+wget
 
 # dev dependencies
 black

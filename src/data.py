@@ -11,15 +11,18 @@ from src.utils.typing import Dataset, PathLike, StrSequence
 import datasets
 import numpy
 import scipy.sparse
+import wget
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-SUPPORTED_DATASETS = ("counterfact",)
+SUPPORTED_DATASETS = ("counterfact", "winoventi")
 
 ROME_BASE_URL = "https://rome.baulab.info/data/dsets"
 COUNTERFACT_URL = f"{ROME_BASE_URL}/counterfact.json"
 ATTRIBUTE_SNIPPETS_URL = f"{ROME_BASE_URL}/attribute_snippets.json"
 TFIDF_IDF_URL = f"{ROME_BASE_URL}/idf.npy"
 TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
+
+WINOVENTI_URL = "https://raw.githubusercontent.com/commonsense-exception/commonsense-exception/main/data/winoventi_bert_large_final.tsv"
 
 
 class ContextMediationSample(TypedDict):
@@ -57,6 +60,13 @@ def _determine_file(file: PathLike | None, url: str) -> Path:
         name = url.split("/")[-1]
         file = env_utils.determine_data_dir() / name
     return Path(file).resolve()
+
+
+def _download_file(file: PathLike, url: str) -> None:
+    """Download the url to file."""
+    file = Path(file)
+    file.parent.mkdir(exist_ok=True, parents=True)
+    wget.download(url, out=str(file))
 
 
 def _reformat_counterfact_file(file: Path) -> None:
@@ -108,7 +118,7 @@ def _load_counterfact(
     """Download and format the counterfact dataset."""
     file = _determine_file(file, url)
     if not file.exists() or overwrite:
-        io_utils.download_file(url, file, overwrite=True)
+        _download_file(file, url)
         _reformat_counterfact_file(file)
 
     dataset = datasets.load_dataset("json", data_files=str(file), **kwargs)
@@ -124,10 +134,97 @@ def _load_counterfact(
     return dataset
 
 
+def _filter_winoventi_sample(wv_sample: dict) -> bool:
+    """Determine whether the WV sample is well-formed; some have typos."""
+    wv_word = wv_sample["Word"]
+    wv_masked_prompt = wv_sample["masked_prompt"]
+    wv_biased_context = wv_sample["biased_word_context"]
+    wv_adversarial_context = wv_sample["adversarial_word_context"]
+
+    prompt_components = wv_masked_prompt.split(". ")
+    has_no_extra_period = len(prompt_components) == 2
+    has_two_entity_mentions = wv_masked_prompt.count(wv_word) == 2
+
+    has_entity_before_attribute = False
+    if has_no_extra_period:
+        context, _ = prompt_components
+        if wv_word in context:
+            start = context.index(wv_word)
+            has_entity_before_attribute = wv_biased_context in context[start:]
+            has_entity_before_attribute |= wv_adversarial_context in context[start:]
+
+    return (
+        has_no_extra_period and has_two_entity_mentions and has_entity_before_attribute
+    )
+
+
+def _reformat_winoventi_sample(wv_sample: dict) -> ContextMediationSample:
+    """Reformat winoventi sample to use context mediation format."""
+    wv_word = entity = wv_sample["Word"]
+
+    wv_masked_prompt = wv_sample["masked_prompt"]
+    wv_prompt_components = wv_masked_prompt.split(". ")
+    assert len(wv_prompt_components) == 2, wv_masked_prompt
+
+    context, prompt = wv_prompt_components
+    assert entity in context, context
+    assert entity in prompt, prompt
+    prompt = prompt.replace("[MASK]", "").strip(". ")
+    context_components = context.split(entity)
+    assert len(context_components) == 2
+    attribute = context_components[1].strip(". ")
+
+    wv_target = wv_sample["target"]
+    wv_incorrect = wv_sample["incorrect"]
+
+    wv_id = f"{wv_word}_{wv_target}_{wv_incorrect}"
+
+    return ContextMediationSample(
+        id=wv_id,
+        entity=entity,
+        prompt=prompt,
+        context=context,
+        attribute=attribute,
+        target_mediated=wv_target,
+        target_unmediated=wv_incorrect,
+        source={**wv_sample},
+    )
+
+
+def _load_winoventi(
+    file: PathLike | None = None,
+    url: str = WINOVENTI_URL,
+    overwrite: bool = False,
+    **kwargs: Any,
+) -> Dataset:
+    """Download and reformat the winoventi dataset."""
+    file = _determine_file(file, url)
+    if not file.exists() or overwrite:
+        _download_file(file, url)
+
+    dataset = datasets.load_dataset(
+        "csv", data_files=str(file), delimiter="\t", **kwargs
+    )
+    assert isinstance(
+        dataset, datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
+    ), type(dataset)
+
+    dataset = dataset.filter(_filter_winoventi_sample, desc="filter winoventi")
+    dataset = dataset.map(
+        _reformat_winoventi_sample,
+        remove_columns=column_names(dataset),
+        desc="reformat winoventi",
+    )
+
+    return dataset
+
+
 def load_dataset(name: str, **kwargs: Any) -> Dataset:
     """Load the dataset by name."""
     if name == "counterfact":
         return _load_counterfact(**kwargs)
+    elif name == "winoventi":
+        return _load_winoventi(**kwargs)
     else:
         raise ValueError(f"unknown dataset: {name}")
 
