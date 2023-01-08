@@ -5,7 +5,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Sequence, TypedDict
 
-from src.utils import env_utils, io_utils
+from src.utils import env_utils
 from src.utils.typing import Dataset, PathLike, StrSequence
 
 import datasets
