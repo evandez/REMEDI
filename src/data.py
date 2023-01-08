@@ -255,7 +255,7 @@ def load_attribute_snippets(
     """
     file = _determine_file(file, url)
     if not file.exists() or overwrite:
-        io_utils.download_file(url, file, overwrite=True)
+        _download_file(file, url)
     with file.open("r") as handle:
         snippets_list = json.load(handle)
 
@@ -281,7 +281,7 @@ def load_tfidf_vectorizer(
     vocab_file = _determine_file(vocab_file, vocab_url)
     for file, url in ((idf_file, idf_url), (vocab_file, vocab_url)):
         if not file.exists() or overwrite:
-            io_utils.download_file(url, file, overwrite=True)
+            _download_file(file, url)
 
     idf = numpy.load(str(idf_file))
     with vocab_file.open("r") as handle:
