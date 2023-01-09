@@ -1,6 +1,6 @@
 """Standalone functions for benchmarking editor performance across metrics."""
 import logging
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from typing import Any, Sequence, cast
 
@@ -431,3 +431,140 @@ def efficacy(
         samples=run.results,
         efficacy=efficacy,
     )
+
+
+@dataclass(frozen=True)
+class GenerationBenchmarkSample(DataClassJsonMixin):
+    """Wrapper around a single sample from the generation benchmark."""
+
+    id: str
+    generations: list[str]
+    references: list[str]
+    fluency_score: float
+    consistency_score: float
+
+
+@dataclass(frozen=True)
+class GenerationBenchmarkResults(DataClassJsonMixin):
+    """Wrapper around generation benchmark results."""
+
+    samples: list[GenerationBenchmarkSample]
+    fluency: metrics.Metric
+    consistency: metrics.Metric
+
+
+def counterfact_generation(
+    *,
+    editor: editors.Editor,
+    dataset: Dataset,
+    attribute_snippets: data.AttributeSnippets | None = None,
+    tfidf_vectorizer: TfidfVectorizer | None = None,
+    max_length: int | None = None,
+    max_new_tokens: int | None = None,
+    desc: str | None = None,
+    **kwargs: Any,
+) -> GenerationBenchmarkResults:
+    """Run the CounterFact generation benchmark.
+
+    Free-form generates on several "generation prompts" per sample, and records
+    the fluency of the generations (measured by weighted n-gram entropy) and
+    consistency with other texts about entities with the same attribute.
+
+    This benchmark *requires* the dataset to be CounterFact or something that looks
+    like it, since it uses extra data that is specific to CounterFact.
+
+    Specifically, it expects each sample can be accessed like:
+
+        prompts = sample["source"]["generation_prompts"]
+
+    """
+    if attribute_snippets is None:
+        attribute_snippets = data.load_attribute_snippets()
+    if tfidf_vectorizer is None:
+        tfidf_vectorizer = data.load_tfidf_vectorizer()
+    if max_new_tokens is None and max_length is None:
+        max_length = editors.DEFAULT_MAX_LENGTH
+    if desc is None:
+        desc = "generate benchmark"
+
+    dataset = _counterfact_select_and_flatten(dataset, "generation_prompts")
+    run = editor.evaluate(
+        dataset=dataset,
+        max_new_tokens=max_new_tokens,
+        max_length=max_length,
+        desc=f"{desc} [run model]",
+        return_before=False,
+        **kwargs,
+    )
+    run_results_by_id = _group_results_by_id(run)
+
+    samples = []
+    for sid, results in run_results_by_id.items():
+        result = next(iter(results))
+        cf_requested_rewrite = result.sample["source"]["requested_rewrite"]
+        relation_id = cf_requested_rewrite["relation_id"]
+        target_id = cf_requested_rewrite["target_new"]["id"]
+
+        generations = [result.after_generation for result in results]
+        references = [
+            snippet["text"] for snippet in attribute_snippets[relation_id][target_id]
+        ]
+
+        consistency_score = metrics.tfidf_similarity(
+            generations, references, tfidf_vectorizer
+        )
+        fluency_score = metrics.weighted_n_gram_entropy(generations)
+
+        entity = result["entity"]
+        attribute = result["attribute"]
+        logger.debug(f"ID={sid} ENTITY={entity}, ATTR={attribute}")
+        logger.debug(f"ID={sid} REFERENCES={references}")
+        logger.debug(f"ID={sid} GENERATIONS={generations}")
+
+        sample = GenerationBenchmarkSample(
+            id=sid,
+            generations=generations,
+            references=references,
+            fluency_score=fluency_score,
+            consistency_score=consistency_score,
+        )
+        samples.append(sample)
+
+    fluency = metrics.Metric.aggregate(
+        [sample.fluency_score for sample in samples], store_values=False
+    )
+    consistency = metrics.Metric.aggregate(
+        [sample.consistency_score for sample in samples], store_values=False
+    )
+    return GenerationBenchmarkResults(
+        samples=samples, fluency=fluency, consistency=consistency
+    )
+
+
+def _counterfact_select_and_flatten(dataset: Dataset, column: str) -> Dataset:
+    """Select the given column in counterfact and flatten it."""
+    column_names = data.column_names(dataset)
+
+    def select_and_flatten_counterfact_row(row: dict) -> dict:
+        prompts = list(set(row["source"][0][column]))
+        result = {"prompt": prompts}
+        for key in data.ContextMediationSample.__required_keys__:
+            if key not in result:
+                result[key] = [row[key][0]] * len(prompts)
+        return result
+
+    return dataset.map(
+        select_and_flatten_counterfact_row,
+        batched=True,
+        batch_size=1,
+        remove_columns=column_names,
+        desc=f"select and flatten {column}",
+    )
+
+
+def _group_results_by_id(results: editors.EditorEvaluateRun) -> OrderedDict:
+    """Group results by sample ID."""
+    grouped = defaultdict(list)
+    for result in results.results:
+        grouped[result.sample["id"]].append(result)
+    return OrderedDict(grouped)
