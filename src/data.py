@@ -237,7 +237,7 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
     nlp = load_spacy_model("en_core_web_sm")
     bb_bios = [sample["raw"] for sample in data]
     bb_bios_abridged = [
-        next(iter(doc.sents))
+        str(next(iter(doc.sents)))
         for doc in tqdm(nlp.pipe(bb_bios), total=len(data), desc="parse biosbias")
     ]
 
