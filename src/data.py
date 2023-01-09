@@ -299,7 +299,7 @@ def _load_bias_in_bios(file: PathLike | None = None, **kwargs: Any) -> Dataset:
             "the .pkl file in via the -f flag"
         )
 
-    if file.suffix in {"pkl", "pickle"}:
+    if file.suffix in {".pkl", ".pickle"}:
         logger.debug(f"{file} is pickle format; will reformat into json")
         file = _reformat_bias_in_bios_file(file)
 
