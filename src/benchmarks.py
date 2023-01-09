@@ -397,10 +397,19 @@ def classification(
 
 
 @dataclass(frozen=True)
+class EfficacySample(DataClassJsonMixin):
+    """Wrapper around a single efficacy sample."""
+
+    id: str
+    target_score: float
+    comparator_score: float
+
+
+@dataclass(frozen=True)
 class EfficacyBenchmarkResults(DataClassJsonMixin):
     """Wrapper around efficacy benchmark results."""
 
-    samples: list[editors.EditorEvaluationResult]
+    samples: list[EfficacySample]
     efficacy: metrics.EfficacyMetrics
 
 
@@ -422,15 +431,31 @@ def efficacy(
     run = editor.evaluate(
         dataset, desc=desc, max_new_tokens=1, return_before=False, **kwargs
     )
+
+    samples = []
+    for result in run.results:
+        sid = result.sample["id"]
+
+        target_score = result.after_target_mediated_score
+        assert target_score is not None
+
+        comparator_score = result.after_target_unmediated_score
+        assert comparator_score is not None
+
+        logger.debug(f"ID={sid} SCORE_T={target_score} SCORE_COMP={comparator_score}")
+        sample = EfficacySample(
+            id=sid,
+            target_score=target_score,
+            comparator_score=comparator_score,
+        )
+        samples.append(sample)
+
     efficacy = metrics.efficacy(
-        [[sample.after_target_mediated_score] for sample in run.results],
-        [[sample.after_target_unmediated_score] for sample in run.results],
+        [[sample.target_score] for sample in samples],
+        [[sample.comparator_score] for sample in samples],
         store_values=False,
     )
-    return EfficacyBenchmarkResults(
-        samples=run.results,
-        efficacy=efficacy,
-    )
+    return EfficacyBenchmarkResults(samples=samples, efficacy=efficacy)
 
 
 @dataclass(frozen=True)
