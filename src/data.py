@@ -23,7 +23,7 @@ from tqdm.auto import tqdm
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_DATASETS = ("counterfact", "winoventi")
+SUPPORTED_DATASETS = ("counterfact", "winoventi", "biosbias")
 
 ROME_BASE_URL = "https://rome.baulab.info/data/dsets"
 COUNTERFACT_URL = f"{ROME_BASE_URL}/counterfact.json"
