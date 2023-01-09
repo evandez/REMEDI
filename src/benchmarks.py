@@ -394,3 +394,40 @@ def classification(
     }
 
     return ClassificationBenchmarkResults(samples=samples, **benchmark_results_kwargs)
+
+
+@dataclass(frozen=True)
+class EfficacyBenchmarkResults(DataClassJsonMixin):
+    """Wrapper around efficacy benchmark results."""
+
+    samples: list[editors.EditorEvaluationResult]
+    efficacy: metrics.EfficacyMetrics
+
+
+def efficacy(
+    *,
+    editor: editors.Editor,
+    dataset: Dataset,
+    desc: str | None = None,
+    **kwargs: Any,
+) -> EfficacyBenchmarkResults:
+    """Run the efficacy benchmark.
+
+    Uses the "prompt" column in the dataset to generate the next token before and
+    after editing, then compares the probabilities between the mediated and unmediated
+    tokens.
+    """
+    if desc is None:
+        desc = "efficacy benchmark"
+    run = editor.evaluate(
+        dataset, desc=desc, max_new_tokens=1, return_before=False, **kwargs
+    )
+    efficacy = metrics.efficacy(
+        [[sample.after_target_mediated_score] for sample in run.results],
+        [[sample.after_target_unmediated_score] for sample in run.results],
+        store_values=False,
+    )
+    return EfficacyBenchmarkResults(
+        samples=run.results,
+        efficacy=efficacy,
+    )

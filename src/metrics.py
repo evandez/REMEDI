@@ -45,6 +45,7 @@ def efficacy(
     p_targets: Sequence[ArrayLike],
     p_comparators: Sequence[ArrayLike],
     assume_log_probs: bool = True,
+    store_values: bool = True,
 ) -> EfficacyMetrics:
     """Compute efficacy on metrics.
 
@@ -77,8 +78,8 @@ def efficacy(
         magnitudes.append(magnitude)
 
     return EfficacyMetrics(
-        score=Metric.aggregate(scores),
-        magnitude=Metric.aggregate(magnitudes),
+        score=Metric.aggregate(scores, store_values=store_values),
+        magnitude=Metric.aggregate(magnitudes, store_values=store_values),
     )
 
 
