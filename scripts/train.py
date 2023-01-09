@@ -119,13 +119,6 @@ if __name__ == "__main__":
         help="model to edit",
     )
     parser.add_argument(
-        "--dataset",
-        "-d",
-        choices=data.SUPPORTED_DATASETS,
-        default="counterfact",
-        help="dataset to train on",
-    )
-    parser.add_argument(
         "--layers", "-l", type=int, nargs="+", help="layers to train for"
     )
     parser.add_argument(
@@ -215,6 +208,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--device", help="device to train on")
     parser.add_argument("--fp16", action="store_true", help="use fp16")
+    data.add_dataset_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     args = parser.parse_args()

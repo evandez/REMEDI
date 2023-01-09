@@ -1,6 +1,10 @@
 """Datasets for evaluating context mediation in LMs."""
+import argparse
 import json
+import logging
+import pickle
 from collections import defaultdict
+from functools import cache
 from itertools import chain
 from pathlib import Path
 from typing import Any, Sequence, TypedDict
@@ -11,8 +15,13 @@ from src.utils.typing import Dataset, PathLike, StrSequence
 import datasets
 import numpy
 import scipy.sparse
+import spacy
 import wget
 from sklearn.feature_extraction.text import TfidfVectorizer
+from tqdm.auto import tqdm
+
+logger = logging.getLogger(__name__)
+
 
 SUPPORTED_DATASETS = ("counterfact", "winoventi")
 
@@ -219,12 +228,94 @@ def _load_winoventi(
     return dataset
 
 
+def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
+    """Reformat the Bias in Bios pickle file on disk."""
+    with pkl_file.open("rb") as handle:
+        data = pickle.load(handle)
+
+    # Take only the first sentence of each bio to make the task harder.
+    nlp = load_spacy_model("en_core_web_sm")
+    bb_bios = [sample["raw"] for sample in data]
+    bb_bios_abridged = [
+        doc.sents[0]
+        for doc in tqdm(nlp.pipe(bb_bios), total=len(data), desc="parse biosbias")
+    ]
+
+    # Normalize the samples.
+    lines = []
+    for index, (sample, bb_bio) in enumerate(zip(data, bb_bios_abridged)):
+        bb_bio = bb_bio.strip("*• ")
+        bb_name_parts = sample["name"]
+        bb_full_name = " ".join(bb_name_parts)
+        bb_title = sample["title"].replace("_", " ")
+        bb_id = "_".join(part for part in bb_name_parts if part)
+        if bb_full_name not in bb_bio:
+            logger.debug(
+                f"will not include sample #{index} because "
+                f"name {bb_full_name} cannot be found by exact match in bio: "
+                f"{bb_bio}"
+            )
+            continue
+
+        entity = bb_name_parts[0]
+        prompt = f"{entity} has the job title of"
+        context = bb_bio
+        attribute = bb_bio[bb_bio.index(bb_full_name) + len(bb_full_name) :]
+        target_mediated = bb_title
+
+        line = ContextMediationSample(
+            id=bb_id,
+            source=sample,
+            entity=entity,
+            prompt=prompt,
+            context=context,
+            attribute=attribute,
+            target_mediated=target_mediated,
+            target_unmediated=None,
+        )
+        lines.append(line)
+
+    # Save in jsonl format.
+    json_file = env_utils.determine_data_dir() / "biosbias.json"
+    with json_file.open("w") as handle:
+        for line in lines:
+            json.dump(line, handle)
+    return json_file
+
+
+def _load_bias_in_bios(file: PathLike | None = None, **kwargs: Any) -> Dataset:
+    """Load the Bias in Bios datast, if possible."""
+    if file is None:
+        file = env_utils.determine_data_dir() / "biosbias.json"
+
+    file = Path(file)
+    if not file.exists():
+        raise FileNotFoundError(
+            f"biosbias file not found: {file}"
+            "\nnote this dataset cannot be downloaded automatically, "
+            "so you will have to retrieve it by following the instructions "
+            "at the github repo https://github.com/microsoft/biosbias and pass "
+            "the .pkl file in via the -f flag"
+        )
+
+    if file.suffix in {"pkl", "pickle"}:
+        file = _reformat_bias_in_bios_file(file)
+
+    dataset = datasets.load_dataset("json", data_files=str(file), **kwargs)
+    assert isinstance(
+        dataset, datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
+    ), type(dataset)
+    return dataset
+
+
 def load_dataset(name: str, **kwargs: Any) -> Dataset:
     """Load the dataset by name."""
     if name == "counterfact":
         return _load_counterfact(**kwargs)
     elif name == "winoventi":
         return _load_winoventi(**kwargs)
+    elif name == "biosbias":
+        return _load_bias_in_bios(**kwargs)
     else:
         raise ValueError(f"unknown dataset: {name}")
 
@@ -312,6 +403,12 @@ def column_names(dataset: Dataset, exclude: StrSequence | None = None) -> list[s
     return column_names
 
 
+@cache
+def load_spacy_model(name: str) -> spacy.language.Language:
+    """Load (and cache) a spacy model."""
+    return spacy.load(name)
+
+
 def maybe_train_test_split(
     dataset: Dataset, **kwargs: Any
 ) -> datasets.dataset_dict.DatasetDict:
@@ -328,3 +425,15 @@ def maybe_train_test_split(
 def disable_caching() -> None:
     """Disable all implicit dataset caching."""
     datasets.disable_caching()
+
+
+def add_dataset_args(parser: argparse.ArgumentParser) -> None:
+    """Add --dataset and related flags to the parser."""
+    parser.add_argument(
+        "--dataset",
+        "-d",
+        choices=SUPPORTED_DATASETS,
+        default="counterfact",
+        help="dataset to use",
+    )
+    parser.add_argument("--dataset-file", "-f", type=Path, help="dataset file to use")
