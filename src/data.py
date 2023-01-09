@@ -279,7 +279,7 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
     json_file = env_utils.determine_data_dir() / "biosbias.json"
     with json_file.open("w") as handle:
         for line in lines:
-            json.dump(line, handle)
+            json.dump(dict(line), handle)
     return json_file
 
 
