@@ -8,6 +8,7 @@ from src.utils import logging_utils
 def main(args: argparse.Namespace) -> None:
     """Do the reformatting by loading the dataset once."""
     data.disable_caching()
+    logging_utils.configure(args=args)
     data.load_dataset(args.dataset, file=args.dataset_file)
 
 
