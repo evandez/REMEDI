@@ -286,6 +286,7 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
 def _load_bias_in_bios(file: PathLike | None = None, **kwargs: Any) -> Dataset:
     """Load the Bias in Bios datast, if possible."""
     if file is None:
+        logger.debug("file not set; defaulting to environment data dir")
         file = env_utils.determine_data_dir() / "biosbias.json"
 
     file = Path(file)
@@ -299,6 +300,7 @@ def _load_bias_in_bios(file: PathLike | None = None, **kwargs: Any) -> Dataset:
         )
 
     if file.suffix in {"pkl", "pickle"}:
+        logger.debug(f"{file} is pickle format; will reformat into json")
         file = _reformat_bias_in_bios_file(file)
 
     dataset = datasets.load_dataset("json", data_files=str(file), **kwargs)
