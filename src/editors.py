@@ -568,7 +568,16 @@ class Editor(nn.Module):
         optimizer = optim.AdamW(self.parameters(), **optimizer_kwargs)
         stopper = training_utils.EarlyStopping(patience=patience)
 
-        with dataset.formatted_as("torch"):
+        # Since sometimes these fields are None, exclude them from the dataset
+        # so the DataLoader does not freak out.
+        exclude_columns = []
+        if lam_u is None:
+            exclude_columns.append("target_unmediated")
+        if lam_m is None:
+            exclude_columns.append("target_mediated")
+        columns = data.column_names(dataset, exclude=exclude_columns)
+
+        with dataset.formatted_as("torch", columns=columns):
             train = cast(torch.utils.data.Dataset, dataset["train"])
             val = cast(torch.utils.data.Dataset, dataset["test"])
             train_loader = torch.utils.data.DataLoader(train, batch_size=batch_size)
