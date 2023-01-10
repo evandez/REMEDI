@@ -491,7 +491,9 @@ def counterfact_paraphrase(
     """
     if desc is None:
         desc = "paraphrase benchmark"
-    dataset = _counterfact_select_and_flatten(dataset, "paraphrase_prompts")
+    dataset = _counterfact_select_and_flatten(
+        dataset, "paraphrase_prompts", desc=f"{desc} [flatten dataset]"
+    )
     efficacy_benchmark = efficacy(
         editor=editor,
         dataset=dataset,
@@ -590,7 +592,9 @@ def counterfact_generation(
     if desc is None:
         desc = "generate benchmark"
 
-    dataset = _counterfact_select_and_flatten(dataset, "generation_prompts")
+    dataset = _counterfact_select_and_flatten(
+        dataset, "generation_prompts", desc=f"{desc} [flatten dataset]"
+    )
     run = editor.evaluate(
         dataset=dataset,
         max_new_tokens=max_new_tokens,
@@ -608,7 +612,7 @@ def counterfact_generation(
         relation_id = cf_requested_rewrite["relation_id"]
         target_id = cf_requested_rewrite["target_new"]["id"]
 
-        generations = [result.after_generation for result in results]
+        generations = [result.after_generations[0] for result in results]
         references = [
             snippet["text"] for snippet in attribute_snippets[relation_id][target_id]
         ]
@@ -644,7 +648,9 @@ def counterfact_generation(
     )
 
 
-def _counterfact_select_and_flatten(dataset: Dataset, column: str) -> Dataset:
+def _counterfact_select_and_flatten(
+    dataset: Dataset, column: str, desc: str | None = None
+) -> Dataset:
     """Select the given column in counterfact, dedupe it, and flatten it."""
     column_names = data.column_names(dataset)
 
@@ -661,7 +667,7 @@ def _counterfact_select_and_flatten(dataset: Dataset, column: str) -> Dataset:
         batched=True,
         batch_size=1,
         remove_columns=column_names,
-        desc=f"select and flatten {column}",
+        desc=desc,
     )
 
 
