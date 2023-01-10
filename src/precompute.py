@@ -619,7 +619,7 @@ def classification_inputs_from_batch(
         # the work of processing the prompt and prompt in context, we may as well
         # record the target probabilities.
 
-        assert target_ids is None == comparator_ids is None
+        assert (target_ids is None) == (comparator_ids is None)
         if target_ids is not None and comparator_ids is not None:
             hiddens_by_layer, outputs = hiddens_from_batch(
                 mt, inputs, layers=layers, device=device, stop=False
