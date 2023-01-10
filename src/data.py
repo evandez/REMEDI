@@ -246,7 +246,7 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
     for index, (sample, bb_bio) in enumerate(zip(data, bb_bios_abridged)):
         bb_bio = bb_bio.strip("*• ")
         bb_name_parts = sample["name"]
-        bb_full_name = " ".join(bb_name_parts)
+        bb_full_name = " ".join(part for part in bb_name_parts if part)
         bb_title = sample["title"].replace("_", " ")
         bb_id = "_".join(part for part in bb_name_parts if part)
         if bb_full_name not in bb_bio:
