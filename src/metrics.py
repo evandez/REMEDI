@@ -26,6 +26,10 @@ class Metric(DataClassJsonMixin):
     std: float
     values: ArrayLike | None = None
 
+    def without_values(self) -> "Metric":
+        """Return the metric without the values stored."""
+        return Metric(mean=self.mean, std=self.std)
+
     @staticmethod
     def aggregate(values: ArrayLike, store_values: bool = True) -> "Metric":
         return Metric(
@@ -39,6 +43,13 @@ class EfficacyMetrics(DataClassJsonMixin):
 
     score: Metric
     magnitude: Metric
+
+    def without_values(self) -> "EfficacyMetrics":
+        """Return the metrics without the values stored."""
+        return EfficacyMetrics(
+            score=self.score.without_values(),
+            magnitude=self.magnitude.without_values(),
+        )
 
 
 def efficacy(

@@ -401,6 +401,7 @@ class EfficacySample(DataClassJsonMixin):
     """Wrapper around a single efficacy sample."""
 
     id: str
+    prompt: str
     target_score: float
     comparator_score: float
 
@@ -435,6 +436,7 @@ def efficacy(
     samples = []
     for result in run.results:
         sid = result.sample["id"]
+        prompt = result.sample["prompt"]
 
         target_score = result.after_target_mediated_score
         assert target_score is not None
@@ -445,6 +447,7 @@ def efficacy(
         logger.debug(f"ID={sid} SCORE_T={target_score} SCORE_COMP={comparator_score}")
         sample = EfficacySample(
             id=sid,
+            prompt=prompt,
             target_score=target_score,
             comparator_score=comparator_score,
         )
@@ -456,6 +459,88 @@ def efficacy(
         store_values=False,
     )
     return EfficacyBenchmarkResults(samples=samples, efficacy=efficacy)
+
+
+@dataclass(frozen=True)
+class ParaphraseSample(DataClassJsonMixin):
+    """Wrapper around a single paraphrase benchmark sample."""
+
+    id: str
+    prompts: list[EfficacySample]
+    efficacy_score: float
+    efficacy_magnitude: float
+
+
+@dataclass(frozen=True)
+class ParaphraseBenchmarkResults(DataClassJsonMixin):
+    """Wrapper around paraphrase benchmark results."""
+
+    samples: list[ParaphraseSample]
+    efficacy: metrics.EfficacyMetrics
+
+
+def counterfact_paraphrase(
+    *,
+    editor: editors.Editor,
+    dataset: Dataset,
+    desc: str | None = None,
+    **kwargs: Any,
+) -> ParaphraseBenchmarkResults:
+    """Run the CounterFact paraphrase benchmark.
+
+    Since this benchmark relies on extra data, it can only be used with the CounterFact
+    dataset. The `counterfact_generation` benchmark is like this as well.
+
+    This function expects that each sample in the dataset supports an access like:
+
+        prompts = sample["source"]["generation_prompts"]
+
+    """
+    if desc is None:
+        desc = "paraphrase benchmark"
+    dataset = _counterfact_select_and_flatten(dataset, "paraphrase_prompts")
+    efficacy_benchmark = efficacy(
+        editor=editor,
+        dataset=dataset,
+        desc=desc,
+        **kwargs,
+    )
+
+    results_by_sample_id: dict = defaultdict(list)
+    for result in efficacy_benchmark.samples:
+        results_by_sample_id[result.id].append(result)
+    results_by_sample_id = OrderedDict(results_by_sample_id)
+
+    efficacy_metrics = metrics.efficacy(
+        [
+            [result.target_score for result in results]
+            for results in results_by_sample_id.values()
+        ],
+        [
+            [result.comparator_score for result in results]
+            for results in results_by_sample_id.values()
+        ],
+    )
+
+    # Reformat EfficacySample -> ParaphraseSample
+    samples = []
+    for (sid, results), efficacy_score, efficacy_magnitude in zip(
+        results_by_sample_id.items(),
+        cast(list, efficacy_metrics.score.values),
+        cast(list, efficacy_metrics.magnitude.values),
+    ):
+        sample = ParaphraseSample(
+            id=sid,
+            prompts=results,
+            efficacy_score=efficacy_score,
+            efficacy_magnitude=efficacy_magnitude,
+        )
+        samples.append(sample)
+
+    return ParaphraseBenchmarkResults(
+        samples=samples,
+        efficacy=efficacy_metrics.without_values(),
+    )
 
 
 @dataclass(frozen=True)
@@ -508,7 +593,7 @@ def counterfact_generation(
     if tfidf_vectorizer is None:
         tfidf_vectorizer = data.load_tfidf_vectorizer()
     if max_new_tokens is None and max_length is None:
-        max_length = editors.DEFAULT_MAX_LENGTH
+        max_length = DEFAULT_MAX_LENGTH
     if desc is None:
         desc = "generate benchmark"
 
@@ -567,7 +652,7 @@ def counterfact_generation(
 
 
 def _counterfact_select_and_flatten(dataset: Dataset, column: str) -> Dataset:
-    """Select the given column in counterfact and flatten it."""
+    """Select the given column in counterfact, dedupe it, and flatten it."""
     column_names = data.column_names(dataset)
 
     def select_and_flatten_counterfact_row(row: dict) -> dict:
