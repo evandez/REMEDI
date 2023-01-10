@@ -856,15 +856,15 @@ class Editor(nn.Module):
         results = []
         for sample, direction in zip(dataset, directions):
             h_e = direction["entity"]
-            h_u = direction["direction_u"]
-            h_m = direction["direction_m"]
+            h_u = direction["unmediated"]
+            h_m = direction["mediated"]
             scores_u = sim(h_e, h_u)
             scores_m = sim(h_e, h_m)
             for bi in range(len(entities)):
                 results.append(
                     EditorClassificationResult(
-                        score_mediated=scores_m[bi].item(),
                         score_unmediated=scores_u[bi].item(),
+                        score_mediated=scores_m[bi].item(),
                         sample={
                             key: sample[key]
                             for key in data.ContextMediationSample.__required_keys__
