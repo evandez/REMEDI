@@ -4,7 +4,7 @@ from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from typing import Any, Sequence, cast
 
-from src import data, editors, metrics, precompute
+from src import data, editors, metrics, models, precompute
 from src.utils.typing import Dataset, Device, StrSequence
 
 import torch
@@ -132,7 +132,10 @@ def essence(
                     for layer_kvs in past_key_values
                 )
 
-            inputs, _ = precompute.inputs_from_batch(editor.mt, prompts, device=device)
+            with models.set_padding_side(editor.mt, padding_side="left"):
+                inputs, _ = precompute.inputs_from_batch(
+                    editor.mt, prompts, device=device
+                )
             if use_references is None:
                 outputs = editor.mt.model.generate(
                     **inputs,
@@ -171,7 +174,7 @@ def essence(
                     inputs=inputs,
                     max_new_tokens=max_new_tokens,
                     max_length=max_length,
-                    past_key_values_for_batch=past_key_values_for_batch,
+                    past_key_values=past_key_values_for_batch,
                     use_cache=past_key_values_for_batch is not None,
                 )
             batch_generations = editor.mt.tokenizer.batch_decode(
