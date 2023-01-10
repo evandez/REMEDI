@@ -224,6 +224,7 @@ def editor_inputs_from_batch(
     batch: data.ContextMediationInput,
     layers: Optional[Sequence[int]] = None,
     device: Optional[Device] = None,
+    entity_occurrence_in_prompt: int = 0,
     return_token_ranges: bool = True,
     return_target_token_ids: bool = True,
     return_entity_hiddens: bool = True,
@@ -262,7 +263,15 @@ def editor_inputs_from_batch(
         assert prompt_inputs is not None and prompt_offset_mapping is not None
         assert context_inputs is not None and context_offset_mapping is not None
         assert entity_inputs is not None and entity_offset_mapping is not None
-        for key_string, key_substring, strings, substrings, inputs, offset_mapping in (
+        for (
+            key_string,
+            key_substring,
+            strings,
+            substrings,
+            inputs,
+            offset_mapping,
+            occurrence,
+        ) in (
             (
                 "entity",
                 "entity",
@@ -270,6 +279,7 @@ def editor_inputs_from_batch(
                 entities,
                 entity_inputs,
                 entity_offset_mapping,
+                0,
             ),
             (
                 "prompt",
@@ -278,16 +288,8 @@ def editor_inputs_from_batch(
                 entities,
                 prompt_inputs,
                 prompt_offset_mapping,
+                entity_occurrence_in_prompt,
             ),
-            # NOTE(evandez): Not currently used anywhere.
-            # (
-            #     "context",
-            #     "entity",
-            #     contexts,
-            #     entities,
-            #     context_inputs,
-            #     context_offset_mapping,
-            # ),
             (
                 "context",
                 "attribute",
@@ -295,6 +297,7 @@ def editor_inputs_from_batch(
                 attributes,
                 context_inputs,
                 context_offset_mapping,
+                0,
             ),
         ):
             lengths = inputs.attention_mask.sum(dim=-1).cpu()
@@ -304,7 +307,10 @@ def editor_inputs_from_batch(
 
             key_tr_base = f"{key}.token_range"
             precomputed[key_tr_base] = tr = token_ranges_from_batch(
-                strings, substrings, offsets_mapping=offset_mapping
+                strings,
+                substrings,
+                offsets_mapping=offset_mapping,
+                occurrence=occurrence,
             )
 
             key_tr_neg = f"{key}.negative_token_range"
