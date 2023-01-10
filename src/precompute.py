@@ -130,7 +130,7 @@ def hiddens_from_batch(
         inputs = inputs.to(device)
     outputs = None
     layer_paths = models.determine_layer_paths(mt, layers=layers, return_dict=True)
-    with nethook.TraceDict(mt.model, layers=layer_paths.values(), stop=True) as ret:
+    with nethook.TraceDict(mt.model, layers=layer_paths.values(), stop=stop) as ret:
         outputs = mt.model(**inputs)
     hiddens_by_layer = {
         layer: ret[layer_path].output[0].cpu()
