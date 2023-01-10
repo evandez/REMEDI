@@ -321,11 +321,11 @@ def editor_inputs_from_batch(
     # Precompute token IDs if needed.
     if return_target_token_ids:
         for target_key in ("target_mediated", "target_unmediated"):
-            target = batch.get(target_key)
-            if target is None:
+            target = cast(str | list, batch.get(target_key))
+            if target is None or any(t is None for t in target):
                 continue
             precomputed[f"{target_key}.token_id"] = first_token_ids_from_batch(
-                mt, cast(str, target)
+                mt, target
             )
 
     # Precompute average/last hidden reps if needed.
