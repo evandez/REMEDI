@@ -622,8 +622,8 @@ def counterfact_generation(
         )
         fluency_score = metrics.weighted_n_gram_entropy(generations)
 
-        entity = result["entity"]
-        attribute = result["attribute"]
+        entity = result.sample["entity"]
+        attribute = result.sample["attribute"]
         logger.debug(f"ID={sid} ENTITY={entity}, ATTR={attribute}")
         logger.debug(f"ID={sid} REFERENCES={references}")
         logger.debug(f"ID={sid} GENERATIONS={generations}")
