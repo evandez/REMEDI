@@ -798,9 +798,10 @@ class Editor(nn.Module):
         self.mt.to_(device)
         self.eval().to(device)
 
+        dtype = models.determine_dtype(self.mt)
+
         sim: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
         if cosine:
-            dtype = models.determine_dtype(self.mt)
             if dtype is torch.float16:
                 sim = training_utils.cosine_similarity_float16
             else:
