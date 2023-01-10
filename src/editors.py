@@ -332,9 +332,6 @@ def editing_loss(
     See `src.precompute.editor_inputs_from_dataset` for expected format of `batch`.
     """
     prompt = batch["prompt"]
-    mediated_token_ids = batch["target_mediated.token_id"]
-    unmediated_token_ids = batch["target_unmediated.token_id"]
-    batch_size = mediated_token_ids.shape[0]
 
     inputs, _ = precompute.inputs_from_batch(editor.mt, prompt, device=device)
     with apply(editor, device=device) as mt_edit:
@@ -342,6 +339,7 @@ def editing_loss(
     outputs_edit = edit.output
     logp_edit = torch.log_softmax(outputs_edit.logits, dim=-1)
 
+    batch_size = len(prompt)
     batch_idx = torch.arange(batch_size)
     last_idx = precompute.last_token_index_from_batch(inputs)
 
@@ -350,10 +348,16 @@ def editing_loss(
 
     # Most basic term, almost always included: probability of the target token.
     if lam_m is not None:
+        mediated_token_ids = batch.get("target_mediated.token_id")
+        if mediated_token_ids is None:
+            raise ValueError("lam_m > 0 but target_mediated not found?")
         loss -= lam_m * logp_edit[batch_idx, last_idx, mediated_token_ids].mean()
 
     # If requested, penalize probability mass on the unmediated token.
     if lam_u is not None:
+        unmediated_token_ids = batch.get("target_unmediated.token_id")
+        if unmediated_token_ids is None:
+            raise ValueError("lam_u > 0 but target_unmediated not found?")
         logp_edit_unmediated = logp_edit[batch_idx, last_idx, unmediated_token_ids]
         p_edit_unmediated = torch.exp(logp_edit_unmediated)
         loss_unmediated = torch.log(1 - p_edit_unmediated).mean()
