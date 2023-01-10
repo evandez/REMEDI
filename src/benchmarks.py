@@ -102,13 +102,6 @@ def essence(
     if desc is None:
         desc = "essence benchmark"
 
-    # Precompute key/values for prompt prefix.
-    past_key_values = None
-    if prompt_prefix is not None:
-        inputs = editor.mt.tokenizer(prompt_prefix, return_tensors="pt").to(device)
-        outputs = editor.mt.model(**inputs, use_cache=True)
-        past_key_values = outputs.past_key_values
-
     generations = []
     reference_groups: list[list[str]] = []
     essence_scores = []
@@ -124,14 +117,8 @@ def essence(
             attributes = batch["attribute"]
 
             prompts = [prompt_template.format(entity) for entity in entities]
-
-            past_key_values_for_batch = None
-            if past_key_values is not None:
-                past_key_values_for_batch = tuple(
-                    tuple(kvs.expand(len(entities), -1, -1, -1) for kvs in layer_kvs)
-                    for layer_kvs in past_key_values
-                )
-
+            if prompt_prefix is not None:
+                prompts = [prompt_prefix + prompt for prompt in prompts]
             with models.set_padding_side(editor.mt, padding_side="left"):
                 inputs, _ = precompute.inputs_from_batch(
                     editor.mt, prompts, device=device
@@ -139,8 +126,6 @@ def essence(
             if use_references is None:
                 outputs = editor.mt.model.generate(
                     **inputs,
-                    use_cache=past_key_values_for_batch is not None,
-                    past_key_values=past_key_values_for_batch,
                     max_new_tokens=max_new_tokens,
                     max_length=max_length,
                     pad_token_id=editor.mt.tokenizer.eos_token_id,
@@ -151,6 +136,10 @@ def essence(
                         outputs, skip_special_tokens=True
                     )
                 ]
+                if prompt_prefix is not None:
+                    batch_reference_groups = [
+                        [r[len(prompt_prefix) :]] for [r] in batch_reference_groups
+                    ]
             else:
                 start = batch_index * batch_size
                 end = start + len(entities)
@@ -174,13 +163,13 @@ def essence(
                     inputs=inputs,
                     max_new_tokens=max_new_tokens,
                     max_length=max_length,
-                    past_key_values=past_key_values_for_batch,
-                    use_cache=past_key_values_for_batch is not None,
                     padding_side="left",
                 )
             batch_generations = editor.mt.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True
             )
+            if prompt_prefix is not None:
+                batch_generations = [g[len(prompt_prefix) :] for g in batch_generations]
             generations += batch_generations
 
             for (sid, entity, attribute, generation, references) in zip(
