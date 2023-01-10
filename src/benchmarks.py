@@ -176,6 +176,7 @@ def essence(
                     max_length=max_length,
                     past_key_values=past_key_values_for_batch,
                     use_cache=past_key_values_for_batch is not None,
+                    padding_side="left",
                 )
             batch_generations = editor.mt.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True
