@@ -411,6 +411,7 @@ class EfficacyBenchmarkResults(DataClassJsonMixin):
     efficacy: metrics.EfficacyMetrics
 
 
+@torch.inference_mode()
 def efficacy(
     *,
     editor: editors.Editor,
@@ -476,6 +477,7 @@ class ParaphraseBenchmarkResults(DataClassJsonMixin):
     efficacy: metrics.EfficacyMetrics
 
 
+@torch.inference_mode()
 def counterfact_paraphrase(
     *,
     editor: editors.Editor,
@@ -562,6 +564,7 @@ class GenerationBenchmarkResults(DataClassJsonMixin):
     consistency: metrics.Metric
 
 
+@torch.inference_mode()
 def counterfact_generation(
     *,
     editor: editors.Editor,
