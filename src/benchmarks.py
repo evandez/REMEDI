@@ -299,6 +299,7 @@ def classification(
     editor: editors.Editor,
     dataset: Dataset,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
+    entity_layer: int | None = None,
     desc: str | None = None,
     device: Device | None = None,
     **kwargs: Any,
@@ -309,6 +310,8 @@ def classification(
         editor: The editor to benchmark.
         dataset: The dataset to benchmark on.
         batch_size: Max number of samples to process at once.
+        entity_layer: The layer to get the entity rep from. This can be different
+            from the edit layer!
         layer: The layer to grab entity reps from.
         desc: A tqdm description.
         device: Send model and inputs to device.
@@ -320,13 +323,14 @@ def classification(
     if desc is None:
         desc = "classification benchmark"
 
-    # TODO(evan): Need to support classification that takes
-    # entity reps from *later* layers as well, but still take edit
-    # directions from the correct layer.
+    if entity_layer is None:
+        entity_layer = editor.layer
+    layers = sorted({editor.layer, entity_layer})
+
     precomputed = precompute.classification_inputs_from_dataset(
         editor.mt,
         dataset,
-        layers=[editor.layer],
+        layers=layers,
         batch_size=batch_size,
         device=device,
         desc=f"{desc} [compute reps]",
@@ -338,6 +342,7 @@ def classification(
             dataset=precomputed,
             take_entity_from="prompt_in_context" if key == "contextual" else "prompt",
             batch_size=batch_size,
+            entity_layer=entity_layer,
             device=device,
             desc=f"{desc} [classify {key}]",
             **kwargs,

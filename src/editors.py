@@ -802,6 +802,7 @@ class Editor(nn.Module):
         normalize: bool = True,
         cosine: bool = False,
         take_entity_from: Literal["prompt_in_context", "prompt", "entity"] = "entity",
+        entity_layer: int | None = None,
         batch_size: int = DEFAULT_BATCH_SIZE,
         device: Device | None = None,
         desc: str | None = "classify",
@@ -816,6 +817,8 @@ class Editor(nn.Module):
             normalize: Normalize hiddens to have 0 mean and unit variance.
             cosine: Use cosine similarity instead of dot product.
             take_entity_from: Which prompt to take entity representation from.
+            entity_layer: The layer to get the entity rep from. This can be different
+                from the edit layer!
             batch_size: Model batch size.
             device: Send model and data to this device.
             desc: Progress bar description.
@@ -839,7 +842,11 @@ class Editor(nn.Module):
         else:
             sim = torch.dot
 
-        key_e = f"{take_entity_from}.entity.hiddens.{self.layer}.last"
+        if entity_layer is None:
+            entity_layer = self.layer
+        layers = sorted({self.layer, entity_layer})
+
+        key_e = f"{take_entity_from}.entity.hiddens.{entity_layer}.last"
         key_u = f"context_unmediated.attribute_unmediated.hiddens.{self.layer}.average"
         key_m = f"context.attribute.hiddens.{self.layer}.average"
 
@@ -853,7 +860,7 @@ class Editor(nn.Module):
                 if not precompute.has_classification_inputs(batch):
                     batch.update(
                         precompute.classification_inputs_from_batch(
-                            self.mt, batch, layers=[self.layer], device=device
+                            self.mt, batch, layers=layers, device=device
                         )
                     )
 
