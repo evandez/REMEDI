@@ -309,6 +309,7 @@ def classification(
         editor: The editor to benchmark.
         dataset: The dataset to benchmark on.
         batch_size: Max number of samples to process at once.
+        layer: The layer to grab entity reps from.
         desc: A tqdm description.
         device: Send model and inputs to device.
 
@@ -319,6 +320,9 @@ def classification(
     if desc is None:
         desc = "classification benchmark"
 
+    # TODO(evan): Need to support classification that takes
+    # entity reps from *later* layers as well, but still take edit
+    # directions from the correct layer.
     precomputed = precompute.classification_inputs_from_dataset(
         editor.mt,
         dataset,
@@ -331,7 +335,7 @@ def classification(
     runs: dict[str, list[editors.EditorClassificationResult]] = {}
     for key in ("contextual", "decontextual"):
         runs[key] = editor.classify(
-            dataset=dataset,
+            dataset=precomputed,
             take_entity_from="prompt_in_context" if key == "contextual" else "prompt",
             batch_size=batch_size,
             device=device,
