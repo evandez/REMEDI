@@ -654,6 +654,8 @@ class Editor(nn.Module):
         device: Optional[Device] = None,
         return_before: bool = True,
         return_after: bool = True,
+        return_mediated: bool = True,
+        return_unmediated: bool = True,
     ) -> EditorEvaluateRun:
         """Evaluate the editor on a held out set.
 
@@ -674,6 +676,8 @@ class Editor(nn.Module):
             device: Send all data to this device. Defaults to None.
             return_before: Return model predictions before edit.
             return_after: Return model predictions after edit.
+            return_mediated: Return mediated token probability.
+            return_unmediated: Return unmediated token probability.
 
         Returns:
             The evaluation results, one per entry in the dataset.
@@ -688,8 +692,16 @@ class Editor(nn.Module):
         if max_length is None and max_new_tokens is None:
             max_length = DEFAULT_MAX_LENGTH
 
+        # Remove risk of accessing a null column if we do not need to.
+        exclude_columns = []
+        if not return_mediated:
+            exclude_columns.append("target_mediated")
+        if not return_unmediated:
+            exclude_columns.append("target_unmediated")
+        columns = data.column_names(dataset, exclude=exclude_columns)
+
         results = []
-        with dataset.formatted_as("torch"):
+        with dataset.formatted_as("torch", columns=columns):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
@@ -754,8 +766,13 @@ class Editor(nn.Module):
                     batched_results[f"{key}_generations"] = [[g] for g in generations]
 
                     if include_target_probs:
+                        target_keys = []
+                        if return_mediated:
+                            target_keys.append("mediated")
+                        if return_unmediated:
+                            target_keys.append("unmediated")
                         batch_indices = torch.arange(current_batch_size)
-                        for target_key in ("mediated", "unmediated"):
+                        for target_key in target_keys:
                             target_id = batch[f"target_{target_key}.token_id"]
                             target_probs = first_token_logps[batch_indices, target_id]
                             target_prob_key = f"{key}_target_{target_key}_score"
