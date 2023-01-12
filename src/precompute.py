@@ -700,31 +700,32 @@ def model_predictions_from_batch(
     device: Device | None = None,
     input_prompt_key: str = "prompt",
     input_target_key: str = "target_unmediated",
-    input_comparator_key: str = "target_mediated",
+    input_comparator_key: str | None = "target_mediated",
     output_correct_key: str = "model_knows",
 ) -> dict:
     """Precompute model predictions on prompt from the batch."""
     prompts = batch[input_prompt_key]
-    targets = batch[input_target_key]
-    comparators = batch[input_comparator_key]
-
     with models.set_padding_side(mt, padding_side="left"):
         inputs, _ = inputs_from_batch(mt, prompts, device=device)
     outputs = mt.model(**inputs)
+    distribution = torch.log_softmax(outputs.logits[:, -1], dim=-1)
+
+    precomputed = {}
 
     batch_idx = torch.arange(len(prompts))
-    target_token_idx = first_token_ids_from_batch(mt, targets)
-    comparator_token_idx = first_token_ids_from_batch(mt, comparators)
+    targets = batch[input_target_key]
+    targets_token_idx = first_token_ids_from_batch(mt, targets)
+    targets_log_p = distribution[batch_idx, targets_token_idx]
+    precomputed[f"logp({input_target_key})"] = targets_log_p.tolist()
 
-    log_probs = torch.log_softmax(outputs.logits[:, -1], dim=-1)
-    log_probs_target = log_probs[batch_idx, target_token_idx]
-    log_probs_comparator = log_probs[batch_idx, comparator_token_idx]
+    if input_comparator_key is not None:
+        comparators = batch[input_comparator_key]
+        comparators_token_idx = first_token_ids_from_batch(mt, comparators)
+        comparators_log_p = distribution[batch_idx, comparators_token_idx]
+        precomputed[f"logp({input_comparator_key})"] = comparators_log_p.tolist()
+        precomputed[output_correct_key] = targets_log_p.gt(comparators_log_p).tolist()
 
-    return {
-        output_correct_key: log_probs_target.gt(log_probs_comparator).tolist(),
-        f"logp({input_target_key})": log_probs_target.tolist(),
-        f"logp({input_comparator_key})": log_probs_comparator.tolist(),
-    }
+    return precomputed
 
 
 def model_predictions_from_dataset(
