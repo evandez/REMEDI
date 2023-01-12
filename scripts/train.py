@@ -32,6 +32,10 @@ def main(args: argparse.Namespace) -> None:
     if layers is None:
         layers = models.determine_layers(mt)
 
+    lam_u = args.lam_u
+    if lam_u is None and args.dataset != "biosbias":
+        lam_u = editors.DEFAULT_LAM_U
+
     dataset = data.maybe_train_test_split(dataset, test_size=args.hold_out)
     for editor_type in args.editor_types:
         editor_factory = editors.SUPPORTED_EDITORS[editor_type]
@@ -73,7 +77,7 @@ def main(args: argparse.Namespace) -> None:
                     batch_size=args.batch_size,
                     lr=args.lr,
                     lam_m=args.lam_m,
-                    lam_u=args.lam_u,
+                    lam_u=lam_u,
                     lam_kl=args.lam_kl,
                     lam_norm=args.lam_norm,
                     lam_ess=args.lam_ess,
@@ -95,6 +99,7 @@ def main(args: argparse.Namespace) -> None:
                     alpha=args.eval_alpha,
                     n_top=args.eval_n_top,
                     max_length=args.eval_max_length,
+                    return_unmediated=False,
                 )
                 logger.info(f"saving {split} eval to {eval_file}")
                 with eval_file.open("w") as handle:
@@ -151,7 +156,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lam-u",
         type=float,
-        default=editors.DEFAULT_LAM_U,
         help="1 - p(unmediated) term loss weight",
     )
     parser.add_argument(
