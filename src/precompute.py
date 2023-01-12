@@ -18,6 +18,11 @@ import torch
 from baukit import nethook
 
 
+def _remove_sent_case(text: str) -> str:
+    """Make the string NOT sentence case (first letter lowercase)."""
+    return text[0].lower() + text[1:]
+
+
 def _maybe_batch(text: str | StrSequence) -> StrSequence:
     """Batch the text if it is not already batched."""
     if isinstance(text, str):
@@ -412,6 +417,60 @@ def has_editor_inputs(batch: dict) -> bool:
     return "prompt.entity.token_range" in batch  # Check for just one flag entry.
 
 
+def prompt_in_context_from_batch(
+    batch: data.ContextMediationInput,
+    context_prefix: str | None = None,
+    prompt_prefix: str | None = None,
+) -> dict:
+    """Compute prompt in context from batch.
+
+    The prompt in context is simply the "prompt" field in each sample prepended with
+    the "context" field. This function tries to make the casing look sensible while
+    also not changing the casing of any entity mention.
+
+    Can optionally include prefixes for all contexts and/or for all prompts. This is
+    useful for adding function or transition words between the prompt and context so
+    that the language model can better reconcile the task.
+    """
+    entities = _maybe_batch(batch["entity"])
+    prompts = _maybe_batch(batch["prompt"])
+    contexts = _maybe_batch(batch["context"])
+
+    prompts_in_context = []
+    for entity, prompt, context in zip(entities, prompts, contexts):
+        if prompt_prefix is not None:
+            if not prompt.startswith(entity):
+                prompt = _remove_sent_case(prompt)
+            prompt = f"{prompt_prefix} {prompt}"
+
+        if context_prefix is not None:
+            if not context.startswith(entity):
+                context = _remove_sent_case(context)
+            context = f"{context_prefix} {context}"
+        context = context.rstrip(". ")
+
+        prompt_in_context = f"{context}. {prompt}"
+        prompts_in_context.append(prompt_in_context)
+
+    return {"prompt_in_context": prompts_in_context}
+
+
+def prompt_in_context_from_dataset(
+    dataset: Dataset, desc: str | None = "precompute prompt in context", **kwargs: Any
+) -> Dataset:
+    """Compute prompt in context for whole dataset."""
+    return dataset.map(
+        partial(prompt_in_context_from_batch, **kwargs),
+        desc=desc,
+        keep_in_memory=True,
+    )
+
+
+def has_prompt_in_context(batch: dict) -> bool:
+    """Check if prompt_in_context has already been computed."""
+    return "prompt_in_context" in batch
+
+
 def entity_deltas_from_batch(
     mt: models.ModelAndTokenizer,
     batch: data.ContextMediationInput,
@@ -420,8 +479,11 @@ def entity_deltas_from_batch(
     fp32: bool = False,
     return_token_ranges: bool = True,
     return_deltas: bool = True,
+    **kwargs: Any,
 ) -> dict:
     """Compute in-context entity delta for the batch.
+
+    Keyword arguments are forwarded to `prompt_in_context_from_batch`.
 
     Args:
         mt: Model and tokenizer.
@@ -436,15 +498,10 @@ def entity_deltas_from_batch(
         Deltas and related precomputed values.
 
     """
+    precomputed: dict = prompt_in_context_from_batch(batch, **kwargs)
+
     entities = _maybe_batch(batch["entity"])
-    prompts = _maybe_batch(batch["prompt"])
-    contexts = _maybe_batch(batch["context"])
-
-    precomputed: dict = {}
-
-    precomputed["prompt_in_context"] = prompts_in_context = [
-        f"{context.rstrip('.')}. {prompt}" for context, prompt in zip(prompts, contexts)
-    ]
+    prompts_in_context = precomputed["prompt_in_context"]
 
     inputs = None
     first_entity_token_ranges = None
@@ -523,7 +580,7 @@ def entity_deltas_from_dataset(
 
 def has_entity_deltas(batch: dict) -> bool:
     """Return True if the batch already has precomputed entity deltas."""
-    return "prompt_in_context" in batch
+    return any("delta" in key for key in batch)
 
 
 def classification_inputs_from_batch(
@@ -550,14 +607,17 @@ def classification_inputs_from_batch(
         Batch with precomputed values.
 
     """
-    precomputed = {**batch}
+    precomputed: dict = {**batch}
     if not has_editor_inputs(precomputed):
         precomputed = editor_inputs_from_batch(
             mt, batch, layers=layers, device=device, fp32=fp32, **kwargs
         )
+    if not has_prompt_in_context(precomputed):
+        precomputed.update(prompt_in_context_from_batch(batch))
 
     entities = _maybe_batch(batch["entity"])
     prompts = _maybe_batch(batch["prompt"])
+    prompts_in_context = cast(list[str], precomputed["prompt_in_context"])
 
     contexts_m = _maybe_batch(batch["context"])
     attributes_m = _maybe_batch(batch["attribute"])
@@ -579,10 +639,6 @@ def classification_inputs_from_batch(
     precomputed["attribute_unmediated"] = attributes_u = [
         attribute.replace(target_m, target_u)
         for attribute, target_m, target_u in zip(attributes_m, targets_m, targets_u)
-    ]
-    precomputed["prompt_in_context"] = prompts_in_context = [
-        f"{context.rstrip('.')}. {prompt}"
-        for prompt, context in zip(prompts, contexts_m)
     ]
 
     for (
