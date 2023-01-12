@@ -132,10 +132,21 @@ def hiddens_from_batch(
     layer_paths = models.determine_layer_paths(mt, layers=layers, return_dict=True)
     with nethook.TraceDict(mt.model, layers=layer_paths.values(), stop=stop) as ret:
         outputs = mt.model(**inputs)
-    hiddens_by_layer = {
-        layer: ret[layer_path].output[0].cpu()
-        for layer, layer_path in layer_paths.items()
-    }
+
+    hiddens_by_layer = {}
+    for layer, layer_path in layer_paths.items():
+        hiddens = ret[layer_path].output
+        if isinstance(hiddens, tuple):
+            hiddens = hiddens[0]
+        assert isinstance(hiddens, torch.Tensor)
+        hiddens_by_layer[layer] = hiddens.cpu()
+
+    # TODO(evandez): Delete this.
+    # hiddens_by_layer = {
+    #     layer: ret[layer_path].output[0].cpu()
+    #     for layer, layer_path in layer_paths.items()
+    # }
+
     return hiddens_by_layer if stop else (hiddens_by_layer, outputs)
 
 
