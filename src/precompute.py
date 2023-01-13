@@ -23,6 +23,11 @@ def _remove_sent_case(text: str) -> str:
     return text[0].lower() + text[1:]
 
 
+def _is_batched(text: str | StrSequence) -> bool:
+    """Determine if text is batched or not."""
+    return not isinstance(text, str)
+
+
 def _maybe_batch(text: str | StrSequence) -> StrSequence:
     """Batch the text if it is not already batched."""
     if isinstance(text, str):
@@ -432,6 +437,7 @@ def prompt_in_context_from_batch(
     useful for adding function or transition words between the prompt and context so
     that the language model can better reconcile the task.
     """
+    is_batched = _is_batched(batch["entity"])
     entities = _maybe_batch(batch["entity"])
     prompts = _maybe_batch(batch["prompt"])
     contexts = _maybe_batch(batch["context"])
@@ -452,7 +458,9 @@ def prompt_in_context_from_batch(
         prompt_in_context = f"{context}. {prompt}"
         prompts_in_context.append(prompt_in_context)
 
-    return {"prompt_in_context": prompts_in_context}
+    return {
+        "prompt_in_context": prompts_in_context if is_batched else prompts_in_context[0]
+    }
 
 
 def prompt_in_context_from_dataset(
