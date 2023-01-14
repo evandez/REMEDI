@@ -231,7 +231,15 @@ def essence(
 
 @dataclass(frozen=True)
 class ClassifierOutputs(DataClassJsonMixin):
-    """Wrapper around a single classifier sample."""
+    """Wrapper around a single classifier sample.
+
+    Fields:
+        logp_target: Log probability of target word under the LM.
+        logp_comparator: Ditto, for comparator word.
+        score_target: Score that classifier assigns to target.
+        score_comparator: Score that classifier assigns to comparator.
+
+    """
 
     logp_target: float
     logp_comparator: float
@@ -413,7 +421,7 @@ class EfficacyBenchmarkResults(DataClassJsonMixin):
     """Wrapper around efficacy benchmark results."""
 
     samples: list[EfficacySample]
-    efficacy: metrics.EfficacyMetrics
+    metrics: metrics.EfficacyMetrics
 
 
 @torch.inference_mode()
@@ -456,12 +464,12 @@ def efficacy(
         )
         samples.append(sample)
 
-    efficacy = metrics.efficacy(
+    efficacy_metrics = metrics.efficacy(
         [[sample.target_score] for sample in samples],
         [[sample.comparator_score] for sample in samples],
         store_values=False,
     )
-    return EfficacyBenchmarkResults(samples=samples, efficacy=efficacy)
+    return EfficacyBenchmarkResults(samples=samples, metrics=efficacy_metrics)
 
 
 @dataclass(frozen=True)
@@ -479,7 +487,7 @@ class ParaphraseBenchmarkResults(DataClassJsonMixin):
     """Wrapper around paraphrase benchmark results."""
 
     samples: list[ParaphraseSample]
-    efficacy: metrics.EfficacyMetrics
+    metrics: metrics.EfficacyMetrics
 
 
 @torch.inference_mode()
@@ -545,12 +553,12 @@ def counterfact_paraphrase(
 
     return ParaphraseBenchmarkResults(
         samples=samples,
-        efficacy=efficacy_metrics.without_values(),
+        metrics=efficacy_metrics.without_values(),
     )
 
 
 @dataclass(frozen=True)
-class GenerationBenchmarkSample(DataClassJsonMixin):
+class GenerationSample(DataClassJsonMixin):
     """Wrapper around a single sample from the generation benchmark."""
 
     id: str
@@ -561,12 +569,19 @@ class GenerationBenchmarkSample(DataClassJsonMixin):
 
 
 @dataclass(frozen=True)
+class GenerationMetrics(DataClassJsonMixin):
+    """Wrapper around all generation metrics."""
+
+    fluency: metrics.Metric
+    consistency: metrics.Metric
+
+
+@dataclass(frozen=True)
 class GenerationBenchmarkResults(DataClassJsonMixin):
     """Wrapper around generation benchmark results."""
 
-    samples: list[GenerationBenchmarkSample]
-    fluency: metrics.Metric
-    consistency: metrics.Metric
+    samples: list[GenerationSample]
+    metrics: GenerationMetrics
 
 
 @torch.inference_mode()
@@ -640,7 +655,7 @@ def counterfact_generation(
         logger.debug(f"ID={sid} REFERENCES={references}")
         logger.debug(f"ID={sid} GENERATIONS={generations}")
 
-        sample = GenerationBenchmarkSample(
+        sample = GenerationSample(
             id=sid,
             generations=generations,
             references=references,
@@ -655,9 +670,8 @@ def counterfact_generation(
     consistency = metrics.Metric.aggregate(
         [sample.consistency_score for sample in samples], store_values=False
     )
-    return GenerationBenchmarkResults(
-        samples=samples, fluency=fluency, consistency=consistency
-    )
+    generation_metrics = GenerationMetrics(fluency=fluency, consistency=consistency)
+    return GenerationBenchmarkResults(samples=samples, metrics=generation_metrics)
 
 
 def _counterfact_select_and_flatten(
