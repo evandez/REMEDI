@@ -1,7 +1,10 @@
 """Editing models."""
 import contextlib
+import logging
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Optional, cast
+from pathlib import Path
+from typing import Any, Callable, DefaultDict, Literal, Optional, cast
 
 from src import data, models, precompute
 from src.utils import tokenizer_utils, training_utils
@@ -11,6 +14,7 @@ from src.utils.typing import (
     Model,
     ModelGenerateOutput,
     ModelOutput,
+    PathLike,
     Tokenizer,
 )
 
@@ -21,6 +25,8 @@ from baukit import nethook, runningstats
 from dataclasses_json import DataClassJsonMixin
 from torch import nn, optim
 from tqdm.auto import tqdm
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_ALPHA = 1.0
 DEFAULT_BETA = 1.0
@@ -1139,3 +1145,81 @@ SUPPORTED_EDITORS = {
     "identity": IdentityEditor,
     "null": NullEditor,
 }
+
+
+def load_editor(
+    editor_type: str,
+    mt: models.ModelAndTokenizer,
+    layer: int,
+    editors_dir: PathLike | None = None,
+    device: Device | None = None,
+) -> Editor | None:
+    """Load editor of given type from the directory, assuming default options."""
+    editor_factory = SUPPORTED_EDITORS[editor_type]
+    editor = editor_factory(mt=mt, layer=layer)
+    editor.to(device)
+
+    if editor_type != "identity":
+        if editors_dir is None:
+            logger.warning("editors_dir not specified for non-identity editor")
+            return None
+
+        weights_file = Path(editors_dir) / editor_type / str(layer) / "weights.pth"
+        if not weights_file.exists():
+            logger.warning(f"weights expected at {weights_file} but not found")
+            return None
+
+        logger.info(f"loading editor weights from {weights_file}")
+        state_dict = torch.load(weights_file, map_location=device)
+        editor.load_state_dict(state_dict)
+
+    return editor
+
+
+def save_editor(editor: Editor, editors_dir: PathLike) -> Path:
+    """Save the editor in a properly indexed directory.
+
+    Does NOT index on the underlying model or the dataset on which the editor
+    was trained on, so callers should make sure `editors_dir` is unique to the
+    model + dataset combo.
+
+    Args:
+        editor: The editor to save.
+        editors_dir: The dir to save to.
+
+    Returns:
+        Path to saved weights file.
+
+    """
+    editors_dir = Path(editors_dir)
+    editor_type = {et: name for name, et in SUPPORTED_EDITORS.items()}[type(editor)]
+    weights_file = editors_dir / editor_type / str(editor.layer) / "weights.pth"
+    torch.save(editor.state_dict(), weights_file)
+    logger.info(f"saved editor to {weights_file}")
+    return weights_file
+
+
+def list_saved_editors(editors_dir: PathLike) -> DefaultDict[str, list[int]]:
+    """Return configs of all editors saved in directory.
+
+    Assumes the file structure laid out by `save_editors`. Return value is a mapping
+    from editor type to layers for which there is a saved editor.
+    """
+    editors_dir = Path(editors_dir)
+
+    editor_types = [d for d in editors_dir.iterdir() if d.is_dir()]
+
+    editor_configs = defaultdict(list)
+    for editor_type in editor_types:
+        editor_configs[editor_type.name] = sorted(
+            [
+                int(layer_dir.name)
+                for layer_dir in editors_dir.iterdir()
+                if layer_dir.is_dir()
+            ]
+        )
+
+    if not editor_configs:
+        logger.warning(f"no editors found in {editors_dir}")
+
+    return editor_configs

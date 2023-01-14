@@ -14,11 +14,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef
 from tqdm.auto import tqdm
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_PROMPT_PREFIX = "The following is an except from a Wikipedia article:\n\n"
 DEFAULT_PROMPT_TEMPLATE = "{} is"
 DEFAULT_MAX_LENGTH = 100
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

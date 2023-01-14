@@ -50,9 +50,6 @@ def main(args: argparse.Namespace) -> None:
         for layer in layers:
             logger.info(f"begin: editor={editor_type}, layer={layer}")
 
-            editor_results_dir = experiment.results_dir / editor_type / str(layer)
-            editor_results_dir.mkdir(exist_ok=True, parents=True)
-
             editor: editors.Editor = editor_factory(layer=layer, **editor_kwargs)
 
             precomputed = cast(Dataset, dataset)
@@ -65,45 +62,19 @@ def main(args: argparse.Namespace) -> None:
                     batch_size=args.batch_size,
                 )
 
-            editor_file = editor_results_dir / f"weights.pth"
-            if editor_file.exists():
-                logger.info(f"found existing editor at {editor_file}")
-                state_dict = torch.load(editor_file, map_location=device)
-                editor.load_state_dict(state_dict)
-            else:
-                editor.fit(
-                    dataset=precomputed,
-                    max_epochs=args.max_epochs,
-                    batch_size=args.batch_size,
-                    lr=args.lr,
-                    lam_m=args.lam_m,
-                    lam_u=lam_u,
-                    lam_kl=args.lam_kl,
-                    lam_norm=args.lam_norm,
-                    lam_ess=args.lam_ess,
-                    device=device,
-                )
-                logger.info(f"saving editor to {editor_file}")
-                torch.save(editor.state_dict(), editor_file)
-
-            for split in args.eval_on:
-                eval_file = editor_results_dir / f"{split}-eval.json"
-                if eval_file.exists() and not args.rerun_eval:
-                    logger.info(f"found existing {split} eval results at {eval_file}")
-                    continue
-
-                results = editor.evaluate(
-                    precomputed[split],  # type: ignore
-                    batch_size=args.batch_size,
-                    device=device,
-                    alpha=args.eval_alpha,
-                    n_top=args.eval_n_top,
-                    max_length=args.eval_max_length,
-                    return_unmediated=False,
-                )
-                logger.info(f"saving {split} eval to {eval_file}")
-                with eval_file.open("w") as handle:
-                    handle.write(results.to_json())
+            editor.fit(
+                dataset=precomputed,
+                max_epochs=args.max_epochs,
+                batch_size=args.batch_size,
+                lr=args.lr,
+                lam_m=args.lam_m,
+                lam_u=lam_u,
+                lam_kl=args.lam_kl,
+                lam_norm=args.lam_norm,
+                lam_ess=args.lam_ess,
+                device=device,
+            )
+            editors.save_editor(editor, editors_dir=experiment.results_dir)
 
 
 if __name__ == "__main__":
@@ -175,24 +146,6 @@ if __name__ == "__main__":
         help="held out fraction (if not already split)",
     )
     parser.add_argument(
-        "--eval-alpha",
-        type=float,
-        default=editors.DEFAULT_ALPHA,
-        help="step size for adding direction in eval",
-    )
-    parser.add_argument(
-        "--eval-n-top",
-        type=int,
-        default=editors.DEFAULT_N_TOP,
-        help="number of top tokens/scores to report in eval",
-    )
-    parser.add_argument(
-        "--eval-max-length",
-        type=int,
-        default=editors.DEFAULT_MAX_LENGTH,
-        help="max length of generations in eval",
-    )
-    parser.add_argument(
         "--use-entity",
         action="store_true",
         help="use entity in linear/mlp editors",
@@ -201,14 +154,6 @@ if __name__ == "__main__":
         "--use-all-entity-tokens",
         action="store_true",
         help="edit all entity tokens instead of just last",
-    )
-    parser.add_argument("--rerun-eval", action="store_true", help="rerun eval step")
-    parser.add_argument(
-        "--eval-on",
-        nargs="+",
-        choices=("train", "test"),
-        default=("test",),
-        help="which sets to eval on",
     )
     parser.add_argument("--device", help="device to train on")
     parser.add_argument("--fp16", action="store_true", help="use fp16")

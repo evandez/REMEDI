@@ -14,35 +14,6 @@ import torch.utils.data
 logger = logging.getLogger(__name__)
 
 
-def load_editor(
-    editor_type: str,
-    mt: models.ModelAndTokenizer,
-    layer: int,
-    editors_dir: Path | None = None,
-    device: Device | None = None,
-) -> editors.Editor | None:
-    """Load editor of given type from the directory, assuming default options."""
-    editor_factory = editors.SUPPORTED_EDITORS[editor_type]
-    editor = editor_factory(mt=mt, layer=layer)
-    editor.to(device)
-
-    if editor_type != "identity":
-        if editors_dir is None:
-            logger.warning("editors_dir not specified for non-identity editor")
-            return None
-
-        weights_file = editors_dir / editor_type / str(layer) / "weights.pth"
-        if not weights_file.exists():
-            logger.warning(f"weights expected at {weights_file} but not found")
-            return None
-
-        logger.info(f"loading editor weights from {weights_file}")
-        state_dict = torch.load(weights_file, map_location=device)
-        editor.load_state_dict(state_dict)
-
-    return editor
-
-
 def main(args: argparse.Namespace) -> None:
     """Run the benchmark."""
     experiment = experiment_utils.setup_experiment(args)
@@ -61,13 +32,7 @@ def main(args: argparse.Namespace) -> None:
 
     layers = args.layers
     if layers is None:
-        layers = sorted(
-            [
-                int(layer_dir.name)
-                for layer_dir in editors_dir.iterdir()
-                if layer_dir.is_dir()
-            ]
-        )
+        layers = editors.list_saved_editors(editors_dir)[editor_type]
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
@@ -78,7 +43,7 @@ def main(args: argparse.Namespace) -> None:
     tfidf_vectorizer = data.load_tfidf_vectorizer()
 
     for layer in layers:
-        editor = load_editor(
+        editor = editors.load_editor(
             editor_type, mt, layer, editors_dir=editors_dir, device=device
         )
         if editor is None:
