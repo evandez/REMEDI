@@ -119,13 +119,6 @@ if __name__ == "__main__":
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
     )
     parser.add_argument(
-        "--model",
-        "-m",
-        choices=models.SUPPORTED_MODELS,
-        default=models.GPT_J_NAME,
-        help="model to classify on",
-    )
-    parser.add_argument(
         "--prepend-context", "-p", action="store_true", help="prepend context to prompt"
     )
     parser.add_argument(
@@ -140,10 +133,9 @@ if __name__ == "__main__":
         default=editors.DEFAULT_MAX_LENGTH,
         help="number of tokens to generate including prompt",
     )
-    parser.add_argument("--fp16", action="store_true", help="use fp16 model version")
-    parser.add_argument("--device", help="device to run model on")
+    data.add_dataset_args(parser)
+    models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
-    data.add_dataset_args(parser)
     args = parser.parse_args()
     main(args)

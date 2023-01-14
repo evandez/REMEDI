@@ -4,6 +4,7 @@ This module is designed to house all the annoying branching logic
 that comes with supporting analysis of many slightly different model
 implementations.
 """
+import argparse
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, Literal, Optional, Sequence, overload
@@ -47,40 +48,6 @@ def unwrap_tokenizer(tokenizer: ModelAndTokenizer | Tokenizer) -> Tokenizer:
     if isinstance(tokenizer, ModelAndTokenizer):
         return tokenizer.tokenizer
     return tokenizer
-
-
-def load_model(
-    name: str, device: Optional[Device] = None, fp16: bool = False
-) -> ModelAndTokenizer:
-    """Load the model given its string name.
-
-    Args:
-        name: Name of the model.
-        device: If set, send model to this device. Defaults to CPU.
-        fp16: Use half precision.
-
-    Returns:
-        ModelAndTokenizer: Loaded model and its tokenizer.
-
-    """
-    if name not in SUPPORTED_MODELS:
-        raise ValueError(f"unknown model: {name}")
-
-    torch_dtype = torch.float16 if fp16 else None
-
-    kwargs: dict = dict(torch_dtype=torch_dtype)
-    if name == GPT_J_NAME:
-        kwargs["low_cpu_mem_usage"] = True
-        if fp16:
-            kwargs["revision"] = "float16"
-
-    model = transformers.AutoModelForCausalLM.from_pretrained(name, **kwargs)
-    model.to(device).eval()
-
-    tokenizer = transformers.AutoTokenizer.from_pretrained(name)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    return ModelAndTokenizer(model, tokenizer)
 
 
 def determine_layers(model: ModelAndTokenizer | Model) -> tuple[int, ...]:
@@ -212,3 +179,60 @@ def map_to(
         )
     assert isinstance(result, orig.__class__), f"{type(result)}/{type(orig)}"
     return result
+
+
+def load_model(
+    name: str, device: Optional[Device] = None, fp16: Optional[bool] = None
+) -> ModelAndTokenizer:
+    """Load the model given its string name.
+
+    Args:
+        name: Name of the model.
+        device: If set, send model to this device. Defaults to CPU.
+        fp16: Whether to use half precision. If not set, depends on model.
+
+    Returns:
+        ModelAndTokenizer: Loaded model and its tokenizer.
+
+    """
+    if name not in SUPPORTED_MODELS:
+        raise ValueError(f"unknown model: {name}")
+    if fp16 is None:
+        fp16 = name == GPT_J_NAME
+
+    torch_dtype = torch.float16 if fp16 else None
+
+    kwargs: dict = dict(torch_dtype=torch_dtype)
+    if name == GPT_J_NAME:
+        kwargs["low_cpu_mem_usage"] = True
+        if fp16:
+            kwargs["revision"] = "float16"
+
+    model = transformers.AutoModelForCausalLM.from_pretrained(name, **kwargs)
+    model.to(device).eval()
+
+    tokenizer = transformers.AutoTokenizer.from_pretrained(name)
+    tokenizer.pad_token = tokenizer.eos_token
+
+    return ModelAndTokenizer(model, tokenizer)
+
+
+def add_model_args(parser: argparse.ArgumentParser) -> None:
+    """Add args needed to load a model.
+
+    The args include:
+        --model: The language model to load, defaulting to GPT-J.
+        --device: The device to send model and inputs to.
+        --fp16: Whether to use half precision version of the model.
+            Note this is used as `--fp16 False` since default value depends on
+            which model we are loading.
+    """
+    parser.add_argument(
+        "--model",
+        "-m",
+        choices=SUPPORTED_MODELS,
+        default=GPT_J_NAME,
+        help="model to edit",
+    )
+    parser.add_argument("--device", help="device to train on")
+    parser.add_argument("--fp16", type=bool, help="set whether to use fp16")

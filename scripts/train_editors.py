@@ -88,13 +88,6 @@ if __name__ == "__main__":
         help="editor type to train",
     )
     parser.add_argument(
-        "--model",
-        "-m",
-        choices=models.SUPPORTED_MODELS,
-        default=models.GPT_J_NAME,
-        help="model to edit",
-    )
-    parser.add_argument(
         "--layers", "-l", type=int, nargs="+", help="layers to train for"
     )
     parser.add_argument(
@@ -155,9 +148,8 @@ if __name__ == "__main__":
         action="store_true",
         help="edit all entity tokens instead of just last",
     )
-    parser.add_argument("--device", help="device to train on")
-    parser.add_argument("--fp16", action="store_true", help="use fp16")
     data.add_dataset_args(parser)
+    models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     args = parser.parse_args()

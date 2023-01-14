@@ -430,7 +430,7 @@ def disable_caching() -> None:
 
 
 def add_dataset_args(parser: argparse.ArgumentParser) -> None:
-    """Add --dataset and related flags to the parser."""
+    """Add --dataset and --dataset-file args to the parser."""
     parser.add_argument(
         "--dataset",
         "-d",
