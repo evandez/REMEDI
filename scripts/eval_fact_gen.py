@@ -40,9 +40,7 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
     logger.info("loading several data sources")
-    dataset = data.load_dataset(
-        args.dataset, file=args.dataset_file, split="train[5000:]"
-    )
+    dataset = data.load_dataset("counterfact", split="train[5000:]")
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_tfidf_vectorizer()
 
@@ -143,7 +141,7 @@ if __name__ == "__main__":
         help="number of tokens to generate including prompt",
     )
     parser.add_argument("--rerun", action="store_true", help="force rerun all evals")
-    data.add_dataset_args(parser)
+    # No dataset args because this only works for counterfact
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
