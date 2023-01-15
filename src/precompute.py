@@ -769,10 +769,12 @@ def model_predictions_from_batch(
     mt: models.ModelAndTokenizer,
     batch: dict,
     device: Device | None = None,
+    return_top_k: int = 5,
     input_prompt_key: str = "prompt",
     input_target_key: str = "target_unmediated",
     input_comparator_key: str | None = "target_mediated",
-    output_correct_key: str = "model_knows",
+    output_correct_key: str = "model_correct",
+    output_top_tokens_key: str = "top_tokens",
 ) -> dict:
     """Precompute model predictions on prompt from the batch."""
     prompts = batch[input_prompt_key]
@@ -783,18 +785,28 @@ def model_predictions_from_batch(
 
     precomputed = {}
 
+    top_tokens_idx = distribution.topk(k=return_top_k, dim=-1).indices.tolist()
+    top_tokens = tokenizer_utils.batch_convert_ids_to_tokens(
+        top_tokens_idx, mt.tokenizer
+    )
+    precomputed[f"{input_prompt_key}.{output_top_tokens_key}"] = top_tokens
+
     batch_idx = torch.arange(len(prompts))
     targets = batch[input_target_key]
     targets_token_idx = first_token_ids_from_batch(mt, targets)
     targets_log_p = distribution[batch_idx, targets_token_idx]
-    precomputed[f"logp({input_target_key})"] = targets_log_p.tolist()
+    precomputed[f"{input_prompt_key}.{input_target_key}.logp"] = targets_log_p.tolist()
 
     if input_comparator_key is not None:
         comparators = batch[input_comparator_key]
         comparators_token_idx = first_token_ids_from_batch(mt, comparators)
         comparators_log_p = distribution[batch_idx, comparators_token_idx]
-        precomputed[f"logp({input_comparator_key})"] = comparators_log_p.tolist()
-        precomputed[output_correct_key] = targets_log_p.gt(comparators_log_p).tolist()
+        precomputed[
+            f"{input_prompt_key}.{input_comparator_key}.logp"
+        ] = comparators_log_p.tolist()
+        precomputed[f"{input_prompt_key}.{output_correct_key}"] = targets_log_p.gt(
+            comparators_log_p
+        ).tolist()
 
     return precomputed
 

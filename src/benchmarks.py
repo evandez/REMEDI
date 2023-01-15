@@ -21,6 +21,7 @@ DEFAULT_PROMPT_TEMPLATE = "{} is"
 DEFAULT_MAX_LENGTH = 100
 DEFAULT_MAX_LENGTH_ERROR_CORRECTION = 25
 DEFAULT_TOP_K = 5
+DEFAULT_N_TOP_TOKENS = DEFAULT_TOP_K
 
 
 @dataclass(frozen=True)
@@ -250,14 +251,17 @@ class ClassifierOutputs(DataClassJsonMixin):
 
     @property
     def label(self) -> bool:
+        """Get the true label value for this sample."""
         return self.logp_target > self.logp_comparator
 
     @property
     def prediction(self) -> bool:
+        """Get the predicted label for this sample."""
         return self.score_target > self.score_comparator
 
     @property
     def correct(self) -> bool:
+        """Get whether the prediction was correct or not."""
         return self.prediction == self.label
 
 
@@ -678,6 +682,37 @@ def counterfact_generation(
     )
 
 
+def _counterfact_select_and_flatten(
+    dataset: Dataset, column: str, desc: str | None = None
+) -> Dataset:
+    """Select the given column in counterfact, dedupe it, and flatten it."""
+    column_names = data.column_names(dataset)
+
+    def select_and_flatten_counterfact_row(row: dict) -> dict:
+        prompts = list(set(row["source"][0][column]))
+        result = {"prompt": prompts}
+        for key in data.ContextMediationSample.__required_keys__:
+            if key not in result:
+                result[key] = [row[key][0]] * len(prompts)
+        return result
+
+    return dataset.map(
+        select_and_flatten_counterfact_row,
+        batched=True,
+        batch_size=1,
+        remove_columns=column_names,
+        desc=desc,
+    )
+
+
+def _group_results_by_id(results: editors.EditorEvaluateRun) -> OrderedDict:
+    """Group results by sample ID."""
+    grouped = defaultdict(list)
+    for result in results.results:
+        grouped[result.sample["id"]].append(result)
+    return OrderedDict(grouped)
+
+
 @dataclass(frozen=True)
 class ErrorCorrectionSample:
     """Wrapper around error correction sample."""
@@ -709,12 +744,14 @@ class ErrorCorrectionBenchmarkResults(DataClassJsonMixin):
     metrics: ErrorCorrectionMetrics
 
 
+# TODO(evandez): This function can probably be generaized a bit, to handle
+# both the target-comparator setup and the recall@k setup.
 @torch.inference_mode()
 def error_correction(
     *,
-    editor: editors.Editor,
     dataset: Dataset,
-    use_editor: bool = True,
+    mt: models.ModelAndTokenizer | None = None,
+    editor: editors.Editor | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     top_k: int = DEFAULT_TOP_K,
     prompt_key: Literal["prompt", "prompt_in_context"] = "prompt_in_context",
@@ -733,10 +770,9 @@ def error_correction(
     improves the accuracy.
 
     Args:
-        editor: The editor to evaluate. If you want to run the benchmark *without*
-            applying an editor, you can make this a `NullEditor`.
+        mt: The model to evaluate. Either this or `editor` must be set.
+        editor: The editor to evaluate. Either this or `mt` must be set.
         dataset: The dataset to evaluate on.
-        use_editor: Whether to use the editor when doing classification.
         batch_size: Batch size for model.
         top_k: Compute top-k labels predicted by model.
         prompt_key: Which column in dataset to use as prompt.
@@ -755,6 +791,12 @@ def error_correction(
         Benchmark results.
 
     """
+    if editor is None and mt is None:
+        raise ValueError("must set at least one of `editor` or `mt`")
+
+    if mt is None:
+        assert editor is not None
+        mt = editor.mt
     if entity_occurrence is None:
         entity_occurrence = 0 if prompt_key == "prompt" else 1
     if desc is None:
@@ -764,7 +806,7 @@ def error_correction(
     if labels is None:
         labels = [x[target_key] for x in dataset]
     labels = sorted(labels)
-    labels_token_idx = precompute.first_token_ids_from_batch(editor.mt, labels)
+    labels_token_idx = precompute.first_token_ids_from_batch(mt, labels)
 
     exclude_columns = []
     if target_key != "target_unmediated":
@@ -782,10 +824,10 @@ def error_correction(
             ids = batch["id"]
             prompts = batch[prompt_key]
             targets = batch[target_key]
-            targets_idx = precompute.first_token_ids_from_batch(editor.mt, targets)
+            targets_idx = precompute.first_token_ids_from_batch(mt, targets)
 
-            with models.set_padding_side(editor.mt, padding_side="left"):
-                inputs, _ = precompute.inputs_from_batch(editor.mt, prompts)
+            with models.set_padding_side(mt, padding_side="left"):
+                inputs, _ = precompute.inputs_from_batch(mt, prompts)
 
             generate_kwargs = dict(
                 return_dict_in_generate=True,
@@ -793,7 +835,7 @@ def error_correction(
                 max_length=max_length,
                 max_new_tokens=max_new_tokens,
             )
-            if use_editor:
+            if editor is not None:
                 with editors.apply(editor, device=device) as edited_mt:
                     outputs = edited_mt.model.generate(
                         batch,
@@ -803,9 +845,9 @@ def error_correction(
                         **generate_kwargs,
                     )
             else:
-                outputs = editor.mt.model.generate(**inputs, **generate_kwargs)
+                outputs = mt.model.generate(**inputs, **generate_kwargs)
 
-            generations = editor.mt.tokenizer.batch_decode(
+            generations = mt.tokenizer.batch_decode(
                 outputs.sequences, skip_special_tokens=True
             )
             distributions = torch.log_softmax(outputs.scores[0], dim=-1)
@@ -847,32 +889,117 @@ def error_correction(
     )
 
 
-def _counterfact_select_and_flatten(
-    dataset: Dataset, column: str, desc: str | None = None
-) -> Dataset:
-    """Select the given column in counterfact, dedupe it, and flatten it."""
-    column_names = data.column_names(dataset)
+@dataclass(frozen=True)
+class MediationSample(DataClassJsonMixin):
+    """Wrapper around a single mediation sample."""
 
-    def select_and_flatten_counterfact_row(row: dict) -> dict:
-        prompts = list(set(row["source"][0][column]))
-        result = {"prompt": prompts}
-        for key in data.ContextMediationSample.__required_keys__:
-            if key not in result:
-                result[key] = [row[key][0]] * len(prompts)
-        return result
-
-    return dataset.map(
-        select_and_flatten_counterfact_row,
-        batched=True,
-        batch_size=1,
-        remove_columns=column_names,
-        desc=desc,
-    )
+    id: str
+    predictions: list[str]
+    logp_target: float
+    logp_comparator: float
 
 
-def _group_results_by_id(results: editors.EditorEvaluateRun) -> OrderedDict:
-    """Group results by sample ID."""
-    grouped = defaultdict(list)
-    for result in results.results:
-        grouped[result.sample["id"]].append(result)
-    return OrderedDict(grouped)
+@dataclass(frozen=True)
+class MediationMetrics(DataClassJsonMixin):
+    """Wrapper around metrics for a mediation sample."""
+
+    accuracy: float
+
+
+@dataclass(frozen=True)
+class MediationTaskResults(DataClassJsonMixin):
+    """Wrapper around results for a single mediation task."""
+
+    samples: list[MediationSample]
+    metrics: MediationMetrics
+
+
+@dataclass(frozen=True)
+class MediationBenchmarkResults(DataClassJsonMixin):
+    """Wrapper around results for the full mediation benchmark."""
+
+    contextual: MediationTaskResults | None = None
+    decontextual: MediationTaskResults | None = None
+
+
+@torch.inference_mode()
+def mediation(
+    *,
+    mt: models.ModelAndTokenizer,
+    dataset: Dataset,
+    n_top_tokens: int = DEFAULT_N_TOP_TOKENS,
+    contextual: bool = True,
+    decontextual: bool = True,
+    device: Device | None = None,
+    desc: str | None = None,
+) -> MediationBenchmarkResults:
+    """Evaluate model's mediation abilities.
+
+    Args:
+        mt: Model to evaluate.
+        dataset: Dataset to evaluate on.
+        n_top_tokens: Number of top tokens to return.
+        contextual: Do contextual eval.
+        decontextual: Do decontextual eval.
+        device: Send model and data to this device.
+        desc: Progress bar description.
+
+    Returns:
+        Benchmark results.
+
+    """
+    if desc is None:
+        desc = "mediation"
+
+    columns = data.column_names(dataset)
+    if contextual and "prompt_in_context" not in columns:
+        dataset = precompute.prompt_in_context_from_dataset(dataset)
+
+    results_kwargs: dict = {}
+    for (key, flag, input_prompt_key, input_target_key, input_comparator_key) in (
+        (
+            "decontextual",
+            decontextual,
+            "prompt",
+            "target_unmediated",
+            "target_mediated",
+        ),
+        (
+            "contextual",
+            contextual,
+            "prompt_in_context",
+            "target_mediated",
+            "target_unmediated",
+        ),
+    ):
+        if not flag:
+            continue
+        dataset = precompute.model_predictions_from_dataset(
+            mt=mt,
+            dataset=dataset,
+            device=device,
+            n_top_tokens=n_top_tokens,
+            input_prompt_key=input_prompt_key,
+            input_target_key=input_target_key,
+            input_comparator_key=input_comparator_key,
+            desc=f"{desc} [{key}]",
+        )
+        samples = [
+            MediationSample(
+                id=x["id"],
+                predictions=x[f"{input_prompt_key}.top_tokens"],
+                logp_target=x[f"{input_prompt_key}.{input_target_key}.logp"],
+                logp_comparator=x[f"{input_prompt_key}.{input_comparator_key}.logp"],
+            )
+            for x in dataset
+        ]
+        accuracy = sum(x[f"{input_target_key}.model_correct"] for x in dataset) / len(
+            dataset
+        )
+        mediation_metrics = MediationMetrics(accuracy=accuracy)
+        mediation_task_results = MediationTaskResults(
+            samples=samples, metrics=mediation_metrics
+        )
+        results_kwargs[key] = mediation_task_results
+
+    return MediationBenchmarkResults(**results_kwargs)
