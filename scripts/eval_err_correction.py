@@ -31,10 +31,7 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
-    logger.info(f"loading {args.dataset}")
-    dataset = data.load_dataset(
-        args.dataset, file=args.dataset_file, split="train[5000:]"
-    )
+    dataset = data.load_dataset("biosbias", split="train[5000:]")
 
     benchmark_kwargs: dict = {}
     if args.decontextualized:
@@ -45,9 +42,8 @@ def main(args: argparse.Namespace) -> None:
     if not baseline_results_file.exists():
         logger.info("begin baseline")
         baseline_results = benchmarks.error_correction(
-            editor=editors.NullEditor(mt=mt, layer=-1),
+            mt=mt,
             dataset=dataset,
-            use_editor=False,
             device=device,
             desc="error correction [baseline]",
             **benchmark_kwargs,
@@ -117,7 +113,7 @@ if __name__ == "__main__":
         help="evaluate in decontextualized setting",
     )
     parser.add_argument("--rerun", action="store_true", help="force rerun all evals")
-    data.add_dataset_args(parser, default="biosbias")
+    # No dataset args because this only works on biosbias
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
