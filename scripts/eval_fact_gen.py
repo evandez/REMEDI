@@ -6,7 +6,6 @@ from pathlib import Path
 
 from src import benchmarks, data, editors, models
 from src.utils import experiment_utils, logging_utils
-from src.utils.typing import Device
 
 import torch
 import torch.utils.data
