@@ -75,7 +75,7 @@ class apply_direction(contextlib.AbstractContextManager):
         self._trace = None
 
     def __enter__(self) -> Model:
-        """Hook the model so the direction is applied."""
+        """Add a hook to the model so the direction is applied."""
         [layer_path] = models.determine_layer_paths(self.model, layers=[self.layer])
 
         def edit_output(output: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
@@ -265,7 +265,7 @@ class EditedModel(nn.Module):
         inputs: Optional[transformers.BatchEncoding] = None,
         **kwargs: Any,
     ) -> ModelGenerateOutput:
-        """Forwards to `mt.model.generate`, but still applies editor."""
+        """Forward to `mt.model.generate`, but apply editor."""
         edit = self.compute_model_outputs(batch, inputs=inputs, generate=True, **kwargs)
         return cast(ModelGenerateOutput, edit.output)
 
@@ -339,7 +339,7 @@ def editing_loss(
     lam_ess: float | None = None,
     device: Optional[Device] = None,
 ) -> torch.Tensor:
-    """Apply the edit to the representat
+    """Apply edits and compute the loss.
 
     See `src.precompute.editor_inputs_from_dataset` for expected format of `batch`.
     """
@@ -718,7 +718,7 @@ class Editor(nn.Module):
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
             for batch in tqdm(loader, desc=desc):
-                if not precompute.has_editor_inputs(batch):
+                if not precompute.has_editor_inputs(batch) and return_after:
                     batch.update(
                         precompute.editor_inputs_from_batch(
                             mt=self.mt, batch=batch, layers=[self.layer], device=device
@@ -1116,6 +1116,7 @@ class ScalarMultipleEditor(Editor):
     """
 
     def __init__(self, *, mt: models.ModelAndTokenizer, **kwargs: Any):
+        """Initialize the editor."""
         super().__init__(mt=mt, **kwargs)
         hidden_size = models.determine_hidden_size(mt)
         self.scalar = nn.Linear(2 * hidden_size, 1)
@@ -1139,6 +1140,7 @@ class NullEditor(Editor):
     """Editor that just returns zero direction."""
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
+        """Return the zero direction."""
         return torch.zeros_like(entity)
 
 

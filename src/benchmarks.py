@@ -496,8 +496,9 @@ class EfficacyBenchmarkResults(DataClassJsonMixin):
 @torch.inference_mode()
 def efficacy(
     *,
-    editor: editors.Editor,
     dataset: Dataset,
+    editor: editors.Editor | None = None,
+    mt: models.ModelAndTokenizer | None = None,
     desc: str | None = None,
     **kwargs: Any,
 ) -> EfficacyBenchmarkResults:
@@ -507,21 +508,35 @@ def efficacy(
     after editing, then compares the probabilities between the mediated and unmediated
     tokens.
     """
+    if (editor is None) == (mt is None):
+        raise ValueError("must one of `editor` and `mt`, not both")
+
     if desc is None:
         desc = "efficacy benchmark"
-    run = editor.evaluate(
-        dataset, desc=desc, max_new_tokens=1, return_before=False, **kwargs
-    )
+
+    evaluate_kwargs = dict(max_new_tokens=1, desc=desc, **kwargs)
+    if editor is None:
+        assert mt is not None
+        run = editors.NullEditor(mt=mt, layer=0).evaluate(
+            dataset, return_after=False, **evaluate_kwargs
+        )
+        target_score_key = "before_target_mediated_score"
+        comparator_score_key = "before_target_unmediated_score"
+    else:
+        assert mt is None
+        run = editor.evaluate(dataset, return_before=False, **evaluate_kwargs)
+        target_score_key = "after_target_mediated_score"
+        comparator_score_key = "after_target_unmediated_score"
 
     samples = []
     for result in run.results:
         sid = result.sample["id"]
         prompt = result.sample["prompt"]
 
-        target_score = result.after_target_mediated_score
+        target_score = getattr(result, target_score_key)
         assert target_score is not None
 
-        comparator_score = result.after_target_unmediated_score
+        comparator_score = getattr(result, comparator_score_key)
         assert comparator_score is not None
 
         logger.debug(f"ID={sid} SCORE_T={target_score} SCORE_COMP={comparator_score}")
@@ -562,7 +577,8 @@ class CounterFactParaphraseBenchmarkResults(DataClassJsonMixin):
 @torch.inference_mode()
 def counterfact_paraphrase(
     *,
-    editor: editors.Editor,
+    editor: editors.Editor | None = None,
+    mt: models.ModelAndTokenizer | None = None,
     dataset: Dataset,
     desc: str | None = None,
     **kwargs: Any,
@@ -584,6 +600,7 @@ def counterfact_paraphrase(
     )
     efficacy_benchmark = efficacy(
         editor=editor,
+        mt=mt,
         dataset=dataset,
         desc=desc,
         **kwargs,
@@ -656,8 +673,9 @@ class CounterFactGenerationBenchmarkResults(DataClassJsonMixin):
 @torch.inference_mode()
 def counterfact_generation(
     *,
-    editor: editors.Editor,
     dataset: Dataset,
+    editor: editors.Editor | None = None,
+    mt: models.ModelAndTokenizer | None = None,
     attribute_snippets: data.AttributeSnippets | None = None,
     tfidf_vectorizer: TfidfVectorizer | None = None,
     max_length: int | None = None,
@@ -679,6 +697,9 @@ def counterfact_generation(
         prompts = sample["source"]["generation_prompts"]
 
     """
+    if (mt is None) == (editor is None):
+        raise ValueError("must set one of `editor` or `mt`, not both")
+
     if attribute_snippets is None:
         attribute_snippets = data.load_attribute_snippets()
     if tfidf_vectorizer is None:
@@ -691,14 +712,23 @@ def counterfact_generation(
     dataset = _counterfact_select_and_flatten(
         dataset, "generation_prompts", desc=f"{desc} [flatten dataset]"
     )
-    run = editor.evaluate(
-        dataset=dataset,
+
+    evaluate_kwargs = dict(
         max_new_tokens=max_new_tokens,
         max_length=max_length,
         desc=f"{desc} [run model]",
-        return_before=False,
         **kwargs,
     )
+    if editor is None:
+        assert mt is not None
+        run = editors.NullEditor(mt=mt, layer=0).evaluate(
+            dataset, return_after=False, **evaluate_kwargs
+        )
+        generations_key = "before_generations"
+    else:
+        assert mt is None
+        run = editor.evaluate(dataset, return_before=False, **evaluate_kwargs)
+        generations_key = "after_generations"
     run_results_by_id = _group_results_by_id(run)
 
     samples = []
@@ -708,7 +738,7 @@ def counterfact_generation(
         relation_id = cf_requested_rewrite["relation_id"]
         target_id = cf_requested_rewrite["target_new"]["id"]
 
-        generations = [result.after_generations[0] for result in results]
+        generations = [getattr(result, generations_key)[0] for result in results]
         references = [
             snippet["text"] for snippet in attribute_snippets[relation_id][target_id]
         ]
