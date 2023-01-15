@@ -2,7 +2,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
-from typing import Any, Literal, Sequence, cast
+from typing import Any, Callable, Literal, Sequence, cast
 
 from src import data, editors, metrics, models, precompute
 from src.utils.typing import Dataset, Device, StrSequence
@@ -72,16 +72,25 @@ class EssenceBenchmarkResults(DataClassJsonMixin):
     metrics: EssenceMetrics
 
 
+PromptTemplateFn = Callable[[dict], str]
+GenerationPostProcessFn = Callable[[str], str]
+
+
 @torch.inference_mode()
 def essence(
     *,
-    editor: editors.Editor,
     dataset: Dataset,
+    editor: editors.Editor | None = None,
+    mt: models.ModelAndTokenizer | None = None,
     alpha: float = editors.DEFAULT_ALPHA,
     beta: float = editors.DEFAULT_BETA,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     prompt_prefix: str | None = DEFAULT_PROMPT_PREFIX,
-    prompt_template: str = DEFAULT_PROMPT_TEMPLATE,
+    prompt_template: str | PromptTemplateFn = DEFAULT_PROMPT_TEMPLATE,
+    post_process: GenerationPostProcessFn | None = None,
+    reference_prompt_prefix: str | None = DEFAULT_PROMPT_PREFIX,
+    reference_prompt_template: str | PromptTemplateFn = DEFAULT_PROMPT_TEMPLATE,
+    reference_post_process: GenerationPostProcessFn | None = None,
     max_new_tokens: int | None = None,
     max_length: int | None = None,
     use_references: Sequence[StrSequence] | None = None,
@@ -90,7 +99,9 @@ def essence(
     device: Device | None = None,
 ) -> EssenceBenchmarkResults:
     """Measures how well the editor preserves the edited entity's essence."""
-    if prompt_template.count("{}") != 1:
+    if editor is None and mt is None:
+        raise ValueError("must set at least one of `editor` and `mt`")
+    if isinstance(prompt_template, str) and prompt_template.count("{}") != 1:
         raise ValueError(f"prompt template needs 1 empty slot: {prompt_template}")
     if use_references is not None and len(use_references) != len(dataset):
         raise ValueError(
@@ -98,12 +109,21 @@ def essence(
             f"use_references={len(use_references)}, dataset={len(dataset)}"
         )
 
+    if mt is None:
+        assert editor is not None
+        mt = editor.mt
     if max_length is None and max_new_tokens is None:
         max_length = DEFAULT_MAX_LENGTH
     if tfidf_vectorizer is None:
         tfidf_vectorizer = data.load_tfidf_vectorizer()
     if desc is None:
         desc = "essence benchmark"
+
+    generate_kwargs = dict(
+        max_length=max_length,
+        max_new_tokens=max_new_tokens,
+        pad_token_id=mt.tokenizer.eos_token_id,
+    )
 
     generations = []
     reference_groups: list[list[str]] = []
@@ -119,29 +139,34 @@ def essence(
             entities = batch["entity"]
             attributes = batch["attribute"]
 
-            prompts = [prompt_template.format(entity) for entity in entities]
-            if prompt_prefix is not None:
-                prompts = [prompt_prefix + prompt for prompt in prompts]
-            with models.set_padding_side(editor.mt, padding_side="left"):
-                inputs, _ = precompute.inputs_from_batch(
-                    editor.mt, prompts, device=device
-                )
+            # Step 1: If needed, generate reference texts.
             if use_references is None:
-                outputs = editor.mt.model.generate(
-                    **inputs,
-                    max_new_tokens=max_new_tokens,
-                    max_length=max_length,
-                    pad_token_id=editor.mt.tokenizer.eos_token_id,
+                reference_prompts = _create_essence_prompts(
+                    batch,
+                    prompt_template=reference_prompt_template,
+                    prompt_prefix=reference_prompt_prefix,
+                )
+                with models.set_padding_side(mt, padding_side="left"):
+                    reference_inputs, _ = precompute.inputs_from_batch(
+                        mt, reference_prompts, device=device
+                    )
+                reference_outputs = mt.model.generate(
+                    **reference_inputs, **generate_kwargs
                 )
                 batch_reference_groups = [
                     [r]
-                    for r in editor.mt.tokenizer.batch_decode(
-                        outputs, skip_special_tokens=True
+                    for r in mt.tokenizer.batch_decode(
+                        reference_outputs, skip_special_tokens=True
                     )
                 ]
-                if prompt_prefix is not None:
+                if reference_prompt_prefix is not None:
                     batch_reference_groups = [
-                        [r[len(prompt_prefix) :]] for [r] in batch_reference_groups
+                        [r[len(reference_prompt_prefix) :]]
+                        for [r] in batch_reference_groups
+                    ]
+                if reference_post_process is not None:
+                    batch_reference_groups = [
+                        [reference_post_process(r)] for [r] in batch_reference_groups
                     ]
             else:
                 start = batch_index * batch_size
@@ -149,30 +174,41 @@ def essence(
                 batch_reference_groups = [list(rs) for rs in use_references[start:end]]
             reference_groups += batch_reference_groups
 
-            with editors.apply(
-                editor, alpha=alpha, beta=beta, device=device
-            ) as edited_mt:
-                outputs = edited_mt.model.generate(
-                    data.ContextMediationBatch(
-                        id=ids,
-                        source=batch["source"],
-                        entity=entities,
-                        prompt=prompts,
-                        attribute=attributes,
-                        context=batch["context"],
-                        target_mediated=None,
-                        target_unmediated=None,
-                    ),
-                    inputs=inputs,
-                    max_new_tokens=max_new_tokens,
-                    max_length=max_length,
-                    padding_side="left",
-                )
-            batch_generations = editor.mt.tokenizer.batch_decode(
+            # Step 2: Generate post-edit text.
+            prompts = _create_essence_prompts(
+                batch, prompt_template=prompt_template, prompt_prefix=prompt_prefix
+            )
+            with models.set_padding_side(mt, padding_side="left"):
+                inputs, _ = precompute.inputs_from_batch(mt, prompts, device=device)
+            if editor is not None:
+                with editors.apply(
+                    editor, alpha=alpha, beta=beta, device=device
+                ) as edited_mt:
+                    outputs = edited_mt.model.generate(
+                        data.ContextMediationBatch(
+                            id=ids,
+                            source=batch["source"],
+                            entity=entities,
+                            prompt=prompts,
+                            attribute=attributes,
+                            context=batch["context"],
+                            target_mediated=None,
+                            target_unmediated=None,
+                        ),
+                        inputs=inputs,
+                        padding_side="left",
+                        **generate_kwargs,
+                    )
+            else:
+                outputs = mt.model.generate(**inputs, **generate_kwargs)
+
+            batch_generations = mt.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True
             )
             if prompt_prefix is not None:
                 batch_generations = [g[len(prompt_prefix) :] for g in batch_generations]
+            if post_process is not None:
+                batch_generations = [post_process(g) for g in batch_generations]
             generations += batch_generations
 
             for (sid, entity, attribute, generation, references) in zip(
@@ -230,6 +266,33 @@ def essence(
         samples=samples,
         metrics=EssenceMetrics(**metrics_kwargs),
     )
+
+
+def _create_essence_prompts(
+    batch: dict,
+    prompt_template: str | PromptTemplateFn = DEFAULT_PROMPT_TEMPLATE,
+    prompt_prefix: str | None = DEFAULT_PROMPT_PREFIX,
+) -> StrSequence:
+    """Create list of fully formatted prompts."""
+    entities = batch["entity"]
+    if isinstance(prompt_template, str):
+        prompts = [prompt_template.format(entity) for entity in entities]
+    else:
+        prompts = [
+            prompt_template(
+                {
+                    key: batch[key][bi]
+                    for key in data.ContextMediationSample.__required_keys__
+                    if key != "source"
+                }
+            )
+            for bi in range(len(entities))
+        ]
+
+    if prompt_prefix is not None:
+        prompts = [prompt_prefix + prompt for prompt in prompts]
+
+    return prompts
 
 
 @dataclass(frozen=True)

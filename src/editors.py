@@ -116,7 +116,7 @@ class EditedModel(nn.Module):
     """Wrapper around an LM which knows how to automatically apply mediation.
 
     Importantly, this model assumes inputs look like `ContextMediationSample`s
-    or batches of them. See `src/utils/dataset_utils.py` for more details.
+    or batches of them. See `src/data.py` for more details.
     """
 
     def __init__(
@@ -1165,7 +1165,7 @@ def load_editor(
     editor = editor_factory(mt=mt, layer=layer)
     editor.to(device)
 
-    if editor_type != "identity":
+    if editor_type not in {"null", "identity"}:
         if editors_dir is None:
             logger.warning("editors_dir not specified for non-identity editor")
             return None
