@@ -1148,8 +1148,8 @@ SUPPORTED_EDITORS = {
 
 
 def load_editor(
-    editor_type: str,
     mt: models.ModelAndTokenizer,
+    editor_type: str,
     layer: int,
     editors_dir: PathLike | None = None,
     device: Device | None = None,

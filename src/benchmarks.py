@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPT_PREFIX = "The following is an except from a Wikipedia article:\n\n"
 DEFAULT_PROMPT_TEMPLATE = "{} is"
 DEFAULT_MAX_LENGTH = 100
+DEFAULT_MAX_LENGTH_ERROR_CORRECTION = 25
+DEFAULT_TOP_K = 5
 
 
 @dataclass(frozen=True)
@@ -483,7 +485,7 @@ class ParaphraseSample(DataClassJsonMixin):
 
 
 @dataclass(frozen=True)
-class ParaphraseBenchmarkResults(DataClassJsonMixin):
+class CounterFactParaphraseBenchmarkResults(DataClassJsonMixin):
     """Wrapper around paraphrase benchmark results."""
 
     samples: list[ParaphraseSample]
@@ -497,7 +499,7 @@ def counterfact_paraphrase(
     dataset: Dataset,
     desc: str | None = None,
     **kwargs: Any,
-) -> ParaphraseBenchmarkResults:
+) -> CounterFactParaphraseBenchmarkResults:
     """Run the CounterFact paraphrase benchmark.
 
     Since this benchmark relies on extra data, it can only be used with the CounterFact
@@ -551,7 +553,7 @@ def counterfact_paraphrase(
         )
         samples.append(sample)
 
-    return ParaphraseBenchmarkResults(
+    return CounterFactParaphraseBenchmarkResults(
         samples=samples,
         metrics=efficacy_metrics.without_values(),
     )
@@ -577,7 +579,7 @@ class GenerationMetrics(DataClassJsonMixin):
 
 
 @dataclass(frozen=True)
-class GenerationBenchmarkResults(DataClassJsonMixin):
+class CounterFactGenerationBenchmarkResults(DataClassJsonMixin):
     """Wrapper around generation benchmark results."""
 
     samples: list[GenerationSample]
@@ -595,7 +597,7 @@ def counterfact_generation(
     max_new_tokens: int | None = None,
     desc: str | None = None,
     **kwargs: Any,
-) -> GenerationBenchmarkResults:
+) -> CounterFactGenerationBenchmarkResults:
     """Run the CounterFact generation benchmark.
 
     Free-form generates on several "generation prompts" per sample, and records
@@ -671,7 +673,161 @@ def counterfact_generation(
         [sample.consistency_score for sample in samples], store_values=False
     )
     generation_metrics = GenerationMetrics(fluency=fluency, consistency=consistency)
-    return GenerationBenchmarkResults(samples=samples, metrics=generation_metrics)
+    return CounterFactGenerationBenchmarkResults(
+        samples=samples, metrics=generation_metrics
+    )
+
+
+@dataclass(frozen=True)
+class ErrorCorrectionSample:
+    """Wrapper around error correction sample."""
+
+    id: str
+    generation: str
+
+    predictions: list[str]
+    target: str
+
+    logp_predictions: list[float]
+    logp_target: float
+
+
+@dataclass(frozen=True)
+class ErrorCorrectionMetrics(DataClassJsonMixin):
+    """Wrapper around aggregated error correction metrics."""
+
+    top1_accuracy: float
+    topk_accuracy: float
+    k: int
+
+
+@dataclass(frozen=True)
+class ErrorCorrectionBenchmarkResults(DataClassJsonMixin):
+    """Wrapper around error correction benchmark."""
+
+    samples: list[ErrorCorrectionSample]
+    metrics: ErrorCorrectionMetrics
+
+
+# TODO:
+# - Better check for whether precompute already done
+# - Make it work for counterfact too
+@torch.inference_mode()
+def error_correction(
+    *,
+    editor: editors.Editor,
+    dataset: Dataset,
+    use_editor: bool = True,
+    batch_size: int = editors.DEFAULT_BATCH_SIZE,
+    top_k: int = DEFAULT_TOP_K,
+    prompt_key: str = "prompt",
+    target_key: str = "target_mediated",
+    entity_occurrence_in_prompt: int = 0,
+    max_length: int | None = None,
+    max_new_tokens: int | None = None,
+    labels: StrSequence | None = None,
+    device: Device | None = None,
+    desc: str | None = None,
+) -> ErrorCorrectionBenchmarkResults:
+    if desc is None:
+        desc = "error correction"
+    if max_length is None and max_new_tokens is None:
+        max_length = DEFAULT_MAX_LENGTH_ERROR_CORRECTION
+    if labels is None:
+        labels = [x[target_key] for x in dataset]
+    labels = sorted(labels)
+    labels_token_idx = precompute.first_token_ids_from_batch(editor.mt, labels)
+
+    # TODO(evandez): This is incorrect, need to determine column names *after*
+    # precomputing.
+    columns = data.column_names(dataset, exclude=["target_unmediated"])
+    if use_editor and not any(str(editor.layer) in col for col in columns):
+        dataset = precompute.editor_inputs_from_dataset(
+            mt=editor.mt,
+            dataset=dataset,
+            layers=[editor.layer],
+            device=device,
+            batch_size=batch_size,
+            desc=f"{desc} [editor inputs]",
+            entity_occurrence_in_prompt=entity_occurrence_in_prompt,
+            return_target_token_ids=False,
+        )
+
+    with dataset.formatted_as("torch", columns=columns):
+        loader = torch.utils.data.DataLoader(
+            cast(torch.utils.data.Dataset, dataset),
+            batch_size=batch_size,
+        )
+
+        samples = []
+        for batch in tqdm(loader, desc=desc):
+            ids = batch["id"]
+            prompts = batch[prompt_key]
+            targets = batch[target_key]
+            targets_idx = precompute.first_token_ids_from_batch(editor.mt, targets)
+
+            with models.set_padding_side(editor.mt, padding_side="left"):
+                inputs, _ = precompute.inputs_from_batch(editor.mt, prompts)
+
+            generate_kwargs = dict(
+                return_dict_in_generate=True,
+                output_scores=True,
+                max_length=max_length,
+                max_new_tokens=max_new_tokens,
+            )
+            if use_editor:
+                with editors.apply(editor, device=device) as edited_mt:
+                    outputs = edited_mt.model.generate(
+                        batch,
+                        inputs=inputs,
+                        padding_side="left",
+                        **generate_kwargs,
+                    )
+            else:
+                outputs = editor.mt.model.generate(
+                    input_ids=inputs.input_ids, **generate_kwargs
+                )
+
+            generations = editor.mt.tokenizer.batch_decode(
+                outputs.sequences, skip_special_tokens=True
+            )
+
+            distributions = torch.log_softmax(outputs.scores[0], dim=-1)
+            for sid, distribution, generation, target, target_idx in zip(
+                ids, distributions, generations, targets, targets_idx
+            ):
+                label_log_probs = distribution[:, labels_token_idx]
+
+                logp_predictions, predictions_idx = label_log_probs.topk(
+                    k=top_k, dim=-1
+                )
+                predictions = [labels[idx] for idx in predictions_idx]
+
+                logp_target = distribution[0, target_idx]
+                sample = ErrorCorrectionSample(
+                    id=sid,
+                    generation=generation,
+                    predictions=predictions,
+                    logp_predictions=logp_predictions,
+                    target=target,
+                    logp_target=logp_target,
+                )
+                samples.append(sample)
+
+    n_correct_top1 = sum(x.predictions[0] == x.target for x in samples)
+    n_correct_topk = sum(x.target in x.predictions for x in samples)
+    top1_accuracy = n_correct_top1 / len(samples)
+    topk_accuracy = n_correct_topk / len(samples)
+    error_correction_metrics = ErrorCorrectionMetrics(
+        top1_accuracy=top1_accuracy,
+        topk_accuracy=topk_accuracy,
+        k=top_k,
+    )
+
+    return ErrorCorrectionBenchmarkResults(
+        samples=samples,
+        metrics=error_correction_metrics,
+    )
 
 
 def _counterfact_select_and_flatten(

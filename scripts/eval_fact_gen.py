@@ -13,6 +13,13 @@ import torch.utils.data
 
 logger = logging.getLogger(__name__)
 
+BENCHMARKS = (
+    "efficacy",
+    "paraphrase",
+    "generation",
+    "essence",
+)
+
 
 def main(args: argparse.Namespace) -> None:
     """Run the benchmark."""
@@ -22,41 +29,50 @@ def main(args: argparse.Namespace) -> None:
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
-
     editors_dir = args.editors_dir
     editor_type = args.editor_type
-    if editor_type != "identity":
-        logger.info(f"will look for {editor_type} editors in {editors_dir}")
-        if not Path(editors_dir, editor_type).exists():
-            raise ValueError(f"editors not found at {editors_dir}")
 
     layers = args.layers
     if layers is None:
         layers = editors.list_saved_editors(editors_dir)[editor_type]
+    logger.info(f"found editors for layers: {layers}")
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
     logger.info("loading several data sources")
-    dataset = data.load_dataset("counterfact", split="train[5000:]")
+    dataset = data.load_dataset(
+        args.dataset, file=args.dataset_file, split="train[5000:]"
+    )
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_tfidf_vectorizer()
 
     for layer in layers:
         editor = editors.load_editor(
-            editor_type, mt, layer, editors_dir=editors_dir, device=device
+            mt, editor_type, layer, editors_dir=editors_dir, device=device
         )
         if editor is None:
             logger.warning(f"skipping benchmark for layer {layer}")
             continue
+        logger.info(f"begin eval for layer {layer}")
 
         results: (
             benchmarks.EfficacyBenchmarkResults
-            | benchmarks.ParaphraseBenchmarkResults
-            | benchmarks.GenerationBenchmarkResults
+            | benchmarks.CounterFactParaphraseBenchmarkResults
+            | benchmarks.CounterFactGenerationBenchmarkResults
             | benchmarks.EssenceBenchmarkResults
         )
         for benchmark_name in args.benchmarks:
+            results_file = (
+                experiment.results_dir / str(layer) / f"{benchmark_name}.json"
+            )
+            if results_file.exists() and not args.rerun:
+                logger.info(
+                    f"found existing {benchmark_name} results for layer {layer} "
+                    f"at {results_file}"
+                )
+                continue
+
             if benchmark_name == "efficacy":
                 results = benchmarks.efficacy(
                     editor=editor, dataset=dataset, device=device
@@ -87,9 +103,7 @@ def main(args: argparse.Namespace) -> None:
                 f"{benchmark_name} benchmark complete! results:\n%s",
                 json.dumps(results.metrics.to_dict(), indent=1),
             )
-            results_file = (
-                experiment.results_dir / str(layer) / f"{benchmark_name}.json"
-            )
+            results_file.parent.mkdir(exist_ok=True, parents=True)
             with results_file.open("w") as handle:
                 json.dump(results, handle)
 
@@ -100,12 +114,8 @@ if __name__ == "__main__":
         "--benchmarks",
         "-b",
         nargs="+",
-        choices=(
-            "efficacy",
-            "paraphrase",
-            "generation",
-            "essence",
-        ),
+        choices=BENCHMARKS,
+        default=BENCHMARKS,
         help="benchmarks to run, defaults depend on dataset",
     )
     parser.add_argument("--editor-type", "-t", help="editor type, inferred by default")
@@ -133,6 +143,7 @@ if __name__ == "__main__":
         default=editors.DEFAULT_MAX_LENGTH,
         help="number of tokens to generate including prompt",
     )
+    parser.add_argument("--rerun", action="store_true", help="force rerun all evals")
     data.add_dataset_args(parser)
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)

@@ -424,7 +424,9 @@ def has_editor_inputs(batch: dict) -> bool:
 
 def prompt_in_context_from_batch(
     batch: data.ContextMediationInput,
+    output_key: str = "prompt_in_context",
     context_prefix: str | None = None,
+    context_suffix: str | None = None,
     prompt_prefix: str | None = None,
 ) -> dict:
     """Compute prompt in context from batch.
@@ -447,20 +449,25 @@ def prompt_in_context_from_batch(
         if prompt_prefix is not None:
             if not prompt.startswith(entity):
                 prompt = _remove_sent_case(prompt)
-            prompt = f"{prompt_prefix} {prompt}"
+            prompt = f"{prompt_prefix}{prompt}"
 
         if context_prefix is not None:
             if not context.startswith(entity):
                 context = _remove_sent_case(context)
             context = f"{context_prefix} {context}"
-        context = context.rstrip(". ")
 
-        prompt_in_context = f"{context}. {prompt}"
+        # Always make sure context is a complete, period-ended sentence.
+        context = context.rstrip(". ") + "."
+
+        if context_suffix is not None:
+            context = f"{context}{context_suffix}"
+        else:
+            context += " "
+
+        prompt_in_context = f"{context}{prompt}"
         prompts_in_context.append(prompt_in_context)
 
-    return {
-        "prompt_in_context": prompts_in_context if is_batched else prompts_in_context[0]
-    }
+    return {output_key: prompts_in_context if is_batched else prompts_in_context[0]}
 
 
 def prompt_in_context_from_dataset(

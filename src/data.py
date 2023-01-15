@@ -429,13 +429,16 @@ def disable_caching() -> None:
     datasets.disable_caching()
 
 
-def add_dataset_args(parser: argparse.ArgumentParser) -> None:
+def add_dataset_args(
+    parser: argparse.ArgumentParser, default: str = "counterfact"
+) -> None:
     """Add --dataset and --dataset-file args to the parser."""
+    assert default in SUPPORTED_DATASETS, default
     parser.add_argument(
         "--dataset",
         "-d",
         choices=SUPPORTED_DATASETS,
-        default="counterfact",
+        default=default,
         help="dataset to use",
     )
     parser.add_argument("--dataset-file", "-f", type=Path, help="dataset file to use")
