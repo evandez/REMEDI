@@ -2,7 +2,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
-from typing import Any, Sequence, cast
+from typing import Any, Literal, Sequence, cast
 
 from src import data, editors, metrics, models, precompute
 from src.utils.typing import Dataset, Device, StrSequence
@@ -709,9 +709,6 @@ class ErrorCorrectionBenchmarkResults(DataClassJsonMixin):
     metrics: ErrorCorrectionMetrics
 
 
-# TODO:
-# - Better check for whether precompute already done
-# - Make it work for counterfact too
 @torch.inference_mode()
 def error_correction(
     *,
@@ -720,15 +717,46 @@ def error_correction(
     use_editor: bool = True,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     top_k: int = DEFAULT_TOP_K,
-    prompt_key: str = "prompt",
-    target_key: str = "target_mediated",
-    entity_occurrence_in_prompt: int = 0,
+    prompt_key: Literal["prompt", "prompt_in_context"] = "prompt_in_context",
+    target_key: Literal["target_mediated", "target_unmediated"] = "target_mediated",
+    entity_occurrence: int | None = None,
     max_length: int | None = None,
     max_new_tokens: int | None = None,
     labels: StrSequence | None = None,
     device: Device | None = None,
     desc: str | None = None,
 ) -> ErrorCorrectionBenchmarkResults:
+    """Run the error correction benchmark.
+
+    This benchmark involves measuring accuracy on a classification task,
+    with or without the editor involved. The goal is to show that the editor
+    improves the accuracy.
+
+    Args:
+        editor: The editor to evaluate. If you want to run the benchmark *without*
+            applying an editor, you can make this a `NullEditor`.
+        dataset: The dataset to evaluate on.
+        use_editor: Whether to use the editor when doing classification.
+        batch_size: Batch size for model.
+        top_k: Compute top-k labels predicted by model.
+        prompt_key: Which column in dataset to use as prompt.
+        target_key: Which column in dataset to use as label.
+        entity_occurrence: Which entity occurrence to edit. Defaults depends on
+            which column is used as prompt.
+        max_length: Max number of tokens to generate.
+        max_new_tokens: Max number of new tokens to generate. Cannot be used with
+            `max_length`, see huggingface docs.
+        labels: Set of labels to consider. If not set, will be determined by looking at
+            all values for column in the dataset.
+        device: Send model and data to this device.
+        desc: TQDM description.
+
+    Returns:
+        Benchmark results.
+
+    """
+    if entity_occurrence is None:
+        entity_occurrence = 0 if prompt_key == "prompt" else 1
     if desc is None:
         desc = "error correction"
     if max_length is None and max_new_tokens is None:
@@ -738,20 +766,10 @@ def error_correction(
     labels = sorted(labels)
     labels_token_idx = precompute.first_token_ids_from_batch(editor.mt, labels)
 
-    # TODO(evandez): This is incorrect, need to determine column names *after*
-    # precomputing.
-    columns = data.column_names(dataset, exclude=["target_unmediated"])
-    if use_editor and not any(str(editor.layer) in col for col in columns):
-        dataset = precompute.editor_inputs_from_dataset(
-            mt=editor.mt,
-            dataset=dataset,
-            layers=[editor.layer],
-            device=device,
-            batch_size=batch_size,
-            desc=f"{desc} [editor inputs]",
-            entity_occurrence_in_prompt=entity_occurrence_in_prompt,
-            return_target_token_ids=False,
-        )
+    exclude_columns = []
+    if target_key != "target_unmediated":
+        exclude_columns.append("target_unmediated")
+    columns = data.column_names(dataset, exclude=exclude_columns)
 
     with dataset.formatted_as("torch", columns=columns):
         loader = torch.utils.data.DataLoader(
@@ -781,18 +799,17 @@ def error_correction(
                         batch,
                         inputs=inputs,
                         padding_side="left",
+                        entity_occurrence=entity_occurrence,
                         **generate_kwargs,
                     )
             else:
-                outputs = editor.mt.model.generate(
-                    input_ids=inputs.input_ids, **generate_kwargs
-                )
+                outputs = editor.mt.model.generate(**inputs, **generate_kwargs)
 
             generations = editor.mt.tokenizer.batch_decode(
                 outputs.sequences, skip_special_tokens=True
             )
-
             distributions = torch.log_softmax(outputs.scores[0], dim=-1)
+
             for sid, distribution, generation, target, target_idx in zip(
                 ids, distributions, generations, targets, targets_idx
             ):

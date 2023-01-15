@@ -138,7 +138,9 @@ class EditedModel(nn.Module):
         self.device = device
 
     def maybe_compute_editor_inputs(
-        self, batch: data.ContextMediationInput | dict
+        self,
+        batch: data.ContextMediationInput | dict,
+        entity_occurrence: int = 0,
     ) -> dict:
         """Maybe compute hidden states for batch, if not already present."""
         precomputed = {**batch}
@@ -149,12 +151,13 @@ class EditedModel(nn.Module):
                 layers=[self.layer],
                 device=self.device,
                 return_target_token_ids=False,
+                entity_occurrence_in_prompt=entity_occurrence,
             )
         return precomputed
 
-    def compute_edit_directions(self, batch: dict) -> torch.Tensor:
+    def compute_edit_directions(self, batch: dict, **kwargs: Any) -> torch.Tensor:
         """Compute edit directions for batch."""
-        precomputed = self.maybe_compute_editor_inputs(batch)
+        precomputed = self.maybe_compute_editor_inputs(batch, **kwargs)
 
         hiddens_entity_key = f"entity.entity.hiddens.{self.editor.layer}."
         if self.editor.input_last_entity_token:
@@ -181,10 +184,13 @@ class EditedModel(nn.Module):
         generate: bool = False,
         inputs: Optional[transformers.BatchEncoding] = None,
         padding_side: Optional[str] = None,
+        entity_occurrence: int = 0,
         **kwargs: Any,
     ) -> EditedModelOutput:
         """Run the model on the inputs, editing its hidden reps in the process."""
-        precomputed = self.maybe_compute_editor_inputs(batch)
+        precomputed = self.maybe_compute_editor_inputs(
+            batch, entity_occurrence=entity_occurrence
+        )
         directions = self.compute_edit_directions(precomputed)
 
         # Which token we apply the edit to depends on which side padding is applied. If
