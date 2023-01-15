@@ -84,7 +84,6 @@ def main(args: argparse.Namespace) -> None:
                     dataset=dataset,
                     attribute_snippets=attribute_snippets,
                     tfidf_vectorizer=tfidf_vectorizer,
-                    max_length=args.max_length,
                 )
             elif benchmark_name == "essence":
                 results = benchmarks.essence(
@@ -124,21 +123,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
-    )
-    parser.add_argument(
-        "--prepend-context", "-p", action="store_true", help="prepend context to prompt"
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=editors.DEFAULT_BATCH_SIZE,
-        help="model batch size",
-    )
-    parser.add_argument(
-        "--max-length",
-        type=int,
-        default=editors.DEFAULT_MAX_LENGTH,
-        help="number of tokens to generate including prompt",
     )
     parser.add_argument("--rerun", action="store_true", help="force rerun all evals")
     # No dataset args because this only works for counterfact
