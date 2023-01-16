@@ -20,18 +20,18 @@ def main(args: argparse.Namespace) -> None:
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     fp16 = args.fp16
-    editors_dir = args.editors_dir
-    editor_type = args.editor_type
-
-    layers = args.layers
-    if layers is None:
-        layers = editors.list_saved_editors(editors_dir)[editor_type]
-    logger.info(f"found editors for layers: {layers}")
 
     logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
     dataset = data.load_dataset("biosbias", split="train[5000:]")
+
+    editors_dir = args.editors_dir
+    editor_type = args.editor_type
+    layers = args.layers
+    if layers is None:
+        layers = editors.list_saved_editors(editors_dir)[editor_type]
+    logger.info(f"found editors for layers: {layers}")
 
     benchmark_kwargs: dict = {}
     if args.decontextualized:
