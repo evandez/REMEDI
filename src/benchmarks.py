@@ -893,7 +893,7 @@ def error_correction(
     if max_length is None and max_new_tokens is None:
         max_length = DEFAULT_MAX_LENGTH
     if labels is None:
-        labels = [x[target_key] for x in dataset]
+        labels = list({x[target_key] for x in dataset})
     labels = sorted(labels)
     labels_token_idx = precompute.first_token_ids_from_batch(mt, labels)
 

@@ -35,7 +35,9 @@ def main(args: argparse.Namespace) -> None:
     if args.decontextualized:
         benchmark_kwargs["entity_occurrence"] = 0
     else:
-        dataset = precompute.prompt_in_context_from_dataset(dataset, output_key="prompt")
+        dataset = precompute.prompt_in_context_from_dataset(
+            dataset, output_key="prompt", context_suffix="\n\n"
+        )
         benchmark_kwargs["entity_occurrence"] = 1
 
     baseline_results_file = experiment.results_dir / "baseline.json"
