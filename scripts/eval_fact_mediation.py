@@ -21,7 +21,7 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"loading {args.model} (device={device}, fp16={args.fp16})")
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
-    dataset = data.load_dataset("counterfact", split="train[5000:]")
+    dataset = data.load_dataset("counterfact", split="train")
 
     results_file = experiment.results_dir / "mediation.json"
     if results_file.exists():

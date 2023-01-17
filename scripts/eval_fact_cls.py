@@ -22,7 +22,7 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"loading {args.model} (device={device}, fp16={args.fp16})")
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
-    dataset = data.load_dataset("counterfact", split="train[5000:]")
+    dataset = data.load_dataset("counterfact", split="train[5000:5250]")
 
     editors_dir = args.editors_dir
     editor_type = args.editor_type

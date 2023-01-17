@@ -31,7 +31,7 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
     logger.info("loading several data sources")
-    dataset = data.load_dataset("counterfact", split="train[5000:]")
+    dataset = data.load_dataset("counterfact", split="train[5000:5250]")
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_tfidf_vectorizer()
 
