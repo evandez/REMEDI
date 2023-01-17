@@ -955,7 +955,7 @@ def error_correction(
                 )
                 predictions = [labels[idx] for idx in predictions_idx]
 
-                logp_target = distribution[0, target_idx]
+                logp_target = distribution[target_idx]
                 sample = ErrorCorrectionSample(
                     id=sid,
                     generation=generation,
