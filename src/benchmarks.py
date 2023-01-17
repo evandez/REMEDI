@@ -846,9 +846,8 @@ def error_correction(
     editor: editors.Editor | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     top_k: int = DEFAULT_TOP_K,
-    prompt_key: Literal["prompt", "prompt_in_context"] = "prompt_in_context",
     target_key: Literal["target_mediated", "target_unmediated"] = "target_mediated",
-    entity_occurrence: int | None = None,
+    entity_occurrence: int = 0,
     max_length: int | None = None,
     max_new_tokens: int | None = None,
     labels: StrSequence | None = None,
@@ -889,8 +888,6 @@ def error_correction(
     if mt is None:
         assert editor is not None
         mt = editor.mt
-    if entity_occurrence is None:
-        entity_occurrence = 0 if prompt_key == "prompt" else 1
     if desc is None:
         desc = "error correction"
     if max_length is None and max_new_tokens is None:
@@ -914,7 +911,7 @@ def error_correction(
         samples = []
         for batch in tqdm(loader, desc=desc):
             ids = batch["id"]
-            prompts = batch[prompt_key]
+            prompts = batch["prompt"]
             targets = batch[target_key]
             targets_idx = precompute.first_token_ids_from_batch(mt, targets)
 
