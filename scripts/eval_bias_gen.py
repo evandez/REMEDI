@@ -53,7 +53,7 @@ def main(args: argparse.Namespace) -> None:
             json.dumps(baseline_results.metrics.to_dict(), indent=1),
         )
         baseline_results_file.parent.mkdir(exist_ok=True, parents=True)
-        with baseline_results_file.open("r") as handle:
+        with baseline_results_file.open("w") as handle:
             json.dump(baseline_results.to_dict(), handle)
     else:
         logger.info(
