@@ -1215,14 +1215,14 @@ def list_saved_editors(editors_dir: PathLike) -> DefaultDict[str, list[int]]:
     """
     editors_dir = Path(editors_dir)
 
-    editor_types = [d for d in editors_dir.iterdir() if d.is_dir()]
+    editor_type_dirs = [d for d in editors_dir.iterdir() if d.is_dir()]
 
     editor_configs = defaultdict(list)
-    for editor_type in editor_types:
-        editor_configs[editor_type.name] = sorted(
+    for editor_type_dir in editor_type_dirs:
+        editor_configs[editor_type_dir.name] = sorted(
             [
                 int(layer_dir.name)
-                for layer_dir in editors_dir.iterdir()
+                for layer_dir in editor_type_dir.iterdir()
                 if layer_dir.is_dir()
             ]
         )
