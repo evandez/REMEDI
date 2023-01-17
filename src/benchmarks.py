@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPT_PREFIX = "The following is an except from a Wikipedia article:\n\n"
 DEFAULT_PROMPT_TEMPLATE = "{} is"
 DEFAULT_MAX_LENGTH = 100
-DEFAULT_MAX_LENGTH_ERROR_CORRECTION = 25
 DEFAULT_TOP_K = 5
 DEFAULT_N_TOP_TOKENS = DEFAULT_TOP_K
 
@@ -895,7 +894,7 @@ def error_correction(
     if desc is None:
         desc = "error correction"
     if max_length is None and max_new_tokens is None:
-        max_length = DEFAULT_MAX_LENGTH_ERROR_CORRECTION
+        max_length = DEFAULT_MAX_LENGTH
     if labels is None:
         labels = [x[target_key] for x in dataset]
     labels = sorted(labels)
