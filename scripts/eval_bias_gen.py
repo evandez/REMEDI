@@ -41,7 +41,7 @@ def main(args: argparse.Namespace) -> None:
         benchmark_kwargs["entity_occurrence"] = 1
 
     baseline_results_file = experiment.results_dir / "baseline.json"
-    if not baseline_results_file.exists():
+    if not baseline_results_file.exists() or args.rerun:
         logger.info("begin baseline")
         baseline_results = benchmarks.error_correction(
             mt=mt,
