@@ -732,7 +732,7 @@ def counterfact_generation(
     run_results_by_id = _group_results_by_id(run)
 
     samples = []
-    for sid, results in run_results_by_id.items():
+    for sid, results in tqdm(run_results_by_id.items(), desc=f"{desc} [tfidf]"):
         result = next(iter(results))
         cf_requested_rewrite = result.sample["source"]["requested_rewrite"]
         relation_id = cf_requested_rewrite["relation_id"]
