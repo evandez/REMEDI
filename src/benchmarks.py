@@ -948,7 +948,7 @@ def error_correction(
             for sid, distribution, generation, target, target_idx in zip(
                 ids, distributions, generations, targets, targets_idx
             ):
-                label_log_probs = distribution[:, labels_token_idx]
+                label_log_probs = distribution[labels_token_idx]
 
                 logp_predictions, predictions_idx = label_log_probs.topk(
                     k=top_k, dim=-1
