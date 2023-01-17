@@ -75,7 +75,9 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="evaluate fact classification")
-    parser.add_argument("--editor-type", "-t", help="editor type, inferred by default")
+    parser.add_argument(
+        "--editor-type", "-t", default="linear", help="editor type, inferred by default"
+    )
     parser.add_argument(
         "--editors-dir",
         "-e",

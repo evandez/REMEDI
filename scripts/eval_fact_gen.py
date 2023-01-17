@@ -126,7 +126,7 @@ def main(args: argparse.Namespace) -> None:
             )
             results_file.parent.mkdir(exist_ok=True, parents=True)
             with results_file.open("w") as handle:
-                json.dump(results, handle)
+                json.dump(results.to_dict(), handle)
 
 
 if __name__ == "__main__":
@@ -139,7 +139,7 @@ if __name__ == "__main__":
         default=BENCHMARKS,
         help="benchmarks to run, defaults depend on dataset",
     )
-    parser.add_argument("--editor-type", "-t", help="editor type, inferred by default")
+    parser.add_argument("--editor-type", "-t", default="linear", help="editor type")
     parser.add_argument(
         "--editors-dir",
         "-e",

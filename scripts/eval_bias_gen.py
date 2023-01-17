@@ -95,7 +95,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="evaluate editor generation on bias dataset"
     )
-    parser.add_argument("--editor-type", "-t", help="editor type, inferred by default")
+    parser.add_argument("--editor-type", "-t", default="linear", help="editor type")
     parser.add_argument(
         "--editors-dir",
         "-e",
