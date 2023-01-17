@@ -960,9 +960,9 @@ def error_correction(
                     id=sid,
                     generation=generation,
                     predictions=predictions,
-                    logp_predictions=logp_predictions,
+                    logp_predictions=logp_predictions.tolist(),
                     target=target,
-                    logp_target=logp_target,
+                    logp_target=logp_target.item(),
                 )
                 samples.append(sample)
 
