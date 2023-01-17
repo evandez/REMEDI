@@ -53,7 +53,7 @@ def find_token_range(
             char_start = string.index(substring, char_start + 1)
         except ValueError as error:
             raise ValueError(
-                f"could not find {occurrence} occurrences "
+                f"could not find {occurrence + 1} occurrences "
                 f'of "{substring} in "{string}"'
             ) from error
     char_end = char_start + len(substring)
