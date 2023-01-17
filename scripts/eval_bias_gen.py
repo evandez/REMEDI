@@ -33,8 +33,10 @@ def main(args: argparse.Namespace) -> None:
 
     benchmark_kwargs: dict = {}
     if args.decontextualized:
-        dataset = precompute.prompt_in_context_from_dataset(dataset)
         benchmark_kwargs["prompt_key"] = "prompt"
+    else:
+        dataset = precompute.prompt_in_context_from_dataset(dataset)
+        benchmark_kwargs["prompt_key"] = "prompt_in_context"
 
     baseline_results_file = experiment.results_dir / "baseline.json"
     if not baseline_results_file.exists():
