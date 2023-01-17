@@ -919,7 +919,7 @@ def error_correction(
             targets_idx = precompute.first_token_ids_from_batch(mt, targets)
 
             with models.set_padding_side(mt, padding_side="left"):
-                inputs, _ = precompute.inputs_from_batch(mt, prompts)
+                inputs, _ = precompute.inputs_from_batch(mt, prompts, device=device)
 
             generate_kwargs = dict(
                 return_dict_in_generate=True,
