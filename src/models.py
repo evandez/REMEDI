@@ -143,7 +143,7 @@ def any_parameter(model: ModelAndTokenizer | Model) -> torch.nn.Parameter | None
 def set_padding_side(
     tokenizer: Tokenizer | ModelAndTokenizer, padding_side: str = "right"
 ) -> Iterator[None]:
-    """Convenience wrapper for `tokenizer_utils.set_padding_side`."""
+    """Wrap `tokenizer_utils.set_padding_side`."""
     tokenizer = unwrap_tokenizer(tokenizer)
     with tokenizer_utils.set_padding_side(tokenizer, padding_side=padding_side):
         yield

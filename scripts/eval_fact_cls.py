@@ -88,6 +88,7 @@ if __name__ == "__main__":
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
     )
     parser.add_argument("--entity-layer", type=int, help="layer to get entity rep from")
+    parser.add_argument("--rerun", action="store_true", help="force rerun experiments")
     # No data args because this only works on CounterFact.
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
