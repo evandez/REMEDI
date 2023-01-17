@@ -926,6 +926,7 @@ def error_correction(
                 output_scores=True,
                 max_length=max_length,
                 max_new_tokens=max_new_tokens,
+                pad_token_id=mt.tokenizer.eos_token_id,
             )
             if editor is not None:
                 with editors.apply(editor, device=device) as edited_mt:
