@@ -1202,6 +1202,7 @@ def save_editor(editor: Editor, editors_dir: PathLike) -> Path:
     editors_dir = Path(editors_dir)
     editor_type = {et: name for name, et in SUPPORTED_EDITORS.items()}[type(editor)]
     weights_file = editors_dir / editor_type / str(editor.layer) / "weights.pth"
+    weights_file.parent.mkdir(exist_ok=True, parents=True)
     torch.save(editor.state_dict(), weights_file)
     logger.info(f"saved editor to {weights_file}")
     return weights_file
