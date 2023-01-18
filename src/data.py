@@ -228,7 +228,7 @@ def _load_winoventi(
     return dataset
 
 
-def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
+def _reformat_bias_in_bios_file(pkl_file: Path, bio_min_words: int = 5) -> Path:
     """Reformat the Bias in Bios pickle file on disk."""
     with pkl_file.open("rb") as handle:
         data = pickle.load(handle)
@@ -250,16 +250,25 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
         bb_bio = bb_bio.strip("*• ")
         bb_title = sample["title"].replace("_", " ")
         bb_id = "_".join(part for part in sample["name"] if part)
-        if bb_name not in bb_bio:
+
+        n_occurrences = bb_bio.count(bb_name)
+        if n_occurrences != 1:
             logger.debug(
-                f"will not include sample #{index} because "
-                f"name {bb_name} cannot be found by exact match in bio: "
-                f"{bb_bio}"
+                f"will not include sample #{index} because there are "
+                f"{n_occurrences} (!= 1) occurrences of '{bb_name}' in '{bb_bio}'"
+            )
+            continue
+
+        approx_n_words = len(bb_bio.split())
+        if approx_n_words < bio_min_words:
+            logger.debug(
+                f"will not include sample #{index} because bio '{bb_bio}' contains "
+                f"too few words (approx. < {bio_min_words})"
             )
             continue
 
         entity = bb_name
-        prompt = f"{entity} has the job title of"
+        prompt = f"{entity} has the occupation of"
         context = bb_bio
         attribute = bb_bio[bb_bio.index(bb_name) + len(bb_name) :]
         target_mediated = bb_title
