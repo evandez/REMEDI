@@ -235,7 +235,8 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
 
     # Take only the first sentence of each bio to make the task harder.
     nlp = load_spacy_model("en_core_web_sm")
-    bb_bios = [sample["raw"] for sample in data]
+    bb_names = [sample["name"][0] for sample in data]
+    bb_bios = [sample["raw"].replace("_", name) for sample, name in zip(data, bb_names)]
     bb_bios_abridged = [
         str(next(iter(doc.sents)))
         for doc in tqdm(nlp.pipe(bb_bios), total=len(data), desc="parse biosbias")
@@ -243,24 +244,24 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
 
     # Normalize the samples.
     lines = []
-    for index, (sample, bb_bio) in enumerate(zip(data, bb_bios_abridged)):
+    for index, (sample, bb_name, bb_bio) in enumerate(
+        zip(data, bb_names, bb_bios_abridged)
+    ):
         bb_bio = bb_bio.strip("*• ")
-        bb_name_parts = sample["name"]
-        bb_full_name = " ".join(part for part in bb_name_parts if part)
         bb_title = sample["title"].replace("_", " ")
-        bb_id = "_".join(part for part in bb_name_parts if part)
-        if bb_full_name not in bb_bio:
+        bb_id = "_".join(part for part in sample["name"] if part)
+        if bb_name not in bb_bio:
             logger.debug(
                 f"will not include sample #{index} because "
-                f"name {bb_full_name} cannot be found by exact match in bio: "
+                f"name {bb_name} cannot be found by exact match in bio: "
                 f"{bb_bio}"
             )
             continue
 
-        entity = bb_name_parts[0]
+        entity = bb_name
         prompt = f"{entity} has the job title of"
         context = bb_bio
-        attribute = bb_bio[bb_bio.index(bb_full_name) + len(bb_full_name) :]
+        attribute = bb_bio[bb_bio.index(bb_name) + len(bb_name) :]
         target_mediated = bb_title
 
         line = ContextMediationSample(
