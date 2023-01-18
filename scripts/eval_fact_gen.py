@@ -98,7 +98,9 @@ def main(args: argparse.Namespace) -> None:
         )
         for benchmark_name in args.benchmarks:
             if baseline is not None:
-                results_file = experiment.results_dir / f"{baseline}-baseline.json"
+                results_file = (
+                    experiment.results_dir / baseline / f"{benchmark_name}.json"
+                )
             else:
                 results_file = (
                     experiment.results_dir
