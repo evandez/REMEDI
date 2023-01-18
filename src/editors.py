@@ -1090,8 +1090,13 @@ class RandomEditor(Editor):
         self.mt.model.to(device)
         self.to(device)
 
+        # We never need these columns, so exclude to avoid null collation.
+        columns = data.column_names(
+            dataset, exclude=["target_mediated", "target_unmediated"]
+        )
+
         rc = runningstats.Covariance()
-        with dataset.formatted_as("torch"):
+        with dataset.formatted_as("torch", columns=columns):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset["train"]), batch_size=batch_size
             )
