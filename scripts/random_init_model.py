@@ -24,7 +24,7 @@ def main(args: argparse.Namespace) -> None:
     if out_dir is None:
         out_dir = env_utils.determine_models_dir() / f"{args.model}_random"
 
-    logger.info(f"saving random model to {out_dir}")
+    logger.info(f"saving randomized {args.model} to {out_dir}")
     model.save_pretrained(str(out_dir))
 
 
