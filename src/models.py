@@ -15,7 +15,7 @@ from src.utils.typing import Device, Model, Tokenizer
 import torch
 import transformers
 
-GPT_J_NAME_SHORT = "gpt-j"  # A useful alias for the CLI.
+GPT_J_NAME_SHORT = "gptj"  # A useful alias for the CLI.
 GPT_J_NAME = "EleutherAI/gpt-j-6B"
 EMBEDDING_LAYER = -1
 
@@ -202,7 +202,7 @@ def load_model(
     if name == GPT_J_NAME_SHORT:
         name = GPT_J_NAME
     if fp16 is None:
-        fp16 = GPT_J_NAME_SHORT in name
+        fp16 = name == GPT_J_NAME
 
     torch_dtype = torch.float16 if fp16 else None
 
