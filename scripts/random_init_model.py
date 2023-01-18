@@ -16,21 +16,21 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device="cpu", fp16=args.fp16)
     model = mt.model
 
-    logger.info(f"reinitialization model with seed {args.seed}")
+    logger.info(f"reinitializating model with seed {args.seed}")
     experiment_utils.set_seed(args.seed)
     model.init_weights()
 
-    out_file = args.out_file
-    if out_file is None:
-        out_file = env_utils.determine_models_dir() / f"{args.model}_random"
+    out_dir = args.out_dir
+    if out_dir is None:
+        out_dir = env_utils.determine_models_dir() / f"{args.model}_random"
 
-    logger.info(f"saving random model to {out_file}")
-    model.save_pretrained(str(out_file))
+    logger.info(f"saving random model to {out_dir}")
+    model.save_pretrained(str(out_dir))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="load a model and random init it")
-    parser.add_argument("--out-file", type=Path, help="path to save model")
+    parser.add_argument("--out-dir", type=Path, help="path to save model")
     parser.add_argument("--seed", type=int, default=123456, help="random seed")
     models.add_model_args(parser)
     logging_utils.add_logging_args(parser)
