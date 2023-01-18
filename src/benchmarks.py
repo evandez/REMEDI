@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPT_PREFIX = "The following is an except from a Wikipedia article:\n\n"
 DEFAULT_PROMPT_TEMPLATE = "{} is"
 DEFAULT_MAX_LENGTH = 100
-DEFAULT_TOP_K = 5
+DEFAULT_TOP_K = 3
 DEFAULT_N_TOP_TOKENS = DEFAULT_TOP_K
 
 
