@@ -41,6 +41,16 @@ def main(args: argparse.Namespace) -> None:
             if getattr(args, banned, None) is not None:
                 raise ValueError(f"cannot set --{banned} with --baseline")
 
+        dataset = precompute.editor_inputs_from_dataset(
+            dataset=dataset,
+            mt=mt,
+            return_entity_hiddens=False,
+            return_attribute_hiddens=False,
+            return_token_ranges=False,
+            return_target_token_ids=True,
+            desc="precompute target token ids",
+        )
+
         if baseline == "prepend-context":
             dataset = precompute.prompt_in_context_from_dataset(
                 dataset, output_key="prompt"
