@@ -15,8 +15,8 @@ from src.utils.typing import Device, Model, Tokenizer
 import torch
 import transformers
 
+GPT_J_NAME_SHORT = "gpt-j"  # A useful alias for the CLI.
 GPT_J_NAME = "EleutherAI/gpt-j-6B"
-SUPPORTED_MODELS = ("gpt2-small", "gpt2", "gpt2-xl", GPT_J_NAME)
 EMBEDDING_LAYER = -1
 
 
@@ -54,7 +54,11 @@ def determine_layers(model: ModelAndTokenizer | Model) -> tuple[int, ...]:
     """Return all hidden layer names for the given model."""
     model = unwrap_model(model)
     assert isinstance(model, Model)
-    return (EMBEDDING_LAYER, *range(model.config.n_layer))
+    return (
+        # TODO(evandez): This is currently incompatible with the editor code.
+        # EMBEDDING_LAYER,
+        *range(model.config.n_layer),
+    )
 
 
 @overload
@@ -195,10 +199,10 @@ def load_model(
         ModelAndTokenizer: Loaded model and its tokenizer.
 
     """
-    if name not in SUPPORTED_MODELS:
-        raise ValueError(f"unknown model: {name}")
+    if name == GPT_J_NAME_SHORT:
+        name = GPT_J_NAME
     if fp16 is None:
-        fp16 = name == GPT_J_NAME
+        fp16 = GPT_J_NAME_SHORT in name
 
     torch_dtype = torch.float16 if fp16 else None
 
@@ -230,8 +234,7 @@ def add_model_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--model",
         "-m",
-        choices=SUPPORTED_MODELS,
-        default=GPT_J_NAME,
+        default=GPT_J_NAME_SHORT,
         help="model to edit",
     )
     parser.add_argument("--device", help="device to train on")

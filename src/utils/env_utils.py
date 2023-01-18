@@ -5,9 +5,11 @@ import pathlib
 from src.utils.typing import PathLike
 
 ENV_DATA_DIR = "CM_DATA_DIR"
+ENV_MODELS_DIR = "CM_MODELS_DIR"
 ENV_RESULTS_DIR = "CM_RESULTS_DIR"
 
 DEFAULT_DATA_DIR = "data"
+DEFAULT_MODELS_DIR = "models"
 DEFAULT_RESULTS_DIR = "results"
 
 
@@ -60,6 +62,20 @@ def determine_data_dir(default: PathLike = DEFAULT_DATA_DIR) -> pathlib.Path:
 
     """
     return read_path(ENV_DATA_DIR, default)
+
+
+def determine_models_dir(default: PathLike = DEFAULT_MODELS_DIR) -> pathlib.Path:
+    """Return directory containing project models.
+
+    Args:
+        default (PathLike, optional): Default to use if CM_MODELS_DIR env
+            variable is not set. Defaults to './models'.
+
+    Returns:
+        pathlib.Path: Directory data is stored in.
+
+    """
+    return read_path(ENV_MODELS_DIR, default)
 
 
 def determine_results_dir(default: PathLike = DEFAULT_RESULTS_DIR) -> pathlib.Path:

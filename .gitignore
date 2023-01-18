@@ -130,6 +130,7 @@ dmypy.json
 
 # Project-specific
 data/
+models/
 results/
 *.json
 *.pth
