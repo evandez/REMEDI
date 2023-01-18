@@ -37,7 +37,7 @@ def main(args: argparse.Namespace) -> None:
 
     baseline = args.baseline
     if baseline is not None:
-        for banned in ("layers", "editor_type", "editors_dir"):
+        for banned in ("layers", "editors_dir"):
             if getattr(args, banned, None) is not None:
                 raise ValueError(f"cannot set --{banned} with --baseline")
 
