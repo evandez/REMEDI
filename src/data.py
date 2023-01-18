@@ -236,7 +236,7 @@ def _reformat_bias_in_bios_file(pkl_file: Path) -> Path:
     # Take only the first sentence of each bio to make the task harder.
     nlp = load_spacy_model("en_core_web_sm")
     bb_names = [sample["name"][0] for sample in data]
-    bb_bios = [sample["raw"].replace("_", name) for sample, name in zip(data, bb_names)]
+    bb_bios = [sample["bio"].replace("_", name) for sample, name in zip(data, bb_names)]
     bb_bios_abridged = [
         str(next(iter(doc.sents)))
         for doc in tqdm(nlp.pipe(bb_bios), total=len(data), desc="parse biosbias")
