@@ -202,7 +202,7 @@ def load_model(
     if name == GPT_J_NAME_SHORT:
         name = GPT_J_NAME
     if fp16 is None:
-        fp16 = name == GPT_J_NAME
+        fp16 = name == GPT_J_NAME or GPT_J_NAME_SHORT in name
 
     torch_dtype = torch.float16 if fp16 else None
 
