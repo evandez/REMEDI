@@ -22,7 +22,11 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"loading {args.model} (device={device}, fp16={args.fp16})")
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
-    dataset = data.load_dataset("counterfact", split="train[5000:6000]")
+    if args.small:
+        split = "train[5000:6000]"
+    else:
+        split = "train[5000:]"
+    dataset = data.load_dataset("counterfact", split=split)
     dataset = precompute.from_args(args, dataset)
 
     editors_dir = args.editors_dir
@@ -42,7 +46,7 @@ def main(args: argparse.Namespace) -> None:
             / str(layer)
             / f"{results_file_name}.json"
         )
-        if results_file.exists() and not args.rerun:
+        if results_file.exists():
             logger.info(f"found existing results for layer {layer} at {results_file}")
             continue
 
@@ -92,6 +96,9 @@ if __name__ == "__main__":
     parser.add_argument("--entity-layer", type=int, help="layer to get entity rep from")
     parser.add_argument(
         "--control-task", action="store_true", help="classify on control task"
+    )
+    parser.add_argument(
+        "--small", action="store_true", help="run on a small subset of data"
     )
     # No data args because this only works on CounterFact.
     models.add_model_args(parser)

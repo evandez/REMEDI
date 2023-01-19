@@ -31,7 +31,11 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
     logger.info("loading several data sources")
-    dataset = data.load_dataset("counterfact", split="train[5000:6000]")
+    if args.small:
+        split = "train[5000:6000]"
+    else:
+        split = "train[5000:]"
+    dataset = data.load_dataset("counterfact", split=split)
     dataset = precompute.from_args(args, dataset)
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_counterfact_tfidf_vectorizer()
@@ -109,7 +113,7 @@ def main(args: argparse.Namespace) -> None:
                     / str(layer)
                     / f"{benchmark_name}.json"
                 )
-            if results_file.exists() and not args.rerun:
+            if results_file.exists():
                 logger.info(
                     f"found existing {benchmark_name} results for layer {layer} "
                     f"at {results_file}"
@@ -167,7 +171,9 @@ if __name__ == "__main__":
         choices=("prepend-context",),
         help="run a baseline instead of evaluating an editor",
     )
-    parser.add_argument("--rerun", action="store_true", help="force rerun all evals")
+    parser.add_argument(
+        "--small", action="store_true", help="run on a small subset of data"
+    )
     # No dataset args because this only works for counterfact
     models.add_model_args(parser)
     precompute.add_preprocessing_args(parser)

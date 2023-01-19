@@ -23,7 +23,11 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"loading {args.model} (device={device}, fp16={args.fp16})")
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
-    dataset = data.load_dataset("biosbias", split="train[5000:6000]")
+    if args.small:
+        split = "train[5000:6000]"
+    else:
+        split = "train[5000:]"
+    dataset = data.load_dataset("biosbias", split=split)
     dataset = precompute.from_args(args, dataset)
 
     editors_dir = args.editors_dir
@@ -46,7 +50,7 @@ def main(args: argparse.Namespace) -> None:
     benchmark_kwargs["tfidf_vectorizer"] = tfidf_vectorizer
 
     baseline_results_file = experiment.results_dir / "baseline.json"
-    if not baseline_results_file.exists() or args.rerun:
+    if not baseline_results_file.exists():
         logger.info("begin baseline")
         baseline_results = benchmarks.biosbias_error_correction(
             mt=mt,
@@ -71,7 +75,7 @@ def main(args: argparse.Namespace) -> None:
         results_file = (
             experiment.results_dir / editor_type / str(layer) / "error_correction.json"
         )
-        if results_file.exists() and not args.rerun:
+        if results_file.exists():
             logger.info(f"found existing results for layer {layer} at {results_file}")
             continue
 
@@ -119,7 +123,9 @@ if __name__ == "__main__":
         action="store_true",
         help="evaluate in decontextualized setting",
     )
-    parser.add_argument("--rerun", action="store_true", help="force rerun all evals")
+    parser.add_argument(
+        "--small", action="store_true", help="run on a small subset of data"
+    )
     # No dataset args because this only works on biosbias
     models.add_model_args(parser)
     precompute.add_preprocessing_args(parser)

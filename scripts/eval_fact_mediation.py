@@ -26,9 +26,7 @@ def main(args: argparse.Namespace) -> None:
     results_file = experiment.results_dir / "mediation.json"
     if results_file.exists():
         logger.info(f"found existing results at {results_file}")
-        if not args.rerun:
-            logger.info("--rerun not set, so nothing to run!")
-            exit()
+        exit()
 
     results = benchmarks.mediation(mt=mt, dataset=dataset, device=device)
 
@@ -54,9 +52,6 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="evaluate mediation")
-    parser.add_argument(
-        "--rerun", action="store_true", help="overwrite existing results"
-    )
     # No dataset args because this only works with counterfact for now.
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
