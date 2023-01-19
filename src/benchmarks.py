@@ -980,8 +980,8 @@ def biosbias_error_correction(
 
                 fluency_score = metrics.weighted_n_gram_entropy(generation)
 
-                [generation_tfidf] = tfidf_vectorizer.transform([generation])
-                reference_tfidf = reference_tfidfs[target]
+                [generation_tfidf] = tfidf_vectorizer.transform([generation]).squeeze()
+                reference_tfidf = reference_tfidfs[target].squeeze()
                 consistency_score = metrics.vector_similarity(
                     generation_tfidf, reference_tfidf
                 )
