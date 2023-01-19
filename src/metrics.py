@@ -125,7 +125,12 @@ def tfidf_similarity(
     if isinstance(reference, str):
         reference = [reference]
     sv, rv = tfidf_vectorizer.transform([" ".join(source), " ".join(reference)]).A
-    return np.dot(sv, rv) / np.linalg.norm(sv) / np.linalg.norm(rv)
+    return vector_similarity(sv, rv)
+
+
+def vector_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Compute cosine similarity between two vectors."""
+    return np.dot(a, b) / np.linalg.norm(a) / np.linalg.norm(b)
 
 
 def average_weighted_n_gram_entropy(

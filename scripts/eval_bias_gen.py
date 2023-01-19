@@ -8,6 +8,7 @@ from src import benchmarks, data, editors, models, precompute
 from src.utils import experiment_utils, logging_utils
 
 import torch
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +42,13 @@ def main(args: argparse.Namespace) -> None:
         )
         benchmark_kwargs["entity_occurrence"] = 1
 
+    tfidf_vectorizer = data.load_biosbias_tfidf_vectorizer()
+    benchmark_kwargs["tfidf_vectorizer"] = tfidf_vectorizer
+
     baseline_results_file = experiment.results_dir / "baseline.json"
     if not baseline_results_file.exists() or args.rerun:
         logger.info("begin baseline")
-        baseline_results = benchmarks.error_correction(
+        baseline_results = benchmarks.biosbias_error_correction(
             mt=mt,
             dataset=dataset,
             device=device,
@@ -79,7 +83,7 @@ def main(args: argparse.Namespace) -> None:
             continue
 
         logger.info(f"begin eval for layer {layer}")
-        results = benchmarks.error_correction(
+        results = benchmarks.biosbias_error_correction(
             editor=editor,
             dataset=dataset,
             device=device,

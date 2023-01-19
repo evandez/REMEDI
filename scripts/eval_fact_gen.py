@@ -34,7 +34,7 @@ def main(args: argparse.Namespace) -> None:
     dataset = data.load_dataset("counterfact", split="train[5000:5250]")
     dataset = precompute.from_args(args, dataset)
     attribute_snippets = data.load_attribute_snippets()
-    tfidf_vectorizer = data.load_tfidf_vectorizer()
+    tfidf_vectorizer = data.load_counterfact_tfidf_vectorizer()
 
     baseline = args.baseline
     if baseline is not None:

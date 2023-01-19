@@ -7,7 +7,7 @@ from collections import defaultdict
 from functools import cache
 from itertools import chain
 from pathlib import Path
-from typing import Any, Sequence, TypedDict
+from typing import Any, Sequence, TypedDict, cast
 
 from src.utils import env_utils
 from src.utils.typing import Dataset, PathLike, StrSequence
@@ -372,7 +372,7 @@ def load_attribute_snippets(
     return attribute_snippets
 
 
-def load_tfidf_vectorizer(
+def load_counterfact_tfidf_vectorizer(
     idf_file: Path | None = None,
     vocab_file: Path | None = None,
     idf_url: str = TFIDF_IDF_URL,
@@ -399,6 +399,24 @@ def load_tfidf_vectorizer(
     vec.vocabulary_ = vocab
     vec._tfidf._idf_diag = scipy.sparse.spdiags(idf, diags=0, m=len(idf), n=len(idf))
     return vec
+
+
+def load_biosbias_tfidf_vectorizer(
+    dataset: datasets.arrow_dataset.Dataset | None = None,
+) -> TfidfVectorizer:
+    """Load the tfidf vectorizer for Bias in Bios."""
+    if dataset is None:
+        logger.info("loading full biosbias dataset for tfidf vectorizer")
+        dataset = cast(
+            datasets.arrow_dataset.Dataset, load_dataset("biosbias", split="train")
+        )
+
+    texts = [x["source"] for x in dataset]
+    logger.info(f"create biosbias tfidf vectorizer from {len(texts)} bios")
+
+    tfidf_vectorizer = TfidfVectorizer()
+    tfidf_vectorizer.fit(texts)
+    return tfidf_vectorizer
 
 
 def column_names(dataset: Dataset, exclude: StrSequence | None = None) -> list[str]:

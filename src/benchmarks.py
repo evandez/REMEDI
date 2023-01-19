@@ -9,6 +9,7 @@ from src import data, editors, metrics, models, precompute
 from src.utils import experiment_utils
 from src.utils.typing import Dataset, Device, StrSequence
 
+import numpy as np
 import torch
 import torch.utils.data
 from dataclasses_json import DataClassJsonMixin
@@ -116,7 +117,7 @@ def essence(
     if max_length is None and max_new_tokens is None:
         max_length = DEFAULT_MAX_LENGTH
     if tfidf_vectorizer is None:
-        tfidf_vectorizer = data.load_tfidf_vectorizer()
+        tfidf_vectorizer = data.load_counterfact_tfidf_vectorizer()
     if desc is None:
         desc = "essence benchmark"
 
@@ -712,7 +713,7 @@ def counterfact_generation(
     if attribute_snippets is None:
         attribute_snippets = data.load_attribute_snippets()
     if tfidf_vectorizer is None:
-        tfidf_vectorizer = data.load_tfidf_vectorizer()
+        tfidf_vectorizer = data.load_counterfact_tfidf_vectorizer()
     if max_new_tokens is None and max_length is None:
         max_length = DEFAULT_MAX_LENGTH
     if desc is None:
@@ -820,6 +821,7 @@ class ErrorCorrectionSample:
     """Wrapper around error correction sample."""
 
     id: str
+    prompt: str
     generation: str
 
     predictions: list[str]
@@ -827,6 +829,9 @@ class ErrorCorrectionSample:
 
     logp_predictions: list[float]
     logp_target: float
+
+    fluency: float
+    consistency: float
 
 
 @dataclass(frozen=True)
@@ -837,33 +842,34 @@ class ErrorCorrectionMetrics(DataClassJsonMixin):
     topk_accuracy: float
     k: int
 
+    fluency: metrics.Metric
+    consistency: metrics.Metric
+
 
 @dataclass(frozen=True)
-class ErrorCorrectionBenchmarkResults(DataClassJsonMixin):
+class BiosBiasErrorCorrectionBenchmarkResults(DataClassJsonMixin):
     """Wrapper around error correction benchmark."""
 
     samples: list[ErrorCorrectionSample]
     metrics: ErrorCorrectionMetrics
 
 
-# TODO(evandez): This function can probably be generaized a bit, to handle
-# both the target-comparator setup and the recall@k setup.
 @torch.inference_mode()
-def error_correction(
+def biosbias_error_correction(
     *,
     dataset: Dataset,
     mt: models.ModelAndTokenizer | None = None,
     editor: editors.Editor | None = None,
+    tfidf_vectorizer: TfidfVectorizer | None = None,
+    references: dict | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     top_k: int = DEFAULT_TOP_K,
-    target_key: Literal["target_mediated", "target_unmediated"] = "target_mediated",
     entity_occurrence: int = 0,
     max_length: int | None = None,
     max_new_tokens: int | None = None,
-    labels: StrSequence | None = None,
     device: Device | None = None,
     desc: str | None = None,
-) -> ErrorCorrectionBenchmarkResults:
+) -> BiosBiasErrorCorrectionBenchmarkResults:
     """Run the error correction benchmark.
 
     This benchmark involves measuring accuracy on a classification task,
@@ -874,17 +880,17 @@ def error_correction(
         mt: The model to evaluate. Either this or `editor` must be set.
         editor: The editor to evaluate. Either this or `mt` must be set.
         dataset: The dataset to evaluate on.
+        tfidf_vectorizer: For computing consistency score.
+        references: Mapping from label to reference texts for that label. By default,
+            full bios for each label will be used.
         batch_size: Batch size for model.
         top_k: Compute top-k labels predicted by model.
         prompt_key: Which column in dataset to use as prompt.
-        target_key: Which column in dataset to use as label.
         entity_occurrence: Which entity occurrence to edit. Defaults depends on
             which column is used as prompt.
         max_length: Max number of tokens to generate.
         max_new_tokens: Max number of new tokens to generate. Cannot be used with
             `max_length`, see huggingface docs.
-        labels: Set of labels to consider. If not set, will be determined by looking at
-            all values for column in the dataset.
         device: Send model and data to this device.
         desc: TQDM description.
 
@@ -898,20 +904,27 @@ def error_correction(
     if mt is None:
         assert editor is not None
         mt = editor.mt
-    if desc is None:
-        desc = "error correction"
     if max_length is None and max_new_tokens is None:
         max_length = DEFAULT_MAX_LENGTH
-    if labels is None:
-        labels = list({x[target_key] for x in dataset})
-    labels = sorted(labels)
+    if desc is None:
+        desc = "error correction"
+
+    if tfidf_vectorizer is None:
+        tfidf_vectorizer = data.load_biosbias_tfidf_vectorizer()
+    if references is None:
+        references = defaultdict(list)
+        for sample in dataset:
+            references[sample["target_mediated"]].append(sample["source"]["bio"])
+
+    labels = sorted({x["target_mediated"] for x in dataset})
     labels_token_idx = precompute.first_token_ids_from_batch(mt, labels)
 
-    exclude_columns = []
-    if target_key != "target_unmediated":
-        exclude_columns.append("target_unmediated")
-    columns = data.column_names(dataset, exclude=exclude_columns)
+    reference_tfidfs = {
+        key: tfidf_vectorizer.transform(texts).mean(axis=0)
+        for key, texts in tqdm(references.items(), desc=f"{desc} [reference tfidfs]")
+    }
 
+    columns = data.column_names(dataset, exclude=["target_unmediated"])
     with dataset.formatted_as("torch", columns=columns):
         loader = torch.utils.data.DataLoader(
             cast(torch.utils.data.Dataset, dataset),
@@ -922,7 +935,7 @@ def error_correction(
         for batch in tqdm(loader, desc=desc):
             ids = batch["id"]
             prompts = batch["prompt"]
-            targets = batch[target_key]
+            targets = batch["target_mediated"]
             targets_idx = precompute.first_token_ids_from_batch(mt, targets)
 
             with models.set_padding_side(mt, padding_side="left"):
@@ -948,12 +961,13 @@ def error_correction(
                 outputs = mt.model.generate(**inputs, **generate_kwargs)
 
             generations = mt.tokenizer.batch_decode(
-                outputs.sequences, skip_special_tokens=True
+                outputs.sequences[:, inputs.input_ids.shape[1] :],
+                skip_special_tokens=True,
             )
             distributions = torch.log_softmax(outputs.scores[0], dim=-1)
 
-            for sid, distribution, generation, target, target_idx in zip(
-                ids, distributions, generations, targets, targets_idx
+            for sid, prompt, distribution, generation, target, target_idx in zip(
+                ids, prompts, distributions, generations, targets, targets_idx
             ):
                 label_log_probs = distribution[labels_token_idx]
 
@@ -963,13 +977,25 @@ def error_correction(
                 predictions = [labels[idx] for idx in predictions_idx]
 
                 logp_target = distribution[target_idx]
+
+                fluency_score = metrics.weighted_n_gram_entropy(generation)
+
+                [generation_tfidf] = tfidf_vectorizer.transform([generation])
+                reference_tfidf = reference_tfidfs[target]
+                consistency_score = metrics.vector_similarity(
+                    generation_tfidf, reference_tfidf
+                )
+
                 sample = ErrorCorrectionSample(
                     id=sid,
+                    prompt=prompt,
                     generation=generation,
                     predictions=predictions,
                     logp_predictions=logp_predictions.tolist(),
                     target=target,
                     logp_target=logp_target.item(),
+                    fluency=fluency_score,
+                    consistency=consistency_score,
                 )
                 samples.append(sample)
 
@@ -977,13 +1003,19 @@ def error_correction(
     n_correct_topk = sum(x.target in x.predictions for x in samples)
     top1_accuracy = n_correct_top1 / len(samples)
     topk_accuracy = n_correct_topk / len(samples)
+
+    fluency = metrics.Metric.aggregate([x.fluency for x in samples])
+    consistency = metrics.Metric.aggregate([x.consistency for x in samples])
+
     error_correction_metrics = ErrorCorrectionMetrics(
         top1_accuracy=top1_accuracy,
         topk_accuracy=topk_accuracy,
         k=top_k,
+        fluency=fluency,
+        consistency=consistency,
     )
 
-    return ErrorCorrectionBenchmarkResults(
+    return BiosBiasErrorCorrectionBenchmarkResults(
         samples=samples,
         metrics=error_correction_metrics,
     )
