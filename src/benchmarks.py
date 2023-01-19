@@ -422,14 +422,14 @@ def classification(
     )
 
     runs: dict[str, list[editors.EditorClassificationResult]] = {}
-    for key in ("contextual", "decontextual"):
-        runs[key] = editor.classify(
+    for task in ("contextual", "decontextual"):
+        runs[task] = editor.classify(
             dataset=precomputed,
-            take_entity_from="prompt_in_context" if key == "contextual" else "prompt",
+            take_entity_from="prompt_in_context" if task == "contextual" else "prompt",
             batch_size=batch_size,
             entity_layer=entity_layer,
             device=device,
-            desc=f"{desc} [classify {key}]",
+            desc=f"{desc} [classify {task}]",
             **kwargs,
         ).results
 
@@ -454,8 +454,8 @@ def classification(
 
     benchmark_results_kwargs: dict = defaultdict(dict)
     for task in ("contextual", "decontextual"):
-        y_true = [getattr(sample, key).label for sample in samples]
-        y_pred = [getattr(sample, key).prediction for sample in samples]
+        y_true = [getattr(sample, task).label for sample in samples]
+        y_pred = [getattr(sample, task).prediction for sample in samples]
 
         # If evaluating on the control task, randomly pick ground truth labels while
         # preserving class balance.
