@@ -1004,8 +1004,10 @@ def biosbias_error_correction(
     top1_accuracy = n_correct_top1 / len(samples)
     topk_accuracy = n_correct_topk / len(samples)
 
-    fluency = metrics.Metric.aggregate([x.fluency for x in samples])
-    consistency = metrics.Metric.aggregate([x.consistency for x in samples])
+    fluency = metrics.Metric.aggregate([x.fluency for x in samples], store_values=False)
+    consistency = metrics.Metric.aggregate(
+        [x.consistency for x in samples], store_values=False
+    )
 
     error_correction_metrics = ErrorCorrectionMetrics(
         top1_accuracy=top1_accuracy,
