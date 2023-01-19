@@ -478,7 +478,9 @@ def classification(
             f1=f1, mcc=mcc, accuracy=accuracy
         )
 
-    return ClassificationBenchmarkResults(samples=samples, **benchmark_results_kwargs)
+    return ClassificationBenchmarkResults(
+        samples=samples, metrics=ClassifierMetrics(**benchmark_results_kwargs)
+    )
 
 
 @dataclass(frozen=True)
