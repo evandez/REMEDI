@@ -339,7 +339,7 @@ class ClassificationSample(DataClassJsonMixin):
 
 
 @dataclass(frozen=True)
-class ClassifierMetrics(DataClassJsonMixin):
+class ClassifierTaskMetrics(DataClassJsonMixin):
     """Wrapper around all classification scores."""
 
     f1: float
@@ -348,11 +348,11 @@ class ClassifierMetrics(DataClassJsonMixin):
 
 
 @dataclass(frozen=True)
-class ClassifierResults(DataClassJsonMixin):
+class ClassifierMetrics(DataClassJsonMixin):
     """Wraps results for a specific classifier."""
 
-    contextual: ClassifierMetrics
-    decontextual: ClassifierMetrics
+    contextual: ClassifierTaskMetrics
+    decontextual: ClassifierTaskMetrics
 
 
 @dataclass(frozen=True)
@@ -367,8 +367,7 @@ class ClassificationBenchmarkResults(DataClassJsonMixin):
     """
 
     samples: list[ClassificationSample]
-    editor: ClassifierResults
-    baseline: ClassifierResults
+    metrics: ClassifierMetrics
 
 
 @torch.inference_mode()
@@ -478,7 +477,7 @@ def classification(
             f1=f1, mcc=mcc, accuracy=accuracy
         )
     benchmark_results_kwargs = {
-        key: ClassifierResults(**classifier_results_kwargs)
+        key: ClassifierMetrics(**classifier_results_kwargs)
         for key, classifier_results_kwargs in benchmark_results_kwargs.items()
     }
 

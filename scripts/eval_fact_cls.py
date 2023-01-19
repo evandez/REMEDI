@@ -32,11 +32,14 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"found editors for layers: {layers}")
 
     for layer in layers:
+        results_file_name = "fact-cls"
+        if args.control_task:
+            results_file_name = f"{results_file_name}-control"
         results_file = (
             experiment.results_dir
             / editor_type
             / str(layer)
-            / "fact-classification.json"
+            / f"{results_file_name}.json"
         )
         if results_file.exists() and not args.rerun:
             logger.info(f"found existing results for layer {layer} at {results_file}")
@@ -55,17 +58,15 @@ def main(args: argparse.Namespace) -> None:
             dataset=dataset,
             device=device,
             entity_layer=args.entity_layer,
+            control_task=args.control_task,
         )
 
         for task_key in ("contextual", "decontextual"):
-            for method_key in ("editor", "baseline"):
-                metrics: benchmarks.ClassifierMetrics = getattr(
-                    getattr(results, method_key), task_key
-                )
-                logger.info(
-                    f"{task_key}/{method_key} results:\n%s",
-                    json.dumps(metrics.to_dict(), indent=1),
-                )
+            metrics: benchmarks.ClassifierMetrics = getattr(results, task_key)
+            logger.info(
+                f"{task_key} results:\n%s",
+                json.dumps(metrics.to_dict(), indent=1),
+            )
 
         results_file.parent.mkdir(exist_ok=True, parents=True)
         logger.info(f"writing results to {results_file}")
@@ -88,7 +89,9 @@ if __name__ == "__main__":
         "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
     )
     parser.add_argument("--entity-layer", type=int, help="layer to get entity rep from")
-    parser.add_argument("--rerun", action="store_true", help="force rerun experiments")
+    parser.add_argument(
+        "--control-task", action="store_true", help="classify on control task"
+    )
     # No data args because this only works on CounterFact.
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
