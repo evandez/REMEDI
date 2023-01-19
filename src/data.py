@@ -411,7 +411,7 @@ def load_biosbias_tfidf_vectorizer(
             datasets.arrow_dataset.Dataset, load_dataset("biosbias", split="train")
         )
 
-    texts = [x["source"] for x in dataset]
+    texts = [x["source"]["bio"] for x in dataset]
     logger.info(f"create biosbias tfidf vectorizer from {len(texts)} bios")
 
     tfidf_vectorizer = TfidfVectorizer()
