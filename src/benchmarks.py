@@ -473,7 +473,7 @@ def classification(
         accuracy = accuracy_score(y_true, y_pred)
         f1 = f1_score(y_true, y_pred)
         mcc = matthews_corrcoef(y_true, y_pred)
-        benchmark_results_kwargs[task] = ClassifierMetrics(
+        benchmark_results_kwargs[task] = ClassifierTaskMetrics(
             f1=f1, mcc=mcc, accuracy=accuracy
         )
     benchmark_results_kwargs = {
