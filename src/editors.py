@@ -1108,7 +1108,6 @@ class RandomEditor(Editor):
                         )
                     )
                 rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"].float())
-
         self.mean[:] = rc.mean()
         self.covariance[:] = rc.covariance()
         return EditorTrainingRun(dataset)
@@ -1124,12 +1123,11 @@ class ScalarMultipleEditor(Editor):
         """Initialize the editor."""
         super().__init__(mt=mt, **kwargs)
         hidden_size = models.determine_hidden_size(mt)
-        self.scalar = nn.Linear(2 * hidden_size, 1)
+        self.scalar = nn.Linear(hidden_size, 1)
 
     def forward(self, *, entity: torch.Tensor, attribute: torch.Tensor) -> torch.Tensor:
         """Return multiple of attribute."""
-        inputs = torch.cat([entity, attribute], dim=-1)
-        scalar = self.scalar(inputs)
+        scalar = self.scalar(attribute)
         return scalar * attribute
 
 
