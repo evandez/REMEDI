@@ -1,10 +1,12 @@
 """Standalone functions for benchmarking editor performance across metrics."""
 import logging
+import random
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, Sequence, cast
 
 from src import data, editors, metrics, models, precompute
+from src.utils import experiment_utils
 from src.utils.typing import Dataset, Device, StrSequence
 
 import torch
@@ -374,6 +376,8 @@ def classification(
     *,
     editor: editors.Editor,
     dataset: Dataset,
+    control_task: bool = False,
+    control_task_seed: int | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     entity_layer: int | None = None,
     desc: str | None = None,
@@ -386,6 +390,11 @@ def classification(
         editor: The editor to benchmark.
         dataset: The dataset to benchmark on.
         batch_size: Max number of samples to process at once.
+        control_task: If set, randomly assign ground truth labels to each sample.
+            Note, if you want to test a control *editor* and/or control *model*, just
+            pass them in via the `editor` arg.
+        control_seed: If control_task is True, set this seed before randomly
+            picking labels.
         entity_layer: The layer to get the entity rep from. This can be different
             from the edit layer!
         layer: The layer to grab entity reps from.
@@ -444,28 +453,30 @@ def classification(
         samples.append(sample)
 
     benchmark_results_kwargs: dict = defaultdict(dict)
-    for method in ("editor", "baseline"):
-        for task in ("contextual", "decontextual"):
-            y_true = [getattr(sample, key).label for sample in samples]
-            y_pred = [getattr(sample, key).prediction for sample in samples]
+    for task in ("contextual", "decontextual"):
+        y_true = [getattr(sample, key).label for sample in samples]
+        y_pred = [getattr(sample, key).prediction for sample in samples]
 
-            # In the baseline case, pick the majority label for everything.
-            if method == "baseline":
-                majority = sum(y_true) >= len(y_true) / 2
-                y_pred = [majority] * len(y_true)
+        # If evaluating on the control task, randomly pick ground truth labels while
+        # preserving class balance.
+        if control_task:
+            balance = sum(y_true) / len(y_true)
+            if control_task_seed is not None:
+                experiment_utils.set_seed(control_task_seed)
+            y_true = [random.random() < balance for _ in range(len(y_true))]
 
-            # In the contextual case, we want to classify whether the model will *not* make
-            # the correct prediction. This does not change accuracy/mcc but does change f1.
-            if task == "contextual":
-                y_true = [not x for x in y_true]
-                y_pred = [not x for x in y_pred]
+        # In the contextual case, we want to classify whether the model will *not* make
+        # the correct prediction. This does not change accuracy/mcc but does change f1.
+        if task == "contextual":
+            y_true = [not x for x in y_true]
+            y_pred = [not x for x in y_pred]
 
-            accuracy = accuracy_score(y_true, y_pred)
-            f1 = f1_score(y_true, y_pred)
-            mcc = matthews_corrcoef(y_true, y_pred)
-            benchmark_results_kwargs[method][task] = ClassifierMetrics(
-                f1=f1, mcc=mcc, accuracy=accuracy
-            )
+        accuracy = accuracy_score(y_true, y_pred)
+        f1 = f1_score(y_true, y_pred)
+        mcc = matthews_corrcoef(y_true, y_pred)
+        benchmark_results_kwargs[task] = ClassifierMetrics(
+            f1=f1, mcc=mcc, accuracy=accuracy
+        )
     benchmark_results_kwargs = {
         key: ClassifierResults(**classifier_results_kwargs)
         for key, classifier_results_kwargs in benchmark_results_kwargs.items()
