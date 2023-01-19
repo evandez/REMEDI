@@ -916,7 +916,7 @@ def biosbias_error_correction(
     labels_token_idx = precompute.first_token_ids_from_batch(mt, labels)
 
     reference_tfidfs = {
-        key: tfidf_vectorizer.transform(texts).mean(axis=0)
+        key: tfidf_vectorizer.transform(texts).mean(axis=0).A
         for key, texts in tqdm(references.items(), desc=f"{desc} [reference tfidfs]")
     }
 
@@ -976,10 +976,10 @@ def biosbias_error_correction(
 
                 fluency_score = metrics.weighted_n_gram_entropy(generation)
 
-                [generation_tfidf] = tfidf_vectorizer.transform([generation]).squeeze()
-                reference_tfidf = reference_tfidfs[target].squeeze()
+                [generation_tfidf] = tfidf_vectorizer.transform([generation]).A
+                reference_tfidf = reference_tfidfs[target]
                 consistency_score = metrics.vector_similarity(
-                    generation_tfidf, reference_tfidf
+                    generation_tfidf.squeeze(), reference_tfidf.squeeze()
                 )
 
                 sample = ErrorCorrectionSample(
