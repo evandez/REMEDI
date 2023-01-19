@@ -67,7 +67,7 @@ def main(args: argparse.Namespace) -> None:
         )
 
         for task_key in ("contextual", "decontextual"):
-            metrics: benchmarks.ClassifierMetrics = getattr(results, task_key)
+            metrics: benchmarks.ClassifierMetrics = getattr(results.metrics, task_key)
             logger.info(
                 f"{task_key} results:\n%s",
                 json.dumps(metrics.to_dict(), indent=1),
