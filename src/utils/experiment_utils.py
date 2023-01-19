@@ -113,6 +113,8 @@ def setup_experiment(args: argparse.Namespace) -> Experiment:
     experiment_name = args.experiment_name
     seed = args.seed
 
+    logger.info(f"setting up experiment {experiment_name}")
+
     set_seed(seed)
 
     results_dir = create_results_dir(
