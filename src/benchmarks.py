@@ -477,10 +477,6 @@ def classification(
         benchmark_results_kwargs[task] = ClassifierTaskMetrics(
             f1=f1, mcc=mcc, accuracy=accuracy
         )
-    benchmark_results_kwargs = {
-        key: ClassifierMetrics(**classifier_results_kwargs)
-        for key, classifier_results_kwargs in benchmark_results_kwargs.items()
-    }
 
     return ClassificationBenchmarkResults(samples=samples, **benchmark_results_kwargs)
 
