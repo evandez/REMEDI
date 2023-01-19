@@ -23,6 +23,7 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
     dataset = data.load_dataset("biosbias", split="train[5000:5250]")
+    dataset = precompute.from_args(args, dataset)
 
     editors_dir = args.editors_dir
     editor_type = args.editor_type
@@ -117,6 +118,7 @@ if __name__ == "__main__":
     parser.add_argument("--rerun", action="store_true", help="force rerun all evals")
     # No dataset args because this only works on biosbias
     models.add_model_args(parser)
+    precompute.add_preprocessing_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     args = parser.parse_args()

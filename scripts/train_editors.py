@@ -27,6 +27,7 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
     dataset: Dataset = data.load_dataset(args.dataset, split="train[:5000]")
+    dataset = precompute.from_args(args, dataset)
 
     layers = args.layers
     if layers is None:
@@ -150,6 +151,7 @@ if __name__ == "__main__":
     )
     data.add_dataset_args(parser)
     models.add_model_args(parser)
+    precompute.add_preprocessing_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     args = parser.parse_args()

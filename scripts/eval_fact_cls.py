@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 
-from src import benchmarks, data, editors, models
+from src import benchmarks, data, editors, models, precompute
 from src.utils import experiment_utils, logging_utils
 
 import torch
@@ -23,6 +23,7 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
     dataset = data.load_dataset("counterfact", split="train[5000:5250]")
+    dataset = precompute.from_args(args, dataset)
 
     editors_dir = args.editors_dir
     editor_type = args.editor_type
@@ -94,6 +95,7 @@ if __name__ == "__main__":
     )
     # No data args because this only works on CounterFact.
     models.add_model_args(parser)
+    precompute.add_preprocessing_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     args = parser.parse_args()

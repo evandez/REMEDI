@@ -1,4 +1,5 @@
 """Logic for getting and mucking with model hidden representations."""
+import argparse
 from functools import partial
 from typing import Any, Literal, Optional, Sequence, cast, overload
 
@@ -833,3 +834,30 @@ def model_predictions_from_dataset(
         keep_in_memory=True,
         num_proc=1,
     )
+
+
+def add_preprocessing_args(
+    parser: argparse.ArgumentParser, add_prompt_in_context: bool = True
+) -> None:
+    """Add common preprocessing args.
+
+    The args include:
+        --attribute-no-entity: When computing attribute rep, do not use entity.
+
+    """
+    parser.add_argument(
+        "--attribute-no-entity",
+        type=bool,
+        action="store_true",
+        default=False,
+        help="set context = attribute",
+    )
+
+
+def from_args(args: argparse.Namespace, dataset: Dataset) -> Dataset:
+    """Apply all the preprocessing steps determined by the args."""
+    if args.attribute_no_entity:
+        dataset = dataset.map(
+            lambda e: {"context": e["attribute"]}, desc="set context=attribute"
+        )
+    return dataset
