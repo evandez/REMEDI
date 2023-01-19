@@ -847,7 +847,6 @@ def add_preprocessing_args(
     """
     parser.add_argument(
         "--attribute-no-entity",
-        type=bool,
         action="store_true",
         default=False,
         help="set context = attribute",
