@@ -26,6 +26,7 @@ def main(args: argparse.Namespace) -> None:
 
     logger.info(f"saving randomized {args.model} to {out_dir}")
     model.save_pretrained(str(out_dir))
+    mt.tokenizer.save_pretrained(str(out_dir))
 
 
 if __name__ == "__main__":
