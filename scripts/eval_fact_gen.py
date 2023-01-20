@@ -145,6 +145,10 @@ def main(args: argparse.Namespace) -> None:
             with results_file.open("w") as handle:
                 json.dump(results.to_dict(), handle)
 
+            metrics_file = results_file.parent / f"{benchmark_name}-metrics.json"
+            with metrics_file.open("w") as handle:
+                json.dump(results.metrics.to_dict(), handle)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="evaluate editors")
