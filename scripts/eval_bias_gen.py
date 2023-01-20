@@ -26,7 +26,7 @@ def main(args: argparse.Namespace) -> None:
     if args.small:
         split = "train[5000:6000]"
     else:
-        split = "train[5000:]"
+        split = "train[5000:10000]"
     dataset = data.load_dataset("biosbias", split=split)
     dataset = precompute.from_args(args, dataset)
 
