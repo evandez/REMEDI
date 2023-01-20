@@ -103,7 +103,7 @@ def main(args: argparse.Namespace) -> None:
         with results_file.open("w") as handle:
             json.dump(results.to_dict(), handle)
 
-        metrics_file = results_file.parent / f"error_correction_metrics.json"
+        metrics_file = results_file.parent / f"{results_file.stem}_metrics.json"
         with metrics_file.open("w") as handle:
             json.dump(results.metrics.to_dict(), handle)
 

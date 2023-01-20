@@ -2,6 +2,7 @@
 import argparse
 import json
 import logging
+import random
 from pathlib import Path
 
 from src import benchmarks, data, editors, models, precompute
@@ -18,6 +19,25 @@ BENCHMARKS = (
     "generation",
     "essence",
 )
+
+
+def _replace_entity(attribute_snippets: data.AttributeSnippets, sample: dict) -> dict:
+    """Replace entity with one that has same target attribute."""
+    requested_rewrite = sample["source"]["requested_rewrite"]
+    relation_id = requested_rewrite["relation_id"]
+    target_id = requested_rewrite["target_new"]["id"]
+    candidates = attribute_snippets[relation_id][target_id]
+    replacement = random.choice(candidates)["name"]
+
+    entity = sample["entity"]
+    context = sample["context"]
+    prompt = sample["prompt"]
+
+    return {
+        "entity": replacement,
+        "context": context.replace(entity, replacement),
+        "prompt": prompt.replace(entity, replacement),
+    }
 
 
 def main(args: argparse.Namespace) -> None:
@@ -56,10 +76,12 @@ def main(args: argparse.Namespace) -> None:
             desc="precompute target token ids",
         )
 
-        if baseline == "prepend-context":
+        if baseline == "prefix":
             dataset = precompute.prompt_in_context_from_dataset(
                 dataset, output_key="prompt"
             )
+        elif baseline == "replace":
+            dataset = dataset.map(_replace_entity, desc="replace entities")
         else:
             raise ValueError(f"unknown baseline: {baseline}")
 
@@ -145,7 +167,7 @@ def main(args: argparse.Namespace) -> None:
             with results_file.open("w") as handle:
                 json.dump(results.to_dict(), handle)
 
-            metrics_file = results_file.parent / f"{benchmark_name}-metrics.json"
+            metrics_file = results_file.parent / f"{benchmark_name}_metrics.json"
             with metrics_file.open("w") as handle:
                 json.dump(results.metrics.to_dict(), handle)
 
@@ -172,7 +194,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--baseline",
-        choices=("prepend-context",),
+        choices=("prefix", "replace"),
         help="run a baseline instead of evaluating an editor",
     )
     parser.add_argument(
