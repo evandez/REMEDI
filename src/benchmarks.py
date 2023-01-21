@@ -460,10 +460,8 @@ def classification(
         # If evaluating on the control task, randomly pick ground truth labels while
         # preserving class balance.
         if control_task:
-            balance = sum(y_true) / len(y_true)
-            if control_task_seed is not None:
-                experiment_utils.set_seed(control_task_seed)
-            y_true = [random.random() < balance for _ in range(len(y_true))]
+            logger.info(f"control_task=True (seed={control_task_seed}), shuffling labels")
+            y_true = _make_control_task(y_true, seed=control_task_seed)
 
         # In the contextual case, we want to classify whether the model will *not* make
         # the correct prediction. This does not change accuracy/mcc but does change f1.
@@ -481,6 +479,15 @@ def classification(
     return ClassificationBenchmarkResults(
         samples=samples, metrics=ClassifierMetrics(**benchmark_results_kwargs)
     )
+
+
+def _make_control_task(y_true: list[bool], seed: int | None = None) -> list[bool]:
+    """Turn the real ground truth labels into a control task."""
+    y_control = list(y_true)
+    if seed is not None:
+        experiment_utils.set_seed(seed)
+    random.shuffle(y_control)
+    return y_control
 
 
 @dataclass(frozen=True)
@@ -1064,6 +1071,8 @@ def biosbias_error_classification(
     editor: editors.Editor,
     dataset: Dataset,
     normalize: bool = True,
+    control_task: bool = False,
+    control_task_seed: int | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     top_k: int = DEFAULT_TOP_K,
     labels: StrSequence | None = None,
@@ -1207,6 +1216,10 @@ def biosbias_error_classification(
                 ground_truth=ground_truth,
             )
         )
+
+    if control_task:
+        logger.info(f"control_task=True (seed={control_task_seed}), shuffling labels")
+        y_true = _make_control_task(y_true, seed=control_task_seed)
 
     f1 = f1_score(y_true, y_pred)
     mcc = matthews_corrcoef(y_true, y_pred)

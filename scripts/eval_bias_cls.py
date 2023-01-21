@@ -80,7 +80,11 @@ def main(args: argparse.Namespace) -> None:
                 f"begin editor_layer={editor_layer}, entity_layer={entity_layer}"
             )
             results = benchmarks.biosbias_error_classification(
-                editor=editor, dataset=dataset, device=device, labels=labels
+                editor=editor,
+                dataset=dataset,
+                device=device,
+                labels=labels,
+                control_task=args.control_task,
             )
             logging.info(
                 f"benchmark complete! results:\n%s",
@@ -119,7 +123,12 @@ if __name__ == "__main__":
         default=editors.DEFAULT_BATCH_SIZE,
         help="model batch size",
     )
-    parser.add_argument("--small", action="store_true", help="use subset of data")
+    parser.add_argument(
+        "--control-task", default=False, action="store_true", help="use control task"
+    )
+    parser.add_argument(
+        "--small", default=False, action="store_true", help="use subset of data"
+    )
     # No data args because this only works on biosbias.
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
