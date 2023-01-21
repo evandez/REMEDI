@@ -1027,13 +1027,25 @@ class ErrorClassificationSample(DataClassJsonMixin):
 
     id: str
 
-    model_top5: list[str]
-    model_top5_logp: list[float]
+    model_top_k: list[str]
+    model_top_k_logp: list[float]
 
-    editor_top5: list[str]
-    editor_top5_scores: list[float]
+    predicted_top_k: list[str]
+    predicted_top_k_scores: list[float]
 
     ground_truth: str
+
+
+@dataclass(frozen=True)
+class ErrorClassificationMetrics(DataClassJsonMixin):
+    """Wrapper around metrics for error classification."""
+
+    f1: float
+    mcc: float
+
+    recall_1: float
+    recall_k: float
+    k: int
 
 
 @dataclass(frozen=True)
@@ -1041,7 +1053,7 @@ class BiosBiasErrorClassificationBenchmarkResults(DataClassJsonMixin):
     """Wrapper around biosbias error classification results."""
 
     samples: list[ErrorClassificationSample]
-    metrics: ClassifierTaskMetrics
+    metrics: ErrorClassificationMetrics
 
 
 @torch.inference_mode()
@@ -1051,6 +1063,7 @@ def biosbias_error_classification(
     dataset: Dataset,
     normalize: bool = True,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
+    top_k: int = DEFAULT_TOP_K,
     labels: StrSequence | None = None,
     entity_layer: int | None = None,
     device: Device | None = None,
@@ -1066,19 +1079,37 @@ def biosbias_error_classification(
 
     columns = data.column_names(dataset)
 
-    precomputed = dataset
     if "prompt_in_context" not in columns:
-        precomputed = precompute.prompt_in_context_from_dataset(precomputed)
+        dataset = precompute.prompt_in_context_from_dataset(dataset)
 
-    precomputed = precompute.classification_inputs_from_dataset(
-        editor.mt, dataset, layers=layers, device=device, batch_size=batch_size
+    # Compute model's predictions on prompt, no editing.
+    if "prompt_in_context.other_targets.logp" not in columns:
+        dataset = precompute.model_predictions_from_dataset(
+            editor.mt,
+            dataset,
+            other_targets=labels,
+            device=device,
+            batch_size=batch_size,
+            desc=f"{desc} [model predictions]",
+        )
+
+    # Compute editor inputs (attribute reps).
+    # TODO(evandez): Should probably eventually check if this already is there.
+    dataset = precompute.classification_inputs_from_dataset(
+        editor.mt,
+        dataset,
+        layers=layers,
+        device=device,
+        batch_size=batch_size,
+        desc=f"{desc} [attr reps]",
     )
 
     key_h_entity = f"prompt_in_context.entity.hiddens.{entity_layer}.last"
 
+    # Compute editor directions.
     h_entities = []
     direction_groups = []
-    for row in dataset:
+    for row in tqdm(dataset, desc=f"{desc} [editor directions]"):
         entity = row["entity"]
         ground_truth = row["target_mediated"].strip().lower()
         attributes = [
@@ -1112,38 +1143,69 @@ def biosbias_error_classification(
         mu_h_entity = h_entities_stacked.mean(dim=0, keepdim=True)
         std_h_entity = h_entities_stacked.std(dim=0, keepdim=True)
         h_entities = [
-            (h_e[None] - mu_h_entity) / std_h_entity for h_e in h_entities_stacked
+            (h_e[None] - mu_h_entity) / std_h_entity
+            for h_e in tqdm(h_entities_stacked, desc=f"{desc} [normalze h_e]")
         ]
 
         mu_directions = directions_stacked.mean(dim=0, keepdim=True)
         std_directions = directions_stacked.std(dim=0, keepdim=True)
         direction_groups = [
             (directions - mu_directions) / (std_directions)
-            for directions in direction_groups
+            for directions in tqdm(
+                direction_groups, desc=f"{desc} [normalize directions]"
+            )
         ]
 
     # Bundle up the results.
-    recalled = []
     y_pred = []
     y_true = []
-    for sample, h_e, directions in list(zip(precomputed, h_entities, direction_groups)):
-        scores = h_e[None].mul(directions).sum(dim=-1)
+    recalled_1 = []
+    recalled_k = []
+    samples = []
+    for row, h_entity, directions in tqdm(
+        list(zip(precomputed, h_entities, direction_groups)), desc=f"{desc} [metrics]"
+    ):
+        scores = h_entity[None].mul(directions).sum(dim=-1)
+        predicted_top_k_scores, predicted_top_k_idx = scores.topk(k=top_k)
+        predicted_top_k_idx = predicted_top_k_idx.squeeze().tolist()
+        predicted_top_k_scores = predicted_top_k_scores.squeez().tolist()
+        predicted_top_k = [labels[idx] for idx in predicted_top_k_idx]
 
-        probe_predictions_idx = scores.topk(k=3).indices.squeeze().tolist()
-        model_predictions_idx = (
-            sample["scores"].topk(dim=-1, k=3).indices.squeeze().tolist()
+        model_logp = torch.tensor(row["prompt_in_context.other_targets.logp"])
+        model_top_k_logp, model_top_k_idx = model_logp.topk(dim=-1, k=top_k)
+        model_top_k_idx = model_top_k_idx.squeeze().tolist()
+        model_top_k_logp = model_top_k_logp.squeeze().tolist()
+        model_top_k = [labels[idx] for idx in model_top_k_idx]
+        model_top_1 = model_top_k[0]
+
+        y_true.append(ground_truth != model_top_1)
+        y_pred.append(ground_truth not in predicted_top_k)
+
+        recalled_1.append(ground_truth == predicted_top_k[0])
+        recalled_k.append(ground_truth in predicted_top_k)
+
+        samples.append(
+            ErrorClassificationSample(
+                id=row["id"],
+                model_top_k=model_top_k,
+                model_top_k_logp=model_top_k_logp,
+                predicted_top_k=predicted_top_k,
+                predicted_top_k_scores=predicted_top_k_scores,
+                ground_truth=ground_truth,
+            )
         )
 
-        probe_predictions = [labels[idx] for idx in probe_predictions_idx]
-        model_prediction = labels[model_predictions_idx[0]]
+    f1 = f1_score(y_true, y_pred)
+    mcc = matthews_corrcoef(y_true, y_pred)
+    recall_1 = sum(recalled_1) / len(recalled_1)
+    recall_k = sum(recalled_k) / len(recalled_k)
+    error_classification_metrics = ErrorClassificationMetrics(
+        f1=f1, mcc=mcc, recall_1=recall_1, recall_k=recall_k, k=top_k
+    )
 
-        y_true.append(model_prediction != ground_truth)
-        y_pred.append(ground_truth not in probe_predictions)
-
-        recalled.append(ground_truth in probe_predictions)
-
-    # TODO(evandez): Finish implementing.
-    return BiosBiasErrorClassificationBenchmarkResults(None, None)  # type: ignore
+    return BiosBiasErrorClassificationBenchmarkResults(
+        samples=samples, metrics=error_classification_metrics
+    )
 
 
 @dataclass(frozen=True)

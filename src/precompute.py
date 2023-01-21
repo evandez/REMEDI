@@ -775,19 +775,29 @@ def has_classification_inputs(batch: dict) -> bool:
     return "context_unmediated" in batch
 
 
+PromptKey = Literal["prompt", "prompt_in_context"]
+TargetKey = Literal["target_mediated", "target_unmediated"]
+
+
 @torch.inference_mode()
 def model_predictions_from_batch(
     mt: models.ModelAndTokenizer,
     batch: dict,
     device: Device | None = None,
     return_top_k: int = 5,
-    input_prompt_key: str = "prompt",
-    input_target_key: str = "target_unmediated",
-    input_comparator_key: str | None = "target_mediated",
+    input_prompt_key: PromptKey = "prompt",
+    input_target_key: TargetKey | None = "target_unmediated",
+    input_comparator_key: TargetKey | None = "target_mediated",
+    other_targets: StrSequence | None = None,
+    other_targets_idx: Sequence[int] | None = None,
     output_correct_key: str = "model_correct",
+    output_other_targets_key: str = "other_targets",
     output_top_tokens_key: str = "top_tokens",
 ) -> dict:
     """Precompute model predictions on prompt from the batch."""
+    if other_targets is not None and other_targets_idx is None:
+        other_targets_idx = first_token_ids_from_batch(mt, other_targets).tolist()
+
     prompts = batch[input_prompt_key]
     with models.set_padding_side(mt, padding_side="left"):
         inputs, _ = inputs_from_batch(mt, prompts, device=device)
@@ -803,10 +813,13 @@ def model_predictions_from_batch(
     precomputed[f"{input_prompt_key}.{output_top_tokens_key}"] = top_tokens
 
     batch_idx = torch.arange(len(prompts))
-    targets = batch[input_target_key]
-    targets_token_idx = first_token_ids_from_batch(mt, targets)
-    targets_log_p = distribution[batch_idx, targets_token_idx]
-    precomputed[f"{input_prompt_key}.{input_target_key}.logp"] = targets_log_p.tolist()
+    if input_target_key:
+        targets = batch[input_target_key]
+        targets_token_idx = first_token_ids_from_batch(mt, targets)
+        targets_log_p = distribution[batch_idx, targets_token_idx]
+        precomputed[
+            f"{input_prompt_key}.{input_target_key}.logp"
+        ] = targets_log_p.tolist()
 
     if input_comparator_key is not None:
         comparators = batch[input_comparator_key]
@@ -815,6 +828,12 @@ def model_predictions_from_batch(
         precomputed[
             f"{input_prompt_key}.{input_comparator_key}.logp"
         ] = comparators_log_p.tolist()
+
+    if other_targets_idx is not None:
+        key = f"{input_prompt_key}.{output_other_targets_key}.logp"
+        precomputed[key] = distribution[:, other_targets_idx].tolist()
+
+    if input_target_key is not None and input_comparator_key is not None:
         precomputed[f"{input_prompt_key}.{output_correct_key}"] = targets_log_p.gt(
             comparators_log_p
         ).tolist()
@@ -828,14 +847,19 @@ def model_predictions_from_dataset(
     device: Optional[Device] = None,
     batch_size: int = 64,
     desc: str | None = "precompute model predictions",
+    other_targets: StrSequence | None = None,
+    other_targets_idx: Sequence[int] | None = None,
     **kwargs: Any,
 ) -> Dataset:
     """Precompute model predictions for the whole dataset."""
+    if other_targets is not None and other_targets_idx is None:
+        other_targets_idx = first_token_ids_from_batch(mt, other_targets).tolist()
     return dataset.map(
         partial(
             model_predictions_from_batch,
             mt,
             device=device,
+            other_targets_idx=other_targets_idx,
             **kwargs,
         ),
         batched=True,
@@ -846,9 +870,7 @@ def model_predictions_from_dataset(
     )
 
 
-def add_preprocessing_args(
-    parser: argparse.ArgumentParser, add_prompt_in_context: bool = True
-) -> None:
+def add_preprocessing_args(parser: argparse.ArgumentParser) -> None:
     """Add common preprocessing args.
 
     The args include:

@@ -1,8 +1,9 @@
 """Evaluate direction classification in Bias in Bios setting."""
 import argparse
+import json
 import logging
 
-from src import data, editors, models, precompute
+from src import benchmarks, data, editors, models, precompute
 from src.utils import experiment_utils, logging_utils
 
 import torch
@@ -27,12 +28,74 @@ def main(args: argparse.Namespace) -> None:
     dataset = data.load_dataset("biosbias", split=split)
     dataset = precompute.from_args(args, dataset)
 
-    # TODO(evandez): Finish.
+    # Precompute model's predictions on prompt in context, no editing.
+    labels = sorted({x["target_mediated"] for x in dataset})
+    dataset = precompute.prompt_in_context_from_dataset(dataset)
+    dataset = precompute.model_predictions_from_dataset(
+        mt,
+        dataset,
+        other_targets=labels,
+        device=device,
+        batch_size=editors.DEFAULT_BATCH_SIZE,
+        desc=f"error classification [model predictions]",
+    )
+
+    editor_layers = args.editor_layers
+    entity_layers = args.entity_layers
+    editor_type = args.editor_type
+    editors_dir = args.editors_dir
+
+    for editor_layer in editor_layers:
+        editor = editors.load_editor(
+            mt, editor_type, editor_layer, editors_dir=editors_dir, device=device
+        )
+        if editor is None:
+            logger.warning(f"skipping benchmark for editor layer {editor_layer}")
+            continue
+
+        for entity_layer in entity_layers:
+            results_file = (
+                experiment.results_dir
+                / editor_type
+                / str(editor_layer)
+                / f"error_cls_layer_{entity_layer}.json"
+            )
+            if results_file.exists():
+                logger.info(
+                    f"found existing results for editor layer {editor_layer}, "
+                    f"entity layer {entity_layer} at {results_file}"
+                )
+                continue
+
+            logger.info(
+                f"begin editor_layer={editor_layer}, entity_layer={entity_layer}"
+            )
+            results = benchmarks.biosbias_error_classification(
+                editor=editor, dataset=dataset, device=device
+            )
+            logging.info(
+                f"benchmark complete! results:\n%s",
+                json.dumps(results.metrics.to_dict(), indent=1),
+            )
+
+            results_file.parent.mkdir(exist_ok=True, parents=True)
+            with results_file.open("w") as handle:
+                json.dump(results.to_dict(), handle)
+
+            metrics_file = results_file.parent / f"{results_file.stem}_metrics.json"
+            with metrics_file.open("w") as handle:
+                json.dump(results.metrics.to_dict(), handle)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="evaluate classification in bias setting"
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=editors.DEFAULT_BATCH_SIZE,
+        help="model batch size",
     )
     # No data args because this only works on biosbias.
     models.add_model_args(parser)
