@@ -21,6 +21,7 @@ def main(args: argparse.Namespace) -> None:
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"loading {args.model} (device={device}, fp16={args.fp16})")
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
+    n_layers = len(models.determine_layers(mt))
 
     if args.small:
         split = "train[5000:6000]"
@@ -31,52 +32,69 @@ def main(args: argparse.Namespace) -> None:
 
     editors_dir = args.editors_dir
     editor_type = args.editor_type
-    layers = args.layers
-    if layers is None:
-        layers = editors.list_saved_editors(editors_dir)[editor_type]
-    logger.info(f"found editors for layers: {layers}")
+    editor_layers = args.editor_layers
+    if editor_layers is None:
+        editor_layers = editors.list_saved_editors(editors_dir)[editor_type]
+    logger.info(f"found editors for layers: {editor_layers}")
 
-    for layer in layers:
-        results_file_name = "fact-cls"
-        if args.control_task:
-            results_file_name = f"{results_file_name}-control"
-        results_file = (
-            experiment.results_dir
-            / editor_type
-            / str(layer)
-            / f"{results_file_name}.json"
-        )
-        if results_file.exists():
-            logger.info(f"found existing results for layer {layer} at {results_file}")
-            continue
-
+    for editor_layer in editor_layers:
         editor = editors.load_editor(
-            mt, editor_type, layer, editors_dir=editors_dir, device=device
+            mt, editor_type, editor_layer, editors_dir=editors_dir, device=device
         )
         if editor is None:
-            logger.warning(f"skipping benchmark for layer {layer}")
+            logger.warning(f"skipping benchmark for editor layer {editor_layer}")
             continue
 
-        logger.info(f"begin classification for layer {layer}")
-        results = benchmarks.classification(
-            editor=editor,
-            dataset=dataset,
-            device=device,
-            entity_layer=args.entity_layer,
-            control_task=args.control_task,
-        )
+        entity_layers = args.entity_layers
+        if entity_layers is None:
+            entity_layers = range(editor_layer, n_layers)
+        logger.info(f"will probe at layers: {entity_layers}")
 
-        for task_key in ("contextual", "decontextual"):
-            metrics: benchmarks.ClassifierMetrics = getattr(results.metrics, task_key)
+        for entity_layer in entity_layers:
+            results_file_name = f"fact_cls_layer_{entity_layer}"
+            if args.control_task:
+                results_file_name = f"{results_file_name}_control_task"
+            results_file = (
+                experiment.results_dir
+                / editor_type
+                / str(editor_layer)
+                / f"{results_file_name}.json"
+            )
+            if results_file.exists():
+                logger.info(
+                    f"found existing results for editor layer {editor_layer}, "
+                    f"entity layer {entity_layer} at {results_file}"
+                )
+                continue
+
             logger.info(
-                f"{task_key} results:\n%s",
-                json.dumps(metrics.to_dict(), indent=1),
+                f"begin editor_layer={editor_layer}, entity_layer={entity_layer}"
+            )
+            results = benchmarks.classification(
+                editor=editor,
+                dataset=dataset,
+                device=device,
+                entity_layer=entity_layer,
+                control_task=args.control_task,
             )
 
-        results_file.parent.mkdir(exist_ok=True, parents=True)
-        logger.info(f"writing results to {results_file}")
-        with results_file.open("w") as handle:
-            json.dump(results.to_dict(), handle)
+            for task_key in ("contextual", "decontextual"):
+                metrics: benchmarks.ClassifierMetrics = getattr(
+                    results.metrics, task_key
+                )
+                logger.info(
+                    f"{task_key} results:\n%s",
+                    json.dumps(metrics.to_dict(), indent=1),
+                )
+
+            results_file.parent.mkdir(exist_ok=True, parents=True)
+            logger.info(f"writing results to {results_file}")
+            with results_file.open("w") as handle:
+                json.dump(results.to_dict(), handle)
+
+            metrics_file = results_file.parent / f"{results_file.stem}_metrics.json"
+            with metrics_file.open("w") as handle:
+                json.dump(results.metrics.to_dict(), handle)
 
 
 if __name__ == "__main__":
@@ -91,9 +109,11 @@ if __name__ == "__main__":
         help="path to editor experiment",
     )
     parser.add_argument(
-        "--layers", "-l", nargs="+", type=int, help="layers to test editors for"
+        "--editor-layers", "-l", nargs="+", type=int, help="layers to test editors for"
     )
-    parser.add_argument("--entity-layer", type=int, help="layer to get entity rep from")
+    parser.add_argument(
+        "--entity-layers", nargs="+", type=int, help="layers to get probe entity at"
+    )
     parser.add_argument(
         "--control-task", action="store_true", help="classify on control task"
     )
