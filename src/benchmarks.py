@@ -460,7 +460,9 @@ def classification(
         # If evaluating on the control task, randomly pick ground truth labels while
         # preserving class balance.
         if control_task:
-            logger.info(f"control_task=True (seed={control_task_seed}), shuffling labels")
+            logger.info(
+                f"control_task=True (seed={control_task_seed}), shuffling labels"
+            )
             y_true = _make_control_task(y_true, seed=control_task_seed)
 
         # In the contextual case, we want to classify whether the model will *not* make
