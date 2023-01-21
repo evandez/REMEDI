@@ -3,6 +3,7 @@ import argparse
 import json
 import logging
 import random
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -24,6 +25,28 @@ BENCHMARKS = (
 )
 
 
+def _prefix_context(sample: dict) -> dict:
+    """Prepend context to all prompts used in the eval."""
+    entity = sample["entity"]
+    prompt = sample["prompt"]
+    context = sample["context"]
+
+    prompt_in_context = precompute.prompt_in_context_from_sample(
+        entity, prompt, context
+    )
+
+    source = {**sample["source"]}
+    for key in ("generation_prompts", "paraphrase_prompts"):
+        source[key] = [
+            precompute.prompt_in_context_from_sample(
+                entity, other_prompt, context
+            )
+            for other_prompt in source[key]
+        ]
+
+    return {"source": source, "prompt": prompt_in_context}
+
+
 def _replace_entity(attribute_snippets: data.AttributeSnippets, sample: dict) -> dict:
     """Replace entity with one that has same target attribute."""
     requested_rewrite = sample["source"]["requested_rewrite"]
@@ -36,10 +59,15 @@ def _replace_entity(attribute_snippets: data.AttributeSnippets, sample: dict) ->
     context = sample["context"]
     prompt = sample["prompt"]
 
+    source = {**sample["source"]}
+    for key in ("generation_prompts", "paraphrase_prompts"):
+        source[key] = [x.replace(entity, replacement) for x in source[key]]
+
     return {
         "entity": replacement,
         "context": context.replace(entity, replacement),
         "prompt": prompt.replace(entity, replacement),
+        "source": source,
     }
 
 
@@ -114,11 +142,11 @@ def main(args: argparse.Namespace) -> None:
         )
 
         if baseline == "prefix":
-            dataset = precompute.prompt_in_context_from_dataset(
-                dataset, output_key="prompt"
-            )
+            dataset = dataset.map(_prefix_context, desc="prefix context")
         elif baseline == "replace":
-            dataset = dataset.map(_replace_entity, desc="replace entities")
+            dataset = dataset.map(
+                partial(_replace_entity, attribute_snippets), desc="replace entities"
+            )
         else:
             raise ValueError(f"unknown baseline: {baseline}")
 

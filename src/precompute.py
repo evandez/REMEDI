@@ -423,14 +423,15 @@ def has_editor_inputs(batch: dict) -> bool:
     return "prompt.entity.token_range" in batch  # Check for just one flag entry.
 
 
-def prompt_in_context_from_batch(
-    batch: data.ContextMediationInput,
-    output_key: str = "prompt_in_context",
+def prompt_in_context_from_sample(
+    entity: str,
+    prompt: str,
+    context: str,
     context_prefix: str | None = None,
     context_suffix: str | None = None,
     prompt_prefix: str | None = None,
-) -> dict:
-    """Compute prompt in context from batch.
+) -> str:
+    """Compute prompt in context for the sample.
 
     The prompt in context is simply the "prompt" field in each sample prepended with
     the "context" field. This function tries to make the casing look sensible while
@@ -439,7 +440,48 @@ def prompt_in_context_from_batch(
     Can optionally include prefixes for all contexts and/or for all prompts. This is
     useful for adding function or transition words between the prompt and context so
     that the language model can better reconcile the task.
+
+    Args:
+        entity: The entity.
+        prompt: The prompt.
+        context: The context.
+        context_prefix: Prepend this to context.
+        context_suffix: Append this to context.
+        prompt_prefix: Prepend this to prompt, but after context.
+
+
+    Returns:
+        A single string with the context followed by the prompt.
+
     """
+    if prompt_prefix is not None:
+        if not prompt.startswith(entity):
+            prompt = _remove_sent_case(prompt)
+        prompt = f"{prompt_prefix}{prompt}"
+
+    if context_prefix is not None:
+        if not context.startswith(entity):
+            context = _remove_sent_case(context)
+        context = f"{context_prefix} {context}"
+
+    # Always make sure context is a complete, period-ended sentence.
+    context = context.rstrip(". ") + "."
+
+    if context_suffix is not None:
+        context = f"{context}{context_suffix}"
+    else:
+        context += " "
+
+    prompt_in_context = f"{context}{prompt}"
+    return prompt_in_context
+
+
+def prompt_in_context_from_batch(
+    batch: data.ContextMediationInput,
+    output_key: str = "prompt_in_context",
+    **kwargs: Any,
+) -> dict:
+    """Compute prompt in context from batch."""
     is_batched = _is_batched(batch["entity"])
     entities = _maybe_batch(batch["entity"])
     prompts = _maybe_batch(batch["prompt"])
@@ -447,25 +489,9 @@ def prompt_in_context_from_batch(
 
     prompts_in_context = []
     for entity, prompt, context in zip(entities, prompts, contexts):
-        if prompt_prefix is not None:
-            if not prompt.startswith(entity):
-                prompt = _remove_sent_case(prompt)
-            prompt = f"{prompt_prefix}{prompt}"
-
-        if context_prefix is not None:
-            if not context.startswith(entity):
-                context = _remove_sent_case(context)
-            context = f"{context_prefix} {context}"
-
-        # Always make sure context is a complete, period-ended sentence.
-        context = context.rstrip(". ") + "."
-
-        if context_suffix is not None:
-            context = f"{context}{context_suffix}"
-        else:
-            context += " "
-
-        prompt_in_context = f"{context}{prompt}"
+        prompt_in_context = prompt_in_context_from_sample(
+            entity, prompt, context, **kwargs
+        )
         prompts_in_context.append(prompt_in_context)
 
     return {output_key: prompts_in_context if is_batched else prompts_in_context[0]}
