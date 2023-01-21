@@ -2,6 +2,7 @@
 import argparse
 import json
 import logging
+from pathlib import Path
 
 from src import benchmarks, data, editors, models, precompute
 from src.utils import experiment_utils, logging_utils
@@ -20,6 +21,7 @@ def main(args: argparse.Namespace) -> None:
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"loading {args.model} (device={device}, fp16={args.fp16})")
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
+    n_layers = len(models.determine_layers(mt))
 
     if args.small:
         split = "train[5000:6000]"
@@ -41,7 +43,6 @@ def main(args: argparse.Namespace) -> None:
     )
 
     editor_layers = args.editor_layers
-    entity_layers = args.entity_layers
     editor_type = args.editor_type
     editors_dir = args.editors_dir
 
@@ -52,6 +53,11 @@ def main(args: argparse.Namespace) -> None:
         if editor is None:
             logger.warning(f"skipping benchmark for editor layer {editor_layer}")
             continue
+
+        entity_layers = args.entity_layers
+        if entity_layers is None:
+            entity_layers = range(editor_layer, n_layers)
+        logger.info(f"will probe at layers: {entity_layers}")
 
         for entity_layer in entity_layers:
             results_file = (
@@ -90,6 +96,19 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="evaluate classification in bias setting"
+    )
+    parser.add_argument("--editor-type", "-t", default="linear", help="editor type")
+    parser.add_argument(
+        "--editors-dir",
+        "-e",
+        type=Path,
+        help="path to editor experiment",
+    )
+    parser.add_argument(
+        "--editor-layers", "-l", nargs="+", type=int, help="layers to test editors for"
+    )
+    parser.add_argument(
+        "--entity-layers", nargs="+", type=int, help="entity layers to probe at"
     )
     parser.add_argument(
         "--batch-size",
