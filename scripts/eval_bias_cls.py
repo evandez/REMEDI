@@ -116,6 +116,7 @@ if __name__ == "__main__":
         default=editors.DEFAULT_BATCH_SIZE,
         help="model batch size",
     )
+    parser.add_argument("--small", action="store_true", help="use subset of data")
     # No data args because this only works on biosbias.
     models.add_model_args(parser)
     experiment_utils.add_experiment_args(parser)
