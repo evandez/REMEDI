@@ -1075,7 +1075,7 @@ def biosbias_error_classification(
     if desc is None:
         desc = "error classification"
     if labels is None:
-        labels = sorted({x["target_mediated"].strip().lower() for x in dataset})
+        labels = sorted({x["target_mediated"] for x in dataset})
     if entity_layer is None:
         entity_layer = editor.layer
     layers = sorted({entity_layer, editor.layer})

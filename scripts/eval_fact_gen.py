@@ -130,6 +130,7 @@ def main(args: argparse.Namespace) -> None:
             essence_references = _precompute_essence_references(
                 mt, dataset, device=device
             )
+
             logger.info(f"saving precomputed references to {essence_refs_file}")
             essence_refs_file.parent.mkdir(exist_ok=True, parents=True)
             with essence_refs_file.open("w") as handle:
