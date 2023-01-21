@@ -1022,6 +1022,131 @@ def biosbias_error_correction(
 
 
 @dataclass(frozen=True)
+class ErrorClassificationSample(DataClassJsonMixin):
+    """Wrapper around a single error classification sample."""
+
+    id: str
+
+    model_top5: list[str]
+    model_top5_logp: list[float]
+
+    editor_top5: list[str]
+    editor_top5_scores: list[float]
+
+    ground_truth: str
+
+
+@dataclass(frozen=True)
+class BiosBiasErrorClassificationBenchmarkResults(DataClassJsonMixin):
+    """Wrapper around biosbias error classification results."""
+
+    samples: list[ErrorClassificationSample]
+    metrics: ClassifierTaskMetrics
+
+
+@torch.inference_mode()
+def biosbias_error_classification(
+    *,
+    editor: editors.Editor,
+    dataset: Dataset,
+    normalize: bool = True,
+    batch_size: int = editors.DEFAULT_BATCH_SIZE,
+    labels: StrSequence | None = None,
+    entity_layer: int | None = None,
+    device: Device | None = None,
+    desc: str | None = None,
+) -> BiosBiasErrorClassificationBenchmarkResults:
+    if desc is None:
+        desc = "error classification"
+    if labels is None:
+        labels = sorted({x["target_mediated"].strip().lower() for x in dataset})
+    if entity_layer is None:
+        entity_layer = editor.layer
+    layers = sorted({entity_layer, editor.layer})
+
+    columns = data.column_names(dataset)
+
+    precomputed = dataset
+    if "prompt_in_context" not in columns:
+        precomputed = precompute.prompt_in_context_from_dataset(precomputed)
+
+    precomputed = precompute.classification_inputs_from_dataset(
+        editor.mt, dataset, layers=layers, device=device, batch_size=batch_size
+    )
+
+    key_h_entity = f"prompt_in_context.entity.hiddens.{entity_layer}.last"
+
+    h_entities = []
+    direction_groups = []
+    for row in dataset:
+        entity = row["entity"]
+        ground_truth = row["target_mediated"].strip().lower()
+        attributes = [
+            f"has the occupation of {label}"
+            if label != ground_truth
+            else row["attribute"]
+            for label in labels
+        ]
+        contexts = [f"{entity} {attribute}" for attribute in attributes]
+        with editors.apply(editor, device=device) as edited_mt:
+            directions = edited_mt.model.compute_edit_directions(
+                {
+                    "entity": [row["entity"]] * len(labels),
+                    "prompt": [row["prompt"]] * len(labels),
+                    "context": contexts,
+                    "attribute": attributes,
+                }
+            )
+
+        h_entity = row[key_h_entity].squeeze()
+
+        h_entities.append(h_entity)
+        direction_groups.append(directions)
+
+    # If requested, normalize to zero mean and unit variance.
+    if normalize:
+        logger.info("normalizing directions")
+        h_entities_stacked = torch.stack(h_entity).to(device).float()
+        directions_stacked = torch.cat(direction_groups).to(device).float()
+
+        mu_h_entity = h_entities_stacked.mean(dim=0, keepdim=True)
+        std_h_entity = h_entities_stacked.std(dim=0, keepdim=True)
+        h_entities = [
+            (h_e[None] - mu_h_entity) / std_h_entity for h_e in h_entities_stacked
+        ]
+
+        mu_directions = directions_stacked.mean(dim=0, keepdim=True)
+        std_directions = directions_stacked.std(dim=0, keepdim=True)
+        direction_groups = [
+            (directions - mu_directions) / (std_directions)
+            for directions in direction_groups
+        ]
+
+    # Bundle up the results.
+    recalled = []
+    y_pred = []
+    y_true = []
+    for sample, h_e, directions in list(zip(precomputed, h_entities, direction_groups)):
+        scores = h_e[None].mul(directions).sum(dim=-1)
+
+        probe_predictions_idx = scores.topk(k=3).indices.squeeze().tolist()
+        model_predictions_idx = (
+            sample["scores"].topk(dim=-1, k=3).indices.squeeze().tolist()
+        )
+
+        probe_predictions = [labels[idx] for idx in probe_predictions_idx]
+        model_prediction = labels[model_predictions_idx[0]]
+
+        y_true.append(model_prediction != ground_truth)
+        y_pred.append(ground_truth not in probe_predictions)
+
+        recalled.append(ground_truth in probe_predictions)
+
+    # TODO(evandez): Finish implementing.
+    return BiosBiasErrorClassificationBenchmarkResults(None, None)  # type: ignore
+
+
+@dataclass(frozen=True)
 class MediationSample(DataClassJsonMixin):
     """Wrapper around a single mediation sample."""
 

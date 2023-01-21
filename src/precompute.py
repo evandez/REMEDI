@@ -639,23 +639,27 @@ def classification_inputs_from_batch(
     attributes_m = _maybe_batch(batch["attribute"])
 
     targets_m = batch["target_mediated"]
-    targets_u = batch["target_unmediated"]
-    if targets_m is None or targets_u is None:
-        raise ValueError("batch missing target words")
+    if targets_m is None:
+        raise ValueError("target_mediated cannot be None")
     targets_m = _maybe_batch(targets_m)
-    targets_u = _maybe_batch(targets_u)
-
     targets_m_ids = precomputed["target_mediated.token_id"]
-    targets_u_ids = precomputed["target_unmediated.token_id"]
 
-    precomputed["context_unmediated"] = contexts_u = [
-        context.replace(target_m, target_u)
-        for context, target_m, target_u in zip(contexts_m, targets_m, targets_u)
-    ]
-    precomputed["attribute_unmediated"] = attributes_u = [
-        attribute.replace(target_m, target_u)
-        for attribute, target_m, target_u in zip(attributes_m, targets_m, targets_u)
-    ]
+    targets_u = batch.get("target_unmediated")
+    targets_u_ids = None
+    contexts_u = None
+    attributes_u = None
+    if targets_u is not None:
+        targets_u = _maybe_batch(targets_u)
+        targets_u_ids = precomputed["target_unmediated.token_id"]
+
+        precomputed["context_unmediated"] = contexts_u = [
+            context.replace(target_m, target_u)
+            for context, target_m, target_u in zip(contexts_m, targets_m, targets_u)
+        ]
+        precomputed["attribute_unmediated"] = attributes_u = [
+            attribute.replace(target_m, target_u)
+            for attribute, target_m, target_u in zip(attributes_m, targets_m, targets_u)
+        ]
 
     for (
         key_string,
@@ -694,6 +698,9 @@ def classification_inputs_from_batch(
             targets_m_ids,
         ),
     ):
+        if strings is None or substrings is None:
+            continue
+
         with models.set_padding_side(mt, padding_side="left"):
             inputs, offsets_mapping = inputs_from_batch(mt, strings, device=device)
 
@@ -706,17 +713,20 @@ def classification_inputs_from_batch(
         # the work of processing the prompt and prompt in context, we may as well
         # record the target probabilities.
 
-        assert (target_ids is None) == (comparator_ids is None)
-        if target_ids is not None and comparator_ids is not None:
+        if target_ids is not None or comparator_ids is not None:
             hiddens_by_layer, outputs = hiddens_from_batch(
                 mt, inputs, layers=layers, device=device, stop=False
             )
             log_probs = torch.log_softmax(outputs.logits[:, -1], dim=-1)
             batch_idx = torch.arange(len(strings))
-            precomputed[f"{key_string}.target.logp"] = log_probs[batch_idx, target_ids]
-            precomputed[f"{key_string}.comparator.logp"] = log_probs[
-                batch_idx, comparator_ids
-            ]
+            if target_ids is not None:
+                precomputed[f"{key_string}.target.logp"] = log_probs[
+                    batch_idx, target_ids
+                ]
+            if comparator_ids is not None:
+                precomputed[f"{key_string}.comparator.logp"] = log_probs[
+                    batch_idx, comparator_ids
+                ]
         else:
             hiddens_by_layer = hiddens_from_batch(
                 mt, inputs, layers=layers, device=device
