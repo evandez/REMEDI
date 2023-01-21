@@ -1045,6 +1045,8 @@ class ErrorClassificationMetrics(DataClassJsonMixin):
 
     recall_1: float
     recall_k: float
+    model_recall_1: float
+    model_recall_k: float
     k: int
 
 
@@ -1165,6 +1167,8 @@ def biosbias_error_classification(
     y_true = []
     recalled_1 = []
     recalled_k = []
+    model_recalled_1 = []
+    model_recalled_k = []
     samples = []
     for row, h_entity, directions in tqdm(
         list(zip(dataset, h_entities, direction_groups)), desc=f"{desc} [metrics]"
@@ -1188,6 +1192,9 @@ def biosbias_error_classification(
         recalled_1.append(ground_truth == predicted_top_k[0])
         recalled_k.append(ground_truth in predicted_top_k)
 
+        model_recalled_1.append(ground_truth == model_top_1)
+        model_recalled_k.append(ground_truth in model_top_k)
+
         samples.append(
             ErrorClassificationSample(
                 id=row["id"],
@@ -1203,8 +1210,16 @@ def biosbias_error_classification(
     mcc = matthews_corrcoef(y_true, y_pred)
     recall_1 = sum(recalled_1) / len(recalled_1)
     recall_k = sum(recalled_k) / len(recalled_k)
+    model_recall_1 = sum(model_recalled_1) / len(model_recalled_1)
+    model_recall_k = sum(model_recalled_k) / len(model_recalled_k)
     error_classification_metrics = ErrorClassificationMetrics(
-        f1=f1, mcc=mcc, recall_1=recall_1, recall_k=recall_k, k=top_k
+        f1=f1,
+        mcc=mcc,
+        recall_1=recall_1,
+        recall_k=recall_k,
+        model_recall_1=model_recall_1,
+        model_recall_k=model_recall_k,
+        k=top_k,
     )
 
     return BiosBiasErrorClassificationBenchmarkResults(
