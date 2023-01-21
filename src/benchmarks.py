@@ -1172,7 +1172,7 @@ def biosbias_error_classification(
         scores = h_entity[None].mul(directions).sum(dim=-1)
         predicted_top_k_scores, predicted_top_k_idx = scores.topk(k=top_k)
         predicted_top_k_idx = predicted_top_k_idx.squeeze().tolist()
-        predicted_top_k_scores = predicted_top_k_scores.squeez().tolist()
+        predicted_top_k_scores = predicted_top_k_scores.squeeze().tolist()
         predicted_top_k = [labels[idx] for idx in predicted_top_k_idx]
 
         model_logp = torch.tensor(row["prompt_in_context.other_targets.logp"])
