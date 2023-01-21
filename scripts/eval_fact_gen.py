@@ -61,7 +61,11 @@ def _precompute_essence_references(
     for batch in tqdm(loader, desc="precompute essence refs"):
         with models.set_padding_side(mt, padding_side="left"):
             inputs, _ = precompute.inputs_from_batch(mt, batch, device=device)
-        outputs = mt.model.generate(**inputs, max_length=benchmarks.DEFAULT_MAX_LENGTH)
+        outputs = mt.model.generate(
+            **inputs,
+            max_length=benchmarks.DEFAULT_MAX_LENGTH,
+            pad_token_id=mt.tokenizer.eos_token_id,
+        )
         references += [
             [r[len(benchmarks.DEFAULT_PROMPT_PREFIX) :]]
             for r in mt.tokenizer.batch_decode(outputs, skip_special_tokens=True)
