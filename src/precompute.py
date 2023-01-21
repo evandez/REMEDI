@@ -674,7 +674,7 @@ def classification_inputs_from_batch(
     targets_u_ids = None
     contexts_u = None
     attributes_u = None
-    if targets_u is not None:
+    if targets_u is not None and all(t is not None for t in targets_u):
         targets_u = _maybe_batch(targets_u)
         targets_u_ids = precomputed["target_unmediated.token_id"]
 
