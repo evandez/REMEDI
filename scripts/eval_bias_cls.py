@@ -88,6 +88,7 @@ def main(args: argparse.Namespace) -> None:
                 device=device,
                 labels=labels,
                 control_task=args.control_task,
+                entity_layer=entity_layer,
             )
             logging.info(
                 f"benchmark complete! results:\n%s",
