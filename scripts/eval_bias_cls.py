@@ -24,7 +24,7 @@ def main(args: argparse.Namespace) -> None:
     n_layers = len(models.determine_layers(mt))
 
     if args.small:
-        split = "train[5000:6000]"
+        split = "train[5000:5250]"
     else:
         split = "train[5000:10000]"
     dataset = data.load_dataset("biosbias", split=split)

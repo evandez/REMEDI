@@ -85,7 +85,7 @@ def main(args: argparse.Namespace) -> None:
 
     logger.info("loading several data sources")
     if args.small:
-        split = "train[5000:6000]"
+        split = "train[5000:5250]"
     else:
         split = "train[5000:10000]"
     dataset = data.load_dataset("counterfact", split=split)
