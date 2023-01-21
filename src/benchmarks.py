@@ -1133,7 +1133,7 @@ def biosbias_error_classification(
                 }
             )
 
-        h_entity = row[key_h_entity].squeeze()
+        h_entity = torch.tensor(row[key_h_entity]).squeeze()
 
         h_entities.append(h_entity)
         direction_groups.append(directions)
@@ -1141,7 +1141,7 @@ def biosbias_error_classification(
     # If requested, normalize to zero mean and unit variance.
     if normalize:
         logger.info("normalizing directions")
-        h_entities_stacked = torch.stack(h_entity).to(device).float()
+        h_entities_stacked = torch.stack(h_entities).to(device).float()
         directions_stacked = torch.cat(direction_groups).to(device).float()
 
         mu_h_entity = h_entities_stacked.mean(dim=0, keepdim=True)
