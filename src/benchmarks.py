@@ -1117,7 +1117,7 @@ def biosbias_error_classification(
     direction_groups = []
     for row in tqdm(dataset, desc=f"{desc} [editor directions]"):
         entity = row["entity"]
-        ground_truth = row["target_mediated"].strip().lower()
+        ground_truth = row["target_mediated"]
         attributes = [
             f"has the occupation of {label}"
             if label != ground_truth
@@ -1173,6 +1173,8 @@ def biosbias_error_classification(
     for row, h_entity, directions in tqdm(
         list(zip(dataset, h_entities, direction_groups)), desc=f"{desc} [metrics]"
     ):
+        ground_truth = row["target_mediated"]
+
         scores = h_entity[None].mul(directions).sum(dim=-1)
         predicted_top_k_scores, predicted_top_k_idx = scores.topk(k=top_k)
         predicted_top_k_idx = predicted_top_k_idx.squeeze().tolist()
