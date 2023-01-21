@@ -1053,7 +1053,7 @@ class RandomEditor(Editor):
         mt: models.ModelAndTokenizer,
         layer: int,
         mean: torch.Tensor | None = None,
-        covariance: torch.Tensor | None = None,
+        variance: torch.Tensor | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the editor."""
@@ -1064,21 +1064,21 @@ class RandomEditor(Editor):
 
         if mean is None:
             mean = torch.zeros(hidden_size)
-        if covariance is None:
-            covariance = torch.ones(hidden_size, hidden_size)
+        if variance is None:
+            variance = torch.ones(hidden_size, hidden_size)
 
         self.mean: torch.Tensor
         self.register_buffer("mean", mean.to(device))
 
-        self.covariance: torch.Tensor
-        self.register_buffer("covariance", covariance.to(device))
+        self.variance: torch.Tensor
+        self.register_buffer("variance", variance.to(device))
 
         self.to_(mt)
 
     def forward(self, *, attribute: torch.Tensor, **_: Any) -> torch.Tensor:
         """Select a random direction."""
         distribution = torch.distributions.MultivariateNormal(
-            self.mean, self.covariance
+            self.mean, covariance_matrix=torch.diag(self.variance)
         )
         return distribution.sample((len(attribute),))
 
@@ -1102,7 +1102,7 @@ class RandomEditor(Editor):
             dataset, exclude=["target_mediated", "target_unmediated"]
         )
 
-        rc = runningstats.Covariance()
+        rv = runningstats.Variance()
         with dataset.formatted_as("torch", columns=columns):
             loader = torch.utils.data.DataLoader(
                 cast(torch.utils.data.Dataset, dataset["train"]), batch_size=batch_size
@@ -1114,9 +1114,9 @@ class RandomEditor(Editor):
                             self.mt, batch, layers=[self.layer], device=device
                         )
                     )
-                rc.add(batch[f"prompt_in_context.entity.delta.{self.layer}"].float())
-        self.mean[:] = rc.mean()
-        self.covariance[:] = rc.covariance()
+                rv.add(batch[f"prompt_in_context.entity.delta.{self.layer}"].float())
+        self.mean[:] = rv.mean()
+        self.variance[:] = rv.covariance()
         return EditorTrainingRun(dataset)
 
 
