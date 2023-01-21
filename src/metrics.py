@@ -32,6 +32,7 @@ class Metric(DataClassJsonMixin):
 
     @staticmethod
     def aggregate(values: ArrayLike, store_values: bool = True) -> "Metric":
+        """Aggregate mean/std of the values."""
         return Metric(
             np.mean(values), np.std(values), values=values if store_values else None
         )
