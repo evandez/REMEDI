@@ -1069,6 +1069,7 @@ def biosbias_error_classification(
     device: Device | None = None,
     desc: str | None = None,
 ) -> BiosBiasErrorClassificationBenchmarkResults:
+    """Classify whether model will make an error in Bias in Bios."""
     if desc is None:
         desc = "error classification"
     if labels is None:
