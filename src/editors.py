@@ -718,10 +718,17 @@ class Editor(nn.Module):
                 cast(torch.utils.data.Dataset, dataset), batch_size=batch_size
             )
             for batch in tqdm(loader, desc=desc):
-                if not precompute.has_editor_inputs(batch) and return_after:
+                if not precompute.has_editor_inputs(batch):
                     batch.update(
                         precompute.editor_inputs_from_batch(
-                            mt=self.mt, batch=batch, layers=[self.layer], device=device
+                            mt=self.mt,
+                            batch=batch,
+                            layers=[self.layer],
+                            device=device,
+                            return_entity_hiddens=return_after,
+                            return_attribute_hiddens=return_after,
+                            return_target_token_ids=return_mediated
+                            or return_unmediated,
                         )
                     )
 
