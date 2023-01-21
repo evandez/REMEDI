@@ -4,12 +4,15 @@ import json
 import logging
 import random
 from pathlib import Path
+from typing import cast
 
 from src import benchmarks, data, editors, models, precompute
 from src.utils import experiment_utils, logging_utils
+from src.utils.typing import Dataset, Device
 
 import torch
 import torch.utils.data
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,32 @@ def _replace_entity(attribute_snippets: data.AttributeSnippets, sample: dict) ->
     }
 
 
+@torch.inference_mode()
+def _precompute_essence_references(
+    mt: models.ModelAndTokenizer, dataset: Dataset, device: Device | None = None
+) -> list[list[str]]:
+    """Precompute essence references to save some compute."""
+    prompts = [
+        benchmarks.DEFAULT_PROMPT_PREFIX
+        + benchmarks.DEFAULT_PROMPT_TEMPLATE.format(x["entity"])
+        for x in dataset
+    ]
+    loader = torch.utils.data.DataLoader(
+        cast(torch.utils.data.Dataset, prompts),
+        batch_size=editors.DEFAULT_BATCH_SIZE,
+    )
+    references = []
+    for batch in tqdm(loader, desc="precompute essence refs"):
+        with models.set_padding_side(mt, padding_side="left"):
+            inputs, _ = precompute.inputs_from_batch(mt, batch, device=device)
+        outputs = mt.model.generate(**inputs, max_length=benchmarks.DEFAULT_MAX_LENGTH)
+        references += [
+            [r[len(benchmarks.DEFAULT_PROMPT_PREFIX) :]]
+            for r in mt.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        ]
+    return references
+
+
 def main(args: argparse.Namespace) -> None:
     """Run the benchmark."""
     experiment = experiment_utils.setup_experiment(args)
@@ -59,6 +88,10 @@ def main(args: argparse.Namespace) -> None:
     dataset = precompute.from_args(args, dataset)
     attribute_snippets = data.load_attribute_snippets()
     tfidf_vectorizer = data.load_counterfact_tfidf_vectorizer()
+
+    essence_references = None
+    if "essence" in args.benchmarks:
+        essence_references = _precompute_essence_references(mt, dataset, device=device)
 
     baseline = args.baseline
     if baseline is not None:
@@ -154,7 +187,9 @@ def main(args: argparse.Namespace) -> None:
                 )
             elif benchmark_name == "essence":
                 results = benchmarks.essence(
-                    tfidf_vectorizer=tfidf_vectorizer, **benchmark_kwargs
+                    tfidf_vectorizer=tfidf_vectorizer,
+                    use_references=essence_references,
+                    **benchmark_kwargs,
                 )
             else:
                 raise ValueError(f"unknown benchmark: {benchmark_name}")
