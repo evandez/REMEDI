@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPT_PREFIX = "The following is an excerpt from a Wikipedia article:\n\n"
 DEFAULT_PROMPT_TEMPLATE = "{} is"
 DEFAULT_MAX_LENGTH = 100
+DEFAULT_MAX_LENGTH_ERROR_CORRECTION = 150
 DEFAULT_TOP_K = 3
 DEFAULT_N_TOP_TOKENS = DEFAULT_TOP_K
 
@@ -912,7 +913,7 @@ def biosbias_error_correction(
         assert editor is not None
         mt = editor.mt
     if max_length is None and max_new_tokens is None:
-        max_length = DEFAULT_MAX_LENGTH
+        max_length = DEFAULT_MAX_LENGTH_ERROR_CORRECTION
     if desc is None:
         desc = "error correction"
 
