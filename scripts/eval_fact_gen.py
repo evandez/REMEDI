@@ -38,9 +38,7 @@ def _prefix_context(sample: dict) -> dict:
     source = {**sample["source"]}
     for key in ("generation_prompts", "paraphrase_prompts"):
         source[key] = [
-            precompute.prompt_in_context_from_sample(
-                entity, other_prompt, context
-            )
+            precompute.prompt_in_context_from_sample(entity, other_prompt, context)
             for other_prompt in source[key]
         ]
 
@@ -123,7 +121,19 @@ def main(args: argparse.Namespace) -> None:
 
     essence_references = None
     if "essence" in args.benchmarks:
-        essence_references = _precompute_essence_references(mt, dataset, device=device)
+        essence_refs_file = experiment.results_dir / "essence_references.txt"
+        if essence_refs_file.exists():
+            logger.info(f"found essence refs at {essence_refs_file}")
+            with essence_refs_file.open("r") as handle:
+                essence_references = [[l] for l in handle.readlines()]
+        else:
+            essence_references = _precompute_essence_references(
+                mt, dataset, device=device
+            )
+            logger.info(f"saving precomputed references to {essence_refs_file}")
+            essence_refs_file.parent.mkdir(exist_ok=True, parents=True)
+            with essence_refs_file.open("w") as handle:
+                handle.write("\n".join([rs[0] for rs in essence_references]))
 
     baseline = args.baseline
     if baseline is not None:
