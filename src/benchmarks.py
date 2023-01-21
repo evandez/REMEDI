@@ -1100,7 +1100,7 @@ def biosbias_error_classification(
         )
 
     # Compute editor inputs (attribute reps).
-    # TODO(evandez): Should probably eventually check if this already is
+    # TODO(evandez): Should probably eventually check if this already is present.
     dataset = precompute.classification_inputs_from_dataset(
         editor.mt,
         dataset,

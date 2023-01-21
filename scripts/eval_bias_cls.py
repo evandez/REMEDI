@@ -80,7 +80,7 @@ def main(args: argparse.Namespace) -> None:
                 f"begin editor_layer={editor_layer}, entity_layer={entity_layer}"
             )
             results = benchmarks.biosbias_error_classification(
-                editor=editor, dataset=dataset, device=device
+                editor=editor, dataset=dataset, device=device, labels=labels
             )
             logging.info(
                 f"benchmark complete! results:\n%s",
