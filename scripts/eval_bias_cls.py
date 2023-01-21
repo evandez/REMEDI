@@ -63,11 +63,14 @@ def main(args: argparse.Namespace) -> None:
         logger.info(f"will probe at layers: {entity_layers}")
 
         for entity_layer in entity_layers:
+            results_file_name = f"error_cls_layer_{entity_layer}"
+            if args.control_task:
+                results_file_name = f"{results_file_name}_control_task"
             results_file = (
                 experiment.results_dir
                 / editor_type
                 / str(editor_layer)
-                / f"error_cls_layer_{entity_layer}.json"
+                / f"{results_file_name}.json"
             )
             if results_file.exists():
                 logger.info(
