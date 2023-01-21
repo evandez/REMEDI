@@ -1189,7 +1189,7 @@ def biosbias_error_classification(
         model_top_1 = model_top_k[0]
 
         y_true.append(ground_truth != model_top_1)
-        y_pred.append(ground_truth not in predicted_top_k)
+        y_pred.append(model_top_1 not in predicted_top_k)
 
         recalled_1.append(ground_truth == predicted_top_k[0])
         recalled_k.append(ground_truth in predicted_top_k)
