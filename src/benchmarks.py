@@ -1052,8 +1052,8 @@ class ErrorClassificationMetrics(DataClassJsonMixin):
     f1: float
     mcc: float
 
-    recall_1: float
-    recall_k: float
+    probe_recall_1: float
+    probe_recall_k: float
     model_recall_1: float
     model_recall_k: float
     k: int
@@ -1176,8 +1176,8 @@ def biosbias_error_classification(
     # Bundle up the results.
     y_pred = []
     y_true = []
-    recalled_1 = []
-    recalled_k = []
+    probe_recalled_1 = []
+    probe_recalled_k = []
     model_recalled_1 = []
     model_recalled_k = []
     samples = []
@@ -1202,8 +1202,8 @@ def biosbias_error_classification(
         y_true.append(ground_truth != model_top_1)
         y_pred.append(model_top_1 not in predicted_top_k)
 
-        recalled_1.append(ground_truth == predicted_top_k[0])
-        recalled_k.append(ground_truth in predicted_top_k)
+        probe_recalled_1.append(ground_truth == predicted_top_k[0])
+        probe_recalled_k.append(ground_truth in predicted_top_k)
 
         model_recalled_1.append(ground_truth == model_top_1)
         model_recalled_k.append(ground_truth in model_top_k)
@@ -1225,15 +1225,15 @@ def biosbias_error_classification(
 
     f1 = f1_score(y_true, y_pred)
     mcc = matthews_corrcoef(y_true, y_pred)
-    recall_1 = sum(recalled_1) / len(recalled_1)
-    recall_k = sum(recalled_k) / len(recalled_k)
+    probe_recall_1 = sum(probe_recalled_1) / len(probe_recalled_1)
+    probe_recall_k = sum(probe_recalled_k) / len(probe_recalled_k)
     model_recall_1 = sum(model_recalled_1) / len(model_recalled_1)
     model_recall_k = sum(model_recalled_k) / len(model_recalled_k)
     error_classification_metrics = ErrorClassificationMetrics(
         f1=f1,
         mcc=mcc,
-        recall_1=recall_1,
-        recall_k=recall_k,
+        probe_recall_1=probe_recall_1,
+        probe_recall_k=probe_recall_k,
         model_recall_1=model_recall_1,
         model_recall_k=model_recall_k,
         k=top_k,
