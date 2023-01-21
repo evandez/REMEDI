@@ -37,8 +37,11 @@ def main(args: argparse.Namespace) -> None:
         mt,
         dataset,
         other_targets=labels,
+        input_prompt_key="prompt_in_context",
+        input_target_key=None,
+        input_comparator_key=None,
         device=device,
-        batch_size=editors.DEFAULT_BATCH_SIZE,
+        batch_size=args.batch_size,
         desc=f"error classification [model predictions]",
     )
 
