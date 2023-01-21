@@ -1094,7 +1094,7 @@ def biosbias_error_classification(
         )
 
     # Compute editor inputs (attribute reps).
-    # TODO(evandez): Should probably eventually check if this already is there.
+    # TODO(evandez): Should probably eventually check if this already is
     dataset = precompute.classification_inputs_from_dataset(
         editor.mt,
         dataset,
@@ -1163,7 +1163,7 @@ def biosbias_error_classification(
     recalled_k = []
     samples = []
     for row, h_entity, directions in tqdm(
-        list(zip(precomputed, h_entities, direction_groups)), desc=f"{desc} [metrics]"
+        list(zip(dataset, h_entities, direction_groups)), desc=f"{desc} [metrics]"
     ):
         scores = h_entity[None].mul(directions).sum(dim=-1)
         predicted_top_k_scores, predicted_top_k_idx = scores.topk(k=top_k)
