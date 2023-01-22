@@ -45,6 +45,22 @@ def _prefix_context(sample: dict) -> dict:
     return {"source": source, "prompt": prompt_in_context}
 
 
+def _prefix_essence_prompt_template(sample: dict) -> str:
+    """Prompt template for essence benchmark of prefix baseline."""
+    entity = sample["entity"]
+    context = sample["context"]
+    prompt = benchmarks.DEFAULT_PROMPT_TEMPLATE.format(entity)
+    prompt_in_context = precompute.prompt_in_context_from_sample(
+        entity, prompt, context
+    )
+    return prompt_in_context
+
+
+def _prefix_essence_post_process(generation: str) -> str:
+    """Post-process essence generation for prefix baseline."""
+    return ". ".join(generation.split(". ")[1:])
+
+
 def _replace_entity(attribute_snippets: data.AttributeSnippets, sample: dict) -> dict:
     """Replace entity with one that has same target attribute."""
     requested_rewrite = sample["source"]["requested_rewrite"]
@@ -218,6 +234,11 @@ def main(args: argparse.Namespace) -> None:
                 )
                 continue
 
+            essence_kwargs: dict = {}
+            if baseline == "prefix":
+                essence_kwargs["prompt_template"] = _prefix_essence_prompt_template
+                essence_kwargs["post_process"] = _prefix_essence_post_process
+
             if benchmark_name == "efficacy":
                 results = benchmarks.efficacy(**benchmark_kwargs)
             elif benchmark_name == "paraphrase":
@@ -233,6 +254,7 @@ def main(args: argparse.Namespace) -> None:
                     tfidf_vectorizer=tfidf_vectorizer,
                     use_references=essence_references,
                     **benchmark_kwargs,
+                    **essence_kwargs,
                 )
             else:
                 raise ValueError(f"unknown benchmark: {benchmark_name}")
