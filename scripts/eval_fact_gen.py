@@ -137,11 +137,11 @@ def main(args: argparse.Namespace) -> None:
 
     essence_references = None
     if "essence" in args.benchmarks:
-        essence_refs_file = experiment.results_dir / "essence_references.txt"
+        essence_refs_file = experiment.results_dir / "essence_references.json"
         if essence_refs_file.exists():
             logger.info(f"found essence refs at {essence_refs_file}")
             with essence_refs_file.open("r") as handle:
-                essence_references = [[l] for l in handle.readlines()]
+                essence_references = [[l] for l in json.load(handle)["references"]]
         else:
             essence_references = _precompute_essence_references(
                 mt, dataset, device=device
@@ -150,7 +150,10 @@ def main(args: argparse.Namespace) -> None:
             logger.info(f"saving precomputed references to {essence_refs_file}")
             essence_refs_file.parent.mkdir(exist_ok=True, parents=True)
             with essence_refs_file.open("w") as handle:
-                handle.write("\n".join([rs[0] for rs in essence_references]))
+                json.dump(
+                    {"references": [rs[0] for rs in essence_references]},
+                    handle,
+                )
 
     baseline = args.baseline
     if baseline is not None:
