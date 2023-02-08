@@ -9,8 +9,8 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Sequence, TypedDict, cast
 
-from src.utils import env_utils
-from src.utils.typing import Dataset, PathLike, StrSequence
+from remedi.utils import env_utils
+from remedi.utils.typing import Dataset, PathLike, StrSequence
 
 import datasets
 import numpy

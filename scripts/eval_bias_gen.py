@@ -4,8 +4,8 @@ import json
 import logging
 from pathlib import Path
 
-from src import benchmarks, data, editors, models, precompute
-from src.utils import experiment_utils, logging_utils
+from remedi import benchmarks, data, editors, models, precompute
+from remedi.utils import experiment_utils, logging_utils
 
 import torch
 from sklearn.feature_extraction.text import TfidfVectorizer

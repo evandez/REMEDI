@@ -3,9 +3,9 @@ import argparse
 import logging
 from typing import cast
 
-from src import data, editors, models, precompute
-from src.utils import experiment_utils, logging_utils
-from src.utils.typing import Dataset
+from remedi import data, editors, models, precompute
+from remedi.utils import experiment_utils, logging_utils
+from remedi.utils.typing import Dataset
 
 import torch
 

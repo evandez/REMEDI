@@ -1,5 +1,5 @@
 """Unit tests for precompute functions."""
-from src import precompute
+from remedi import precompute
 
 import pytest
 import torch

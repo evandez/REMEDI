@@ -2,7 +2,7 @@
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional, Sequence, Tuple
 
-from src.utils.typing import StrSequence, Tokenizer, TokenizerOffsetMapping
+from remedi.utils.typing import StrSequence, Tokenizer, TokenizerOffsetMapping
 
 
 def find_token_range(

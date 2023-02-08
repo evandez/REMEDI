@@ -9,8 +9,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, Literal, Optional, Sequence, overload
 
-from src.utils import tokenizer_utils
-from src.utils.typing import Device, Model, Tokenizer
+from remedi.utils import tokenizer_utils
+from remedi.utils.typing import Device, Model, Tokenizer
 
 import torch
 import transformers

@@ -9,8 +9,8 @@ to any other scripts. The code will simply read it from the cache.
 """
 import argparse
 
-from src import data
-from src.utils import logging_utils
+from remedi import data
+from remedi.utils import logging_utils
 
 
 def main(args: argparse.Namespace) -> None:

@@ -5,9 +5,9 @@ from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, Sequence, cast
 
-from src import data, editors, metrics, models, precompute
-from src.utils import experiment_utils
-from src.utils.typing import Dataset, Device, StrSequence
+from remedi import data, editors, metrics, models, precompute
+from remedi.utils import experiment_utils
+from remedi.utils.typing import Dataset, Device, StrSequence
 
 import torch
 import torch.utils.data

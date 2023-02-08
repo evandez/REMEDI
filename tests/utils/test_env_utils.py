@@ -2,7 +2,7 @@
 import os
 import pathlib
 
-from src.utils import env_utils
+from remedi.utils import env_utils
 
 import pytest
 

@@ -7,8 +7,8 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.utils import env_utils
-from src.utils.typing import PathLike
+from remedi.utils import env_utils
+from remedi.utils.typing import PathLike
 
 import numpy
 import torch

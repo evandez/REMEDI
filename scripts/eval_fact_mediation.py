@@ -3,8 +3,8 @@ import argparse
 import json
 import logging
 
-from src import benchmarks, data, models
-from src.utils import experiment_utils, logging_utils
+from remedi import benchmarks, data, models
+from remedi.utils import experiment_utils, logging_utils
 
 import torch
 

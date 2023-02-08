@@ -1,5 +1,5 @@
 """Simple unit tests for metrics."""
-from src import metrics
+from remedi import metrics
 
 import numpy
 import pytest

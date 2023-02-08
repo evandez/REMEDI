@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Sequence
 
-from src.utils.typing import ArrayLike, StrSequence
+from remedi.utils.typing import ArrayLike, StrSequence
 
 import nltk
 import numpy as np

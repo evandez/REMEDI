@@ -1,5 +1,5 @@
 """Unit tests for `src.utils.tokenizers`."""
-from src.utils import tokenizer_utils
+from remedi.utils import tokenizer_utils
 
 import pytest
 import transformers

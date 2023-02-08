@@ -1,5 +1,5 @@
 """Unit tests for the `src.utils.training_utils` module."""
-from src.utils import training_utils
+from remedi.utils import training_utils
 
 PATIENCE = 5
 

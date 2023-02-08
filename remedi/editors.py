@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, DefaultDict, Literal, Optional, cast
 
-from src import data, models, precompute
-from src.utils import tokenizer_utils, training_utils
-from src.utils.typing import (
+from remedi import data, models, precompute
+from remedi.utils import tokenizer_utils, training_utils
+from remedi.utils.typing import (
     Dataset,
     Device,
     Model,

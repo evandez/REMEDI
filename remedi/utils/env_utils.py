@@ -2,7 +2,7 @@
 import os
 import pathlib
 
-from src.utils.typing import PathLike
+from remedi.utils.typing import PathLike
 
 ENV_DATA_DIR = "CM_DATA_DIR"
 ENV_MODELS_DIR = "CM_MODELS_DIR"

@@ -1,5 +1,5 @@
 """Unit tests model_utils functions."""
-from src import models
+from remedi import models
 
 import pytest
 import torch

@@ -3,9 +3,9 @@ import argparse
 from functools import partial
 from typing import Any, Literal, Optional, Sequence, cast, overload
 
-from src import data, models
-from src.utils import tokenizer_utils
-from src.utils.typing import (
+from remedi import data, models
+from remedi.utils import tokenizer_utils
+from remedi.utils.typing import (
     Dataset,
     Device,
     ModelInput,

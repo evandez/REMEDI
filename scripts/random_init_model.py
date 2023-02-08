@@ -3,8 +3,8 @@ import argparse
 import logging
 from pathlib import Path
 
-from src import models
-from src.utils import env_utils, experiment_utils, logging_utils
+from remedi import models
+from remedi.utils import env_utils, experiment_utils, logging_utils
 
 logger = logging.getLogger(__name__)
 

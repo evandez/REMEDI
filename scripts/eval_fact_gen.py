@@ -7,9 +7,9 @@ from functools import partial
 from pathlib import Path
 from typing import cast
 
-from src import benchmarks, data, editors, models, precompute
-from src.utils import experiment_utils, logging_utils
-from src.utils.typing import Dataset, Device
+from remedi import benchmarks, data, editors, models, precompute
+from remedi.utils import experiment_utils, logging_utils
+from remedi.utils.typing import Dataset, Device
 
 import torch
 import torch.utils.data
