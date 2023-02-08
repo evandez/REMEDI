@@ -1,4 +1,12 @@
-"""Reformat datasets."""
+"""Reformat datasets.
+
+This script handles reformatting and caching dataset from outside sources.
+Callers usually should specify --dataset-file and point to the raw data
+downloaded from its source.
+
+Once the data is reformatted, you'll no longer have to specify --dataset-file
+to any other scripts. The code will simply read it from the cache.
+"""
 import argparse
 
 from src import data
