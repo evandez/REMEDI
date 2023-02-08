@@ -3,13 +3,12 @@ import logging
 import random
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Sequence, cast
+from typing import Any, Callable, Sequence, cast
 
 from src import data, editors, metrics, models, precompute
 from src.utils import experiment_utils
 from src.utils.typing import Dataset, Device, StrSequence
 
-import numpy as np
 import torch
 import torch.utils.data
 from dataclasses_json import DataClassJsonMixin
