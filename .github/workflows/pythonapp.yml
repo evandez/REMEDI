@@ -23,13 +23,13 @@ jobs:
           python -m nltk.downloader punkt stopwords
       - name: lint (black)
         run: |
-          python -m black --check src
+          python -m black --check remedi scripts
       - name: lint (isort)
         run: |
-          isort -c scripts src
+          isort -c remedi scripts
       - name: type check
         run: |
-          mypy scripts src
+          mypy remedi scripts
       - name: run unit tests
         run: |
           pytest tests
