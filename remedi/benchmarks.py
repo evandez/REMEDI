@@ -213,7 +213,7 @@ def essence(
                 batch_generations = [post_process(g) for g in batch_generations]
             generations += batch_generations
 
-            for (sid, entity, attribute, generation, references) in zip(
+            for sid, entity, attribute, generation, references in zip(
                 ids,
                 entities,
                 attributes,
@@ -1311,7 +1311,7 @@ def mediation(
         dataset = precompute.prompt_in_context_from_dataset(dataset)
 
     results_kwargs: dict = {}
-    for (key, flag, input_prompt_key, input_target_key, input_comparator_key) in (
+    for key, flag, input_prompt_key, input_target_key, input_comparator_key in (
         (
             "decontextual",
             decontextual,
