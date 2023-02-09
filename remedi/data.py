@@ -35,8 +35,6 @@ TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 
 WINOVENTI_URL = "https://raw.githubusercontent.com/commonsense-exception/commonsense-exception/main/data/winoventi_bert_large_final.tsv"
 
-MCRAE_TOTAL_PARTICIPANTS = 30
-
 
 class ContextMediationSample(TypedDict):
     """Single sample that can be used for context mediation analysis."""
@@ -338,16 +336,6 @@ def _get_mcrae_feature(row: dict) -> str:
     return feature
 
 
-def _get_mcrae_prod_prob(row: dict) -> float:
-    """Return the probability that feature applies to concept.
-
-    Measured by how often study participants chose the feature for
-    the concept, out of 30 participants total.
-    """
-    frequency = int(row["Prod_Freq"])
-    return frequency / MCRAE_TOTAL_PARTICIPANTS
-
-
 def _get_mcrae_sample_id(
     concept: str, context_feature: str, prompt_feature: str
 ) -> str:
@@ -411,7 +399,6 @@ def _get_mcrae_context_and_attribute(concept: str, feature: str) -> tuple[str, s
 
 def _create_samples_from_mcrae_norms(
     text_file: Path,
-    min_prod_prob: float = 0.5,
     min_co_prob: float = 0.5,
     samples_per_feature_pair: int = 1,
     seed: int | None = 123456,
@@ -445,10 +432,6 @@ def _create_samples_from_mcrae_norms(
     for row in rows:
         concept = _get_mcrae_concept(row)
         feature = _get_mcrae_feature(row)
-        prod_prob = _get_mcrae_prod_prob(row)
-        if prod_prob < min_prod_prob:
-            continue
-
         others = features_by_concept[concept] - {feature}
         for other in others:
             f_co[feature][other] += 1
