@@ -1099,7 +1099,7 @@ class RandomEditor(Editor):
 
         # We never need these columns, so exclude to avoid null collation.
         columns = data.column_names(
-            dataset, exclude=["target_mediated", "target_unmediated"]
+            dataset, exclude=["target_mediated", "target_unmediated", "source"]
         )
 
         rv = runningstats.Variance()
