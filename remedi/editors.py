@@ -582,7 +582,7 @@ class Editor(nn.Module):
 
         # Since sometimes these fields are None, exclude them from the dataset
         # so the DataLoader does not freak out.
-        exclude_columns = []
+        exclude_columns = ["source"]
         if lam_u is None:
             exclude_columns.append("target_unmediated")
         if lam_m is None:
