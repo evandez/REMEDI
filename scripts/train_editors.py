@@ -34,7 +34,7 @@ def main(args: argparse.Namespace) -> None:
         layers = models.determine_layers(mt)
 
     lam_u = args.lam_u
-    if lam_u is None and args.dataset != "biosbias":
+    if lam_u is None and args.dataset not in {"biosbias", "mcrae"}:
         lam_u = editors.DEFAULT_LAM_U
 
     dataset = data.maybe_train_test_split(dataset, test_size=args.hold_out)
