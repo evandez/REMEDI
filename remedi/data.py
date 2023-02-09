@@ -1,8 +1,10 @@
 """Datasets for evaluating context mediation in LMs."""
 import argparse
+import csv
 import json
 import logging
 import pickle
+import random
 from collections import defaultdict
 from functools import cache
 from itertools import chain
@@ -23,7 +25,7 @@ from tqdm.auto import tqdm
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_DATASETS = ("counterfact", "winoventi", "biosbias")
+SUPPORTED_DATASETS = ("counterfact", "winoventi", "biosbias", "mcrae")
 
 ROME_BASE_URL = "https://rome.baulab.info/data/dsets"
 COUNTERFACT_URL = f"{ROME_BASE_URL}/counterfact.json"
@@ -32,6 +34,8 @@ TFIDF_IDF_URL = f"{ROME_BASE_URL}/idf.npy"
 TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 
 WINOVENTI_URL = "https://raw.githubusercontent.com/commonsense-exception/commonsense-exception/main/data/winoventi_bert_large_final.tsv"
+
+MCRAE_TOTAL_PARTICIPANTS = 30
 
 
 class ContextMediationSample(TypedDict):
@@ -295,7 +299,7 @@ def _reformat_bias_in_bios_file(pkl_file: Path, bio_min_words: int = 5) -> Path:
 def _load_bias_in_bios(file: PathLike | None = None, **kwargs: Any) -> Dataset:
     """Load the Bias in Bios datast, if possible."""
     if file is None:
-        logger.debug("file not set; defaulting to environment data dir")
+        logger.debug("biosbias file not set; defaulting to environment data dir")
         file = env_utils.determine_data_dir() / "biosbias.json"
 
     file = Path(file)
@@ -319,6 +323,213 @@ def _load_bias_in_bios(file: PathLike | None = None, **kwargs: Any) -> Dataset:
     return dataset
 
 
+def _get_mcrae_concept(row: dict) -> str:
+    """Return the McRae concept, cleaning it up."""
+    concept = row["Concept"]
+    return concept.replace("_", " ")
+
+
+def _get_mcrae_feature(row: dict) -> str:
+    """Return the normalized McRae feature, cleaning it up."""
+    feature = row["Feature"]
+    for prefix in ("inbeh", "beh"):
+        feature = feature.replace(f"{prefix}_-_", "")
+    feature = feature.replace("_", " ")
+    return feature
+
+
+def _get_mcrae_prod_prob(row: dict) -> float:
+    """Return the probability that feature applies to concept.
+
+    Measured by how often study participants chose the feature for
+    the concept, out of 30 participants total.
+    """
+    frequency = int(row["Prod_Freq"])
+    return frequency / MCRAE_TOTAL_PARTICIPANTS
+
+
+def _get_mcrae_sample_id(
+    concept: str, context_feature: str, prompt_feature: str
+) -> str:
+    """Return a unique, readable ID for the McRae context mediation sample."""
+    cid = concept.replace(" ", "_")
+    cfid = context_feature.replace(" ", "_")
+    pfid = prompt_feature.replace(" ", "_")
+    return f"{cid}/{cfid}/{pfid}"
+
+
+def _make_mcrae_feature_fluent(feature: str) -> str:
+    """Heuristically adjust feature so that concept can be fluently prepended."""
+    if any(
+        feature.startswith(prefix)
+        for prefix in {
+            "a ",
+            "an ",
+            "associated ",
+            "eaten ",
+            "found ",
+            "made ",
+            "part ",
+            "owned ",
+            "used ",
+            "worn ",
+        }
+    ):
+        feature = f"is {feature}"
+    return feature
+
+
+def _get_mcrae_prompt_and_target(concept: str, feature: str) -> tuple[str, str]:
+    """Transform McRae concept and target feature to a prompt and target token."""
+    feature = _make_mcrae_feature_fluent(feature)
+
+    components = feature.strip().split()  # Heuristic, but good enough
+    target = components[-1]
+    prompt = " ".join(components[:-1]).strip()
+    prompt = f"{concept} {prompt}"
+
+    return prompt, target
+
+
+def _create_samples_from_mcrae_norms(
+    text_file: Path,
+    min_prod_prob: float = 0.5,
+    min_co_prob: float = 0.5,
+    samples_per_feature_pair: int = 1,
+    seed: int | None = 123456,
+) -> Path:
+    """Transform McRae entries into context mediation samples.
+
+    The McRae norms dataset gives us concepts and features of those concepts, e.g.,
+    a concept might be "accordion" and a feature for it would be "musical instrument".
+
+    To create context mediation samples, we look for pairs of attributes that often
+    co-occur for different concepts. We make one the context and one the prompt,
+    selecting the concept to apply it to at random from the set of concepts that do
+    not have either attribute. In the "source" field, we store all features implied
+    by the context as well as the probability that they co-occur.
+    """
+    with text_file.open("r") as handle:
+        rows = tuple(csv.DictReader(handle, delimiter="\t"))
+
+    # Index features and concepts.
+    features_by_concept = defaultdict(set)
+    concepts_by_feature = defaultdict(set)
+    for row in rows:
+        concept = _get_mcrae_concept(row)
+        feature = _get_mcrae_feature(row)
+        concepts_by_feature[feature].add(concept)
+        features_by_concept[concept].add(feature)
+
+    # Find attributes that co-occur.
+    f_o: dict[str, int] = defaultdict(int)
+    f_co: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for row in rows:
+        concept = _get_mcrae_concept(row)
+        feature = _get_mcrae_feature(row)
+        prod_prob = _get_mcrae_prod_prob(row)
+        if prod_prob < min_prod_prob:
+            continue
+
+        others = features_by_concept[concept] - {feature}
+        for other in others:
+            f_co[feature][other] += 1
+        f_o[feature] += 1
+
+    f_prob = {
+        feature: {
+            other: f_co[feature][other] / f_o[feature]
+            for other in concepts_by_feature
+            if other != feature and f_co[feature][other] > 0
+        }
+        for feature in concepts_by_feature
+    }
+
+    # Choose the pairs we're going to use.
+    feature_pairs = [
+        (feature, other)
+        for feature, cos in f_prob.items()
+        for other, co_prob in cos.items()
+        if co_prob >= min_co_prob
+    ]
+    print(feature_pairs[:100])
+
+    # Make the samples. If requested, set seed ahead of time so we always
+    # generate the same dataset.
+    if seed is not None:
+        random.seed(seed)
+    random.shuffle(feature_pairs)
+
+    samples = []
+    for context_feature, prompt_feature in feature_pairs:
+        candidate_concepts = [
+            concept
+            for concept, features in features_by_concept.items()
+            if context_feature not in features and prompt_feature not in features
+        ]
+        concepts = random.sample(candidate_concepts, k=samples_per_feature_pair)
+        for concept in concepts:
+            sid = _get_mcrae_sample_id(concept, context_feature, prompt_feature)
+            prompt, target_mediated = _get_mcrae_prompt_and_target(
+                concept, prompt_feature
+            )
+            context = f"{concept} {_make_mcrae_feature_fluent(context_feature)}"
+            sample = ContextMediationSample(
+                id=sid,
+                entity=concept,
+                context=context,
+                attribute=context_feature,
+                prompt=prompt,
+                target_mediated=target_mediated,
+                target_unmediated=None,
+                source={
+                    "concept": concept,
+                    "context_feature": context_feature,
+                    "prompt_feature": prompt_feature,
+                    "co_prob": f_prob[context_feature][prompt_feature],
+                    "all_co_features": [
+                        (co_feat, f"{co_prob:.2f}")
+                        for co_feat, co_prob in f_prob[context_feature].items()
+                    ],
+                },
+            )
+            samples.append(sample)
+
+    json_file = env_utils.determine_data_dir() / "mcrae.json"
+    with json_file.open("w") as handle:
+        for sample in samples:
+            json.dump(sample, handle)
+
+    return json_file
+
+
+def _load_mcrae(file: PathLike | None = None, **kwargs: Any) -> Dataset:
+    """Load the McRae norms dataset, if possible."""
+    if file is None:
+        logger.debug("mcrae file not set; defaulting to environment data dir")
+        file = env_utils.determine_data_dir() / "mcrae.json"
+
+    file = Path(file)
+    if not file.exists():
+        raise FileNotFoundError(
+            f"mcrae file not found: {file}"
+            "\nnote this dataset cannot be downloaded automatically, "
+            "so you will have to retrieve it from the supplementary material "
+            "available here https://link.springer.com/article/10.3758/BF03192726 "
+            "and then pass the CONCS_FEATS_concstats_brm.txt file in via the -f flag"
+        )
+
+    if file.suffix == ".txt":
+        logger.debug(f"{file} is in txt format; will reformat into json")
+        file = _create_samples_from_mcrae_norms(file)
+
+    dataset = datasets.load_dataset("json", data_files=str(file), **kwargs)
+    assert isinstance(
+        dataset, datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
+    ), type(dataset)
+    return dataset
+
+
 def load_dataset(name: str, **kwargs: Any) -> Dataset:
     """Load the dataset by name."""
     if name == "counterfact":
@@ -327,6 +538,8 @@ def load_dataset(name: str, **kwargs: Any) -> Dataset:
         return _load_winoventi(**kwargs)
     elif name == "biosbias":
         return _load_bias_in_bios(**kwargs)
+    elif name == "mcrae":
+        return _load_mcrae(**kwargs)
     else:
         raise ValueError(f"unknown dataset: {name}")
 
