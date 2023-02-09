@@ -11,7 +11,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Sequence, TypedDict, cast
 
-from remedi.utils import env_utils
+from remedi.utils import env_utils, lang_utils
 from remedi.utils.typing import Dataset, PathLike, StrSequence
 
 import datasets
@@ -379,16 +379,34 @@ def _make_mcrae_feature_fluent(feature: str) -> str:
     return feature
 
 
+def _strip_mcrae_parenthetical(concept: str) -> str:
+    """Strip parenthetical from concept."""
+    return concept.split("(")[0].strip()
+
+
 def _get_mcrae_prompt_and_target(concept: str, feature: str) -> tuple[str, str]:
     """Transform McRae concept and target feature to a prompt and target token."""
     feature = _make_mcrae_feature_fluent(feature)
 
-    components = feature.strip().split()  # Heuristic, but good enough
+    # Pick last word to be target.
+    components = feature.strip().split()
     target = components[-1]
+
+    # To make sentences look realistic, pick an article for the concept.
+    # We'll just default to "a" for cases where we can't figure it out.
+    a = lang_utils.determine_article(concept).capitalize()
     prompt = " ".join(components[:-1]).strip()
-    prompt = f"{concept} {prompt}"
+    prompt = f"{a} {concept} {prompt}"
 
     return prompt, target
+
+
+def _get_mcrae_context_and_attribute(concept: str, feature: str) -> tuple[str, str]:
+    """Transform McRae concept and feature to a context and attribute."""
+    feature = _make_mcrae_feature_fluent(feature)
+    a = lang_utils.determine_article(concept).capitalize()
+    context = f"{a} {concept} {feature}."
+    return context, feature
 
 
 def _create_samples_from_mcrae_norms(
@@ -452,7 +470,6 @@ def _create_samples_from_mcrae_norms(
         for other, co_prob in cos.items()
         if co_prob >= min_co_prob
     ]
-    print(feature_pairs[:100])
 
     # Make the samples. If requested, set seed ahead of time so we always
     # generate the same dataset.
@@ -470,15 +487,18 @@ def _create_samples_from_mcrae_norms(
         concepts = random.sample(candidate_concepts, k=samples_per_feature_pair)
         for concept in concepts:
             sid = _get_mcrae_sample_id(concept, context_feature, prompt_feature)
+            entity = _strip_mcrae_parenthetical(concept)
             prompt, target_mediated = _get_mcrae_prompt_and_target(
-                concept, prompt_feature
+                entity, prompt_feature
             )
-            context = f"{concept} {_make_mcrae_feature_fluent(context_feature)}"
+            context, attribute = _get_mcrae_context_and_attribute(
+                entity, context_feature
+            )
             sample = ContextMediationSample(
                 id=sid,
-                entity=concept,
+                entity=entity,
                 context=context,
-                attribute=context_feature,
+                attribute=attribute,
                 prompt=prompt,
                 target_mediated=target_mediated,
                 target_unmediated=None,
