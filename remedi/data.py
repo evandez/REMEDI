@@ -490,8 +490,10 @@ def _create_samples_from_mcrae_norms(
                 source={
                     "concept": concept,
                     "context_feature": context_feature,
+                    "context_feature_freq": f_o[context_feature],
                     "prompt_feature": prompt_feature,
-                    "co_prob": f_prob[context_feature][prompt_feature],
+                    "prompt_feature_freq": f_o[prompt_feature],
+                    "co_freq": f_co[context_feature][prompt_feature],
                     "all_co_features": [
                         (co_feat, f"{co_prob:.2f}")
                         for co_feat, co_prob in f_prob[context_feature].items()
