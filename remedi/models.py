@@ -17,6 +17,10 @@ import transformers
 
 GPT_J_NAME_SHORT = "gptj"  # A useful alias for the CLI.
 GPT_J_NAME = "EleutherAI/gpt-j-6B"
+
+GPT_NEO_X_NAME_SHORT = "neox"
+GPT_NEO_X_NAME = "EleutherAI/gpt-neox-20b"
+
 EMBEDDING_LAYER = -1
 
 
@@ -201,8 +205,17 @@ def load_model(
     """
     if name == GPT_J_NAME_SHORT:
         name = GPT_J_NAME
+    elif name == GPT_NEO_X_NAME_SHORT:
+        name = GPT_NEO_X_NAME
+
+    # I usually save randomly initialized variants under the short name of the
+    # corresponding real model (e.g. gptj_random, neox_random), so check here
+    # if we are dealing with *any* variant of the big model.
+    is_gpt_j_variant = name == GPT_J_NAME or GPT_J_NAME_SHORT in name
+    is_neo_x_variant = name == GPT_NEO_X_NAME or GPT_NEO_X_NAME_SHORT in name
+
     if fp16 is None:
-        fp16 = name == GPT_J_NAME or GPT_J_NAME_SHORT in name
+        fp16 = is_gpt_j_variant or is_neo_x_variant
 
     torch_dtype = torch.float16 if fp16 else None
 
@@ -213,6 +226,8 @@ def load_model(
             kwargs["revision"] = "float16"
 
     model = transformers.AutoModelForCausalLM.from_pretrained(name, **kwargs)
+    if is_neo_x_variant:
+        model.to(torch_dtype)
     model.to(device).eval()
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(name)
