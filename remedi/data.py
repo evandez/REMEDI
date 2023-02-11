@@ -337,8 +337,8 @@ def _reformat_bias_in_bios_file(
 
         entity = bb_name
         prompt = f"{entity} has the occupation of"
-        context = f"About {entity}: {bb_bio}"
-        attribute = bb_bio
+        context = bb_bio
+        attribute = bb_bio[bb_bio.index(bb_name) + len(bb_name) :].strip(".: ")
         target_mediated = bb_title
 
         line = ContextMediationSample(
