@@ -35,6 +35,12 @@ TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 
 WINOVENTI_URL = "https://raw.githubusercontent.com/commonsense-exception/commonsense-exception/main/data/winoventi_bert_large_final.tsv"
 
+BIOS_BIAS_BLACKLISTED_NAMES = frozenset(
+    {
+        "Non-Residential",
+    }
+)
+
 
 class ContextMediationSample(TypedDict):
     """Single sample that can be used for context mediation analysis."""
@@ -231,29 +237,52 @@ def _load_winoventi(
     return dataset
 
 
-def _reformat_bias_in_bios_file(pkl_file: Path, bio_min_words: int = 5) -> Path:
+def _reformat_bias_in_bios_file(
+    pkl_file: Path, bio_min_words: int = 10, limit: int | None = 50000
+) -> Path:
     """Reformat the Bias in Bios pickle file on disk."""
     with pkl_file.open("rb") as handle:
         data = pickle.load(handle)
 
-    # Take only the first sentence of each bio to make the task harder.
-    nlp = load_spacy_model("en_core_web_sm")
+    if limit is not None:
+        data = data[:limit]
+
+    # We'll use first name as the entity.
     bb_names = [sample["name"][0] for sample in data]
-    bb_bios = [sample["bio"].replace("_", name) for sample, name in zip(data, bb_names)]
-    bb_bios_abridged = [
-        str(next(iter(doc.sents)))
-        for doc in tqdm(nlp.pipe(bb_bios), total=len(data), desc="parse biosbias")
-    ]
+
+    # Take only one sentence of each bio to make the task harder.
+    nlp = load_spacy_model("en_core_web_sm")
+    bb_bios_raw = [sample["raw"] for sample in data]
+
+    bb_bios_abridged = []
+    for doc in tqdm(nlp.pipe(bb_bios_raw), total=len(data), desc="parse biosbias"):
+        sents = iter(doc.sents)
+        sent = next(sents)
+        sent = next(sents, sent)
+        bb_bios_abridged.append(sent)
 
     # Normalize the samples.
     lines = []
     for index, (sample, bb_name, bb_bio) in enumerate(
         zip(data, bb_names, bb_bios_abridged)
     ):
+        if bb_name in BIOS_BIAS_BLACKLISTED_NAMES:
+            logger.debug(
+                f"will not include sample #{index} because it has "
+                f"blacklisted name '{bb_name}'"
+            )
+            continue
+
+        bb_bio = bb_bio.replace(sample["name"][-1], bb_name)
         bb_bio = bb_bio.strip("*• ")
+        bb_bio = f"About {bb_name}: {bb_bio}"
+
         bb_title = sample["title"].replace("_", " ")
         bb_id = "_".join(part for part in sample["name"] if part)
 
+        # NOTE(evan): This filtering is necessary due to a downstream limitation where
+        # the editor assumes that the last occurrence of an entity is always the second
+        # occurrence.
         n_occurrences = bb_bio.count(bb_name)
         if n_occurrences != 1:
             logger.debug(
@@ -272,8 +301,8 @@ def _reformat_bias_in_bios_file(pkl_file: Path, bio_min_words: int = 5) -> Path:
 
         entity = bb_name
         prompt = f"{entity} has the occupation of"
-        context = bb_bio
-        attribute = bb_bio[bb_bio.index(bb_name) + len(bb_name) :]
+        context = f"About {entity}: {bb_bio}"
+        attribute = bb_bio
         target_mediated = bb_title
 
         line = ContextMediationSample(
