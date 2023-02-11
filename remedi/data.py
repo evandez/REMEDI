@@ -98,8 +98,10 @@ def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
     cf_target_true = cf_requested_rewrite["target_true"]["str"]
     cf_prompt = cf_requested_rewrite["prompt"].format(cf_subject)
 
+    cf_paraphrase_prompts = cf_sample["paraphrase_prompts"]
+
     entity = cf_subject
-    prompt = cf_prompt
+    prompt = cf_paraphrase_prompts[0]
     context = f"{cf_prompt} {cf_target_new}"
     attribute = context.split(entity)[-1].strip(",-;: ")
     target_mediated = cf_target_new
