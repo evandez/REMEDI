@@ -276,7 +276,7 @@ def _reformat_bias_in_bios_file(
 
     bb_bios_abridged = []
     for doc in tqdm(nlp.pipe(bb_bios_raw), total=len(data), desc="parse biosbias"):
-        sents = iter(doc.sents)
+        sents = doc.sents
         sent = next(sents)
         sent = next(sents, sent)
         bb_bios_abridged.append(str(sent))
