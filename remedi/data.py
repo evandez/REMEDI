@@ -279,7 +279,7 @@ def _reformat_bias_in_bios_file(
         sents = iter(doc.sents)
         sent = next(sents)
         sent = next(sents, sent)
-        bb_bios_abridged.append(sent)
+        bb_bios_abridged.append(str(sent))
 
     # Normalize the samples.
     lines = []
