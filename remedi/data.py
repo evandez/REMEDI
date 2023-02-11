@@ -41,6 +41,26 @@ BIOS_BIAS_BLACKLISTED_NAMES = frozenset(
     }
 )
 
+# These prefixes do not make as much sense when put in front of the first name, so
+# we'll try to remove them as much as possible.
+BIOS_BIAS_PREFIXES = (
+    "professor",
+    "prof.",
+    "prof",
+    "dr.",
+    "dr",
+    "doctor",
+    "mr.",
+    "mr",
+    "ms.",
+    "ms",
+    "mrs.",
+    "mrs",
+    "rev.",
+    "rev",
+    "pastor",
+)
+
 
 class ContextMediationSample(TypedDict):
     """Single sample that can be used for context mediation analysis."""
@@ -273,9 +293,23 @@ def _reformat_bias_in_bios_file(
             )
             continue
 
-        bb_bio = bb_bio.replace(sample["name"][-1], bb_name)
+        # Replace all variants of the person's name with their first name.
+        # We'll ignore suffixes, but try to strip prefixes since they are much more
+        # common and do not mesh well with just first names.
+        full_name = " ".join(part for part in sample["name"] if part)
+        last_name = sample["name"][-1]
+        first_last_name = f"{bb_name} {last_name}"
+
+        replacements = []
+        for name in (full_name, first_last_name, last_name):
+            for prefix in BIOS_BIAS_PREFIXES:
+                replacements.append(f"{prefix} {name}")
+                replacements.append(f"{prefix.capitalize()} {name}")
+                replacements.append(f"{prefix.upper()} {name}")
+        replacements += [full_name, first_last_name, last_name]
+        for replace in replacements:
+            bb_bio = bb_bio.replace(replace, bb_name)
         bb_bio = bb_bio.strip("*• ")
-        bb_bio = f"About {bb_name}: {bb_bio}"
 
         bb_title = sample["title"].replace("_", " ")
         bb_id = "_".join(part for part in sample["name"] if part)
@@ -284,7 +318,9 @@ def _reformat_bias_in_bios_file(
         # the editor assumes that the last occurrence of an entity is always the second
         # occurrence.
         n_occurrences = bb_bio.count(bb_name)
-        if n_occurrences != 1:
+        if n_occurrences == 0:
+            bb_bio = f"About {bb_name}: {bb_bio}"
+        elif n_occurrences != 1:
             logger.debug(
                 f"will not include sample #{index} because there are "
                 f"{n_occurrences} (!= 1) occurrences of '{bb_name}' in '{bb_bio}'"
