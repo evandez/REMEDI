@@ -258,7 +258,10 @@ def _load_winoventi(
 
 
 def _reformat_bias_in_bios_file(
-    pkl_file: Path, bio_min_words: int = 10, limit: int | None = 50000
+    pkl_file: Path,
+    bio_min_words: int = 10,
+    sent_min_words: int = 3,
+    limit: int | None = 50000,
 ) -> Path:
     """Reformat the Bias in Bios pickle file on disk."""
     with pkl_file.open("rb") as handle:
@@ -276,10 +279,15 @@ def _reformat_bias_in_bios_file(
 
     bb_bios_abridged = []
     for doc in tqdm(nlp.pipe(bb_bios_raw), total=len(data), desc="parse biosbias"):
-        sents = doc.sents
-        sent = next(sents)
-        sent = next(sents, sent)
-        bb_bios_abridged.append(str(sent))
+        sents = [
+            str(sent) for sent in doc.sents if len(str(sent).split()) >= sent_min_words
+        ]
+        if len(sents) == 0:
+            bb_bios_abridged.append("")  # will get filtered out later
+        elif len(sents) == 1:
+            bb_bios_abridged.append(sents[0])  # no choice but first
+        else:
+            bb_bios_abridged.append(sents[1])  # otherwise, always take second sentence
 
     # Normalize the samples.
     lines = []
