@@ -285,11 +285,12 @@ def _reformat_bias_in_bios_file(
             if len(str(sent).strip().split()) >= sent_min_words
         ]
         if len(sents) == 0:
-            bb_bios_abridged.append("")  # will get filtered out later
+            bb_bio_abridged = ""  # will get filtered out later
         elif len(sents) == 1:
-            bb_bios_abridged.append(sents[0])  # no choice but first
+            bb_bio_abridged = sents[0]  # no choice but first
         else:
-            bb_bios_abridged.append(sents[1])  # otherwise, always take second sentence
+            bb_bio_abridged = sents[1]  # otherwise, always take second sentence
+        bb_bios_abridged.append(bb_bio_abridged)
 
     # Normalize the samples.
     lines = []
