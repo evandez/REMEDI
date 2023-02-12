@@ -21,8 +21,6 @@ GPT_J_NAME = "EleutherAI/gpt-j-6B"
 GPT_NEO_X_NAME_SHORT = "neox"
 GPT_NEO_X_NAME = "EleutherAI/gpt-neox-20b"
 
-EMBEDDING_LAYER = -1
-
 
 @dataclass(frozen=True)
 class ModelAndTokenizer:
@@ -58,11 +56,13 @@ def determine_layers(model: ModelAndTokenizer | Model) -> tuple[int, ...]:
     """Return all hidden layer names for the given model."""
     model = unwrap_model(model)
     assert isinstance(model, Model)
-    return (
-        # TODO(evandez): This is currently incompatible with the editor code.
-        # EMBEDDING_LAYER,
-        *range(model.config.n_layer),
-    )
+
+    if isinstance(model, transformers.GPTNeoXForCausalLM):
+        n_layer = model.config.num_hidden_layers
+    else:
+        n_layer = model.config.n_layer
+
+    return (*range(n_layer),)
 
 
 @overload
@@ -114,8 +114,8 @@ def determine_layer_paths(
 
     layer_paths = {}
     for layer in layers:
-        if layer == EMBEDDING_LAYER:
-            layer_path = "transformer.wte"
+        if isinstance(model, transformers.GPTNeoXForCausalLM):
+            layer_path = f"gpt_neox.layers.{layer}"
         else:
             layer_path = f"transformer.h.{layer}"
         layer_paths[layer] = layer_path
