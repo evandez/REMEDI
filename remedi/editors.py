@@ -743,12 +743,14 @@ class Editor(nn.Module):
 
                 generate_kwargs = dict(
                     do_sample=False,
-                    max_length=max_length,
-                    max_new_tokens=max_new_tokens,
                     return_dict_in_generate=True,
                     output_scores=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
+                if max_length is not None:
+                    generate_kwargs["max_length"] = max_length
+                if max_new_tokens is not None:
+                    generate_kwargs["max_new_tokens"] = max_new_tokens
 
                 outputs_before = None
                 if return_before:
