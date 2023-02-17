@@ -2,9 +2,7 @@
 from experiments import utils
 from experiments.aliases import *
 
-from invoke import Collection, task
-
-ns = Collection()
+from invoke import task
 
 
 def _train(c, model, dataset, device=None):
@@ -14,14 +12,31 @@ def _train(c, model, dataset, device=None):
     c.run(cmd)
 
 
-for dataset in DATASETS:
-    ns_dataset = Collection(dataset)
-    for model in MODELS:
+def _maybe_random_model(c, model, random=False):
+    if random:
+        random_model = MODELS_DIR / f"{model}_random"
+        if not random_model.exists():
+            c.run(f"python -m scripts.random_init_model -m {model}")
+        return random_model
+    return model
 
-        @task
-        def train_task(c, device=None):
-            f"""Train REMEDI editors for {model}/{dataset}."""
-            _train(c, model, dataset, device=device)
 
-        ns_dataset.add_task(train_task, model)
-    ns.add_collection(ns_dataset)
+@task(name=CF)
+def train_cf(c, model=DEFAULT_MODEL, random=False, device=None):
+    """Train REMEDI for factual editing."""
+    model = _maybe_random_model(c, model, random=random)
+    _train(c, model, CF, device=device)
+
+
+@task(name=BB)
+def train_bb(c, model=DEFAULT_MODEL, random=False, device=None):
+    """Train REMEDI for context mediation."""
+    model = _maybe_random_model(c, model, random=random)
+    _train(c, model, BB, device=device)
+
+
+@task(name=MC)
+def train_mc(c, model=DEFAULT_MODEL, random=False, device=None):
+    """Train REMEDI for entailment analysis."""
+    model = _maybe_random_model(c, model, random=random)
+    _train(c, model, MC, device=device)

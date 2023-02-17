@@ -23,9 +23,7 @@ def require_editors_dir(model, dataset):
     """Assert dir containing trained editors exists and return it."""
     editors_dir = experiment_results_dir(EX_EDITORS, model=model, dataset=dataset)
     if not editors_dir.exists():
-        raise Exit(
-            message=f"editors not found at {editors_dir}; did you train them?", code=1
-        )
+        raise Exit(message=f"editors not found at {editors_dir}", code=1)
     return editors_dir
 
 

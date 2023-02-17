@@ -4,17 +4,18 @@ from pathlib import Path
 # Assume all results are written to default results dir.
 HERE = Path(__file__).parent
 RESULTS_DIR = Path(os.getenv("CM_RESULTS_DIR", HERE / "results"))
+MODELS_DIR = Path(os.getenv("CM_MODELS_DIR", HERE / "models"))
 
 # All models and datasets.
 GPT2 = "gpt2"
 GPT2_XL = "gpt2-xl"
 GPTJ = "gptj"
-MODELS = (GPT2, GPT2_XL, GPTJ)
+
+DEFAULT_MODEL = GPTJ
 
 CF = "counterfact"
 BB = "biosbias"
 MC = "mcrae"
-DATASETS = (CF, BB, MC)
 
 # Experiment keys.
 EX_PREFIX = "post_icml_"  # Prepended to every experiment name.
