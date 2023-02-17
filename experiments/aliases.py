@@ -2,9 +2,9 @@ import os
 from pathlib import Path
 
 # Assume all results are written to default results dir.
-HERE = Path(__file__).parent
-RESULTS_DIR = Path(os.getenv("CM_RESULTS_DIR", HERE / "results"))
-MODELS_DIR = Path(os.getenv("CM_MODELS_DIR", HERE / "models"))
+REPO_ROOT = Path(__file__).parent.parent
+RESULTS_DIR = Path(os.getenv("CM_RESULTS_DIR", REPO_ROOT / "results"))
+MODELS_DIR = Path(os.getenv("CM_MODELS_DIR", REPO_ROOT / "models"))
 
 # All models and datasets.
 GPT2 = "gpt2"
