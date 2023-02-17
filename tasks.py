@@ -1,5 +1,8 @@
-# mypy: ignore-errors
-from invoke import Collection, task
+from invoke import Collection, Exit, task
+
+# Root invoke namespace.
+ns = Collection()
+
 
 ###############
 # Setup       #
@@ -13,6 +16,8 @@ def install(c):
     c.run("python -m spacy download en_core_web_sm")
     c.run("python -W ignore -m nltk.downloader punkt cmudict")
 
+
+ns.add_task(install)
 
 ###############
 # Code health #
@@ -64,3 +69,12 @@ ns_presubmit.add_task(presubmit_isort, "isort")
 ns_presubmit.add_task(presubmit_mypy, "mypy")
 ns_presubmit.add_task(presubmit_pytest, "pytest")
 ns_presubmit.add_task(presubmit, default=True)
+
+ns.add_collection(ns_presubmit)
+
+###############
+# Experiments #
+###############
+import experiments
+
+ns.add_collection(Collection.from_module(experiments))
