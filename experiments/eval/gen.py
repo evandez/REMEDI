@@ -9,7 +9,7 @@ from invoke import task
 def eval_gen_cf(c, model=DEFAULT_MODEL, device=None):
     """Evaluate REMEDI on factual editing."""
     editors_dir = utils.require_editors_dir(model=model, dataset=CF)
-    name = utils.experiment_name("eval_fact_gen", model=model)
+    name = utils.experiment_name("eval_gen_counterfact", model=model)
     layer = REMEDI_EDITOR_LAYER[model][CF]
     cmd = f"python -m scripts.eval_fact_gen -n {name} -m {model}"
     cmd = utils.maybe_set_device(cmd, device=device)
@@ -24,7 +24,7 @@ def eval_gen_cf(c, model=DEFAULT_MODEL, device=None):
 def eval_gen_bb(c, model=DEFAULT_MODEL, device=None):
     """Evaluate REMEDI on context mediation correction."""
     editors_dir = utils.require_editors_dir(model=model, dataset=BB)
-    name = utils.experiment_name("eval_bias_gen", model=model)
+    name = utils.experiment_name("eval_gen_biosbias", model=model)
     layer = REMEDI_EDITOR_LAYER[model][BB]
     cmd = f"python -m scripts.eval_bias_gen -n {name} -m {model} -l {layer} -e {editors_dir}"
     cmd = utils.maybe_set_device(cmd, device=device)

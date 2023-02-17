@@ -7,7 +7,7 @@ from invoke import Collection, task
 
 def _sweep_gen(c, model, dataset, device=None):
     editors_dir = utils.require_editors_dir(model, dataset)
-    name = utils.experiment_name("sweep_fact_gen", dataset=dataset, model=model)
+    name = utils.experiment_name("sweep_gen", dataset=dataset, model=model)
     script = "eval_fact_gen" if dataset == CF else "eval_bias_gen"
     cmd = f"python -m scripts.{script} --small -m {model} -n {name} -e {editors_dir}"
     cmd = utils.maybe_set_device(cmd, device=device)
@@ -28,7 +28,7 @@ def sweep_gen_bb(c, model=DEFAULT_MODEL, device=None):
 
 def _sweep_cls(c, model, dataset, device=None):
     editors_dir = utils.require_editors_dir(model, dataset)
-    name = utils.experiment_name("sweep_fact_cls", dataset=dataset, model=model)
+    name = utils.experiment_name("sweep_cls", dataset=dataset, model=model)
     script = "eval_fact_cls" if dataset == CF else "eval_bias_cls"
     layer = REMEDI_EDITOR_LAYER[model][dataset]
     cmd = f"python -m scripts.{script} --small -m {model} -n {name} -e {editors_dir} -l {layer}"
