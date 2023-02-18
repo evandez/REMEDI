@@ -89,6 +89,7 @@ def add_experiment_args(parser: argparse.ArgumentParser) -> None:
         --experiment-name (-n): Requied, unique identifier for this experiment.
         --results-dir: Root directory containing all experiment folders.
         --clear-results-dir: If set, experiment-specific results directory is cleared.
+        --args-file-name: Dump all args to this file; defaults to generated name.
         --seed: Random seed.
 
     """
@@ -98,7 +99,6 @@ def add_experiment_args(parser: argparse.ArgumentParser) -> None:
         required=True,
         help="unique name for the experiment",
     )
-    parser.add_argument("--args-file-name", help="file name for args dump")
     parser.add_argument(
         "--results-dir", type=Path, help="root directory containing experiment results"
     )
@@ -108,6 +108,7 @@ def add_experiment_args(parser: argparse.ArgumentParser) -> None:
         default=False,
         help="clear any old results and start anew",
     )
+    parser.add_argument("--args-file-name", help="file name for args dump")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="random seed")
 
 
