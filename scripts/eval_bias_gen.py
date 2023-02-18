@@ -39,10 +39,10 @@ def main(args: argparse.Namespace) -> None:
 
     benchmark_kwargs: dict = {}
     if args.decontextualized:
-        results_dir = experiment.results_dir / "contextual"
+        results_dir = experiment.results_dir / "decontextual"
         benchmark_kwargs["entity_occurrence"] = 0
     else:
-        results_dir = experiment.results_dir / "decontextual"
+        results_dir = experiment.results_dir / "contextual"
         dataset = precompute.prompt_in_context_from_dataset(
             dataset, output_key="prompt", context_suffix="\n\n"
         )
