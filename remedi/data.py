@@ -35,7 +35,7 @@ TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 
 WINOVENTI_URL = "https://raw.githubusercontent.com/commonsense-exception/commonsense-exception/main/data/winoventi_bert_large_final.tsv"
 
-BIOS_BIAS_BLACKLISTED_NAMES = frozenset(
+_BIOS_BIAS_BLACKLISTED_NAMES = frozenset(
     {
         "Non-Residential",
     }
@@ -43,7 +43,7 @@ BIOS_BIAS_BLACKLISTED_NAMES = frozenset(
 
 # These prefixes do not make as much sense when put in front of the first name, so
 # we'll try to remove them as much as possible.
-BIOS_BIAS_PREFIXES = (
+_BIOS_BIAS_PREFIXES = (
     "professor",
     "prof.",
     "prof",
@@ -60,6 +60,8 @@ BIOS_BIAS_PREFIXES = (
     "rev",
     "pastor",
 )
+
+_COUNTERFACT_PARAPHRASE_PROMPT_ARTIFACTS = (" (b. ", "(tr. ", "(min. ")
 
 
 class ContextMediationSample(TypedDict):
@@ -92,7 +94,7 @@ ContextMediationInput = ContextMediationSample | ContextMediationBatch
 
 
 def _determine_file(file: PathLike | None, url: str) -> Path:
-    """Default the (maybe null) file to something sensible based on the URL."""
+    """Set default for (maybe null) file to something sensible based on the URL."""
     if file is None:
         name = url.split("/")[-1]
         file = env_utils.determine_data_dir() / name
@@ -106,13 +108,73 @@ def _download_file(file: PathLike, url: str) -> None:
     wget.download(url, out=str(file))
 
 
-def _reformat_counterfact_file(file: Path) -> None:
-    """Reformat the counterfact file to be jsonl instead of json."""
-    with file.open("r") as handle:
-        lines = json.load(handle)
-    with file.open("w") as handle:
-        for line in lines:
-            json.dump(line, handle)
+def _rejoin_sents_on_entity(entity: str, sents: list[str]) -> list[str]:
+    """Rejoin any splits where the entity was broken into multiple sentences."""
+    candidates = [
+        index
+        for index, (left, right) in enumerate(zip(sents, sents[1:]))
+        if (entity not in left and entity not in right and entity in f"{left} {right}")
+        or left.endswith(entity)
+    ]
+    if not candidates:
+        return sents
+
+    assert len(candidates) == 1
+    [index] = candidates
+    merged = f"{sents[index]} {sents[index + 1]}"
+    return [*sents[:index], merged, *sents[index + 2 :]]
+
+
+def _strip_counterfact_paraphrase_prompt(entity: str, prompt: str) -> str:
+    """Strip the cruft out of one of CounterFact's paraphrase prompts."""
+    nlp = load_spacy_model("en_core_web_sm")
+
+    # Sometimes the paraphrase model stuck in a bunch of newlines, always
+    # take what comes after them.
+    prompt = prompt.split("\n")[-1].strip()
+
+    # Similarly, it sometimes adds a wikipedia title. In these cases, a good
+    # heuristic is just to only take everything beyond and including the entity.
+    if prompt.startswith("Category:"):
+        prompt = entity + prompt.split(entity)[-1]
+
+    # Another common, weird artifact to get rid of:
+    for artifact in _COUNTERFACT_PARAPHRASE_PROMPT_ARTIFACTS:
+        if artifact in prompt:
+            prompt = prompt.split(artifact)[-1]
+
+    sents = [str(sent) for sent in nlp(prompt).sents]
+    if (
+        entity == "Kalajoki"
+        or entity == "Adam Adamant Lives!"
+        or entity == "Napalm Death"
+    ):
+        print(sents)
+    sents = _rejoin_sents_on_entity(entity, sents)
+    if len(sents) <= 2:
+        if entity not in sents[0]:
+            assert len(sents) == 2
+            sents = [sents[1]]
+    else:
+        if "?" in sents[-2]:
+            sents = [sents[-2], sents[-1]]
+        else:
+            sents = [sents[-1]]
+
+    stripped = " ".join(sents).strip()
+
+    # If there's still a period in the sentence, but the entity does not have it,
+    # it usually means we failed to split a sentence.
+    if "." in stripped and "." not in entity:
+        stripped = stripped.split(".")[-1].strip()
+
+    # Finally, if we really messed something up along the way, just default to the
+    # cleaned up paraphrase prompt.
+    if entity not in stripped:
+        logger.debug(f"prompt cleaning failed for {entity}: {stripped}")
+        return prompt
+
+    return stripped
 
 
 def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
@@ -123,11 +185,10 @@ def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
     cf_target_new = cf_requested_rewrite["target_new"]["str"]
     cf_target_true = cf_requested_rewrite["target_true"]["str"]
     cf_prompt = cf_requested_rewrite["prompt"].format(cf_subject)
-
     cf_paraphrase_prompts = cf_sample["paraphrase_prompts"]
 
     entity = cf_subject
-    prompt = cf_paraphrase_prompts[0]
+    prompt = _strip_counterfact_paraphrase_prompt(entity, cf_paraphrase_prompts[0])
     context = f"{cf_prompt} {cf_target_new}"
     attribute = context.split(entity)[-1].strip(",-;: ")
     target_mediated = cf_target_new
@@ -147,6 +208,17 @@ def _reformat_counterfact_sample(cf_sample: dict) -> ContextMediationSample:
     )
 
 
+def _reformat_counterfact_file(file: Path) -> Path:
+    """Reformat the counterfact file to be jsonl instead of json."""
+    with file.open("r") as handle:
+        lines = json.load(handle)
+    file = file.parent / f"{file.stem}.jsonl"
+    with file.open("w") as handle:
+        for line in tqdm(lines, desc="reformat counterfact"):
+            json.dump(_reformat_counterfact_sample(line), handle)
+    return file
+
+
 def _load_counterfact(
     file: PathLike | None = None,
     url: str = COUNTERFACT_URL,
@@ -154,21 +226,21 @@ def _load_counterfact(
     **kwargs: Any,
 ) -> Dataset:
     """Download and format the counterfact dataset."""
-    file = _determine_file(file, url)
-    if not file.exists() or overwrite:
-        _download_file(file, url)
-        _reformat_counterfact_file(file)
+    if file is None:
+        file = env_utils.determine_data_dir() / "counterfact.jsonl"
+        if not file.exists():
+            file = _determine_file(file, url)
+            _download_file(file, url)
+
+    file = Path(file)
+    if file.suffix != ".jsonl":
+        file = _reformat_counterfact_file(file)
 
     dataset = datasets.load_dataset("json", data_files=str(file), **kwargs)
     assert isinstance(
         dataset, datasets.arrow_dataset.Dataset | datasets.dataset_dict.DatasetDict
     ), type(dataset)
 
-    dataset = dataset.map(
-        _reformat_counterfact_sample,
-        remove_columns=column_names(dataset),
-        desc="reformat counterfact",
-    )
     return dataset
 
 
@@ -297,7 +369,7 @@ def _reformat_bias_in_bios_file(
     for index, (sample, bb_name, bb_bio) in enumerate(
         zip(data, bb_names, bb_bios_abridged)
     ):
-        if bb_name in BIOS_BIAS_BLACKLISTED_NAMES:
+        if bb_name in _BIOS_BIAS_BLACKLISTED_NAMES:
             logger.debug(
                 f"will not include sample #{index} because it has "
                 f"blacklisted name '{bb_name}'"
@@ -313,7 +385,7 @@ def _reformat_bias_in_bios_file(
 
         replacements = []
         for name in (full_name, first_last_name, last_name):
-            for prefix in BIOS_BIAS_PREFIXES:
+            for prefix in _BIOS_BIAS_PREFIXES:
                 replacements.append(f"{prefix} {name}")
                 replacements.append(f"{prefix.capitalize()} {name}")
                 replacements.append(f"{prefix.upper()} {name}")
