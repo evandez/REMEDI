@@ -228,9 +228,12 @@ def _load_counterfact(
     """Download and format the counterfact dataset."""
     if file is None:
         file = env_utils.determine_data_dir() / "counterfact.jsonl"
+
+        # If jsonl file not here, means we need to download and reformat.
         if not file.exists():
             file = _determine_file(file, url)
-            _download_file(file, url)
+            if not file.exists():
+                _download_file(file, url)
 
     file = Path(file)
     if file.suffix != ".jsonl":
