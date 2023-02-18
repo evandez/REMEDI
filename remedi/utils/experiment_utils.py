@@ -4,6 +4,7 @@ import json
 import logging
 import random
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,7 +40,7 @@ def create_results_dir(
     experiment_name: str,
     root: PathLike | None = None,
     args: argparse.Namespace | None = None,
-    args_file: PathLike | None = None,
+    args_file_name: str | None = None,
     clear_if_exists: bool = False,
 ) -> Path:
     """Create a directory for storing experiment results.
@@ -70,9 +71,10 @@ def create_results_dir(
 
     results_dir.mkdir(exist_ok=True, parents=True)
     if args is not None:
-        if args_file is None:
-            args_file = results_dir / "args.json"
-        args_file = Path(args_file)
+        if args_file_name is None:
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            args_file_name = f"args-{timestamp}.json"
+        args_file = results_dir / args_file_name
         logger.info(f"saving args to {args_file}")
         with args_file.open("w") as handle:
             json.dump({key: str(value) for key, value in vars(args).items()}, handle)
@@ -96,6 +98,7 @@ def add_experiment_args(parser: argparse.ArgumentParser) -> None:
         required=True,
         help="unique name for the experiment",
     )
+    parser.add_argument("--args-file-name", help="file name for args dump")
     parser.add_argument(
         "--results-dir", type=Path, help="root directory containing experiment results"
     )
@@ -121,6 +124,7 @@ def setup_experiment(args: argparse.Namespace) -> Experiment:
         experiment_name,
         root=args.results_dir,
         args=args,
+        args_file_name=args.args_file_name,
         clear_if_exists=args.clear_results_dir,
     )
 
