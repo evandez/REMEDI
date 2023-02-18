@@ -28,6 +28,14 @@ REMEDI_EDITOR_LAYER = {
         CF: 1,
         BB: 11,
     },
+    GPT2_XL: {
+        CF: 3,
+        BB: 4,
+    },
+    GPT2: {
+        CF: 5,
+        BB: 9,
+    },
 }
 
 # Layer to take entity from during classification.
