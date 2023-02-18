@@ -19,17 +19,17 @@ jobs:
       - name: install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          python -m nltk.downloader punkt stopwords
+          pip install invoke
+          invoke install
       - name: lint (black)
         run: |
-          python -m black --check remedi scripts
+          invoke presubmit.black
       - name: lint (isort)
         run: |
-          isort -c remedi scripts
+          invoke presubmit.isort
       - name: type check
         run: |
-          mypy remedi scripts
+          invoke presubmit.mypy
       - name: run unit tests
         run: |
-          pytest tests
+          invoke presubmit.pytest

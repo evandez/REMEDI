@@ -12,6 +12,7 @@ ns = Collection()
 @task
 def install(c):
     """Install the project into the current environment."""
+    c.run("python -m pip install --upgrade pip")
     c.run("python -m pip install -r requirements.txt")
     c.run("python -m spacy download en_core_web_sm")
     c.run("python -W ignore -m nltk.downloader punkt cmudict")
