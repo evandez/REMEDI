@@ -231,7 +231,7 @@ def _load_counterfact(
 
         # If jsonl file not here, means we need to download and reformat.
         if not file.exists():
-            file = _determine_file(file, url)
+            file = _determine_file(None, url)
             if not file.exists():
                 _download_file(file, url)
 
