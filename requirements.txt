@@ -2,6 +2,7 @@ git+https://github.com/davidbau/baukit
 accelerate
 dataclasses_json
 datasets
+invoke
 jupyter
 jupyter_http_over_ws
 matplotlib
