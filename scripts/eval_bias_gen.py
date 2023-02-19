@@ -8,7 +8,6 @@ from remedi import benchmarks, data, editors, models, precompute
 from remedi.utils import experiment_utils, logging_utils
 
 import torch
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 logger = logging.getLogger(__name__)
 
