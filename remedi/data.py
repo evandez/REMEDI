@@ -485,6 +485,11 @@ def _get_mcrae_feature(row: dict) -> str:
     return feature
 
 
+def _get_mcrae_feature_prob(row: dict) -> float:
+    """Get p(feature | concept) using production frequencies."""
+    return int(row["Prod_Freq"]) / 30
+
+
 def _get_mcrae_sample_id(
     concept: str, context_feature: str, prompt_feature: str
 ) -> str:
@@ -548,7 +553,7 @@ def _get_mcrae_context_and_attribute(concept: str, feature: str) -> tuple[str, s
 
 def _create_samples_from_mcrae_norms(
     text_file: Path,
-    min_co_prob: float = 0.5,
+    min_co_prob: float = 0.1,
     samples_per_feature_pair: int = 1,
     seed: int | None = 123456,
 ) -> Path:
@@ -569,21 +574,27 @@ def _create_samples_from_mcrae_norms(
     # Index features and concepts.
     features_by_concept = defaultdict(set)
     concepts_by_feature = defaultdict(set)
+    probs_by_concept_feature = defaultdict(float)
     for row in rows:
         concept = _get_mcrae_concept(row)
         feature = _get_mcrae_feature(row)
+        prob = _get_mcrae_feature_prob(row)
+
         concepts_by_feature[feature].add(concept)
         features_by_concept[concept].add(feature)
+        probs_by_concept_feature[concept, feature] = prob
 
     # Find attributes that co-occur.
     f_o: dict[str, int] = defaultdict(int)
-    f_co: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    f_co: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for row in rows:
         concept = _get_mcrae_concept(row)
         feature = _get_mcrae_feature(row)
+        prob = _get_mcrae_feature_prob(row)
+
         others = features_by_concept[concept] - {feature}
         for other in others:
-            f_co[feature][other] += 1
+            f_co[feature][other] += prob * probs_by_concept_feature[concept, other]
         f_o[feature] += 1
 
     f_prob = {
