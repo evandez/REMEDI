@@ -144,12 +144,6 @@ def _strip_counterfact_paraphrase_prompt(entity: str, prompt: str) -> str:
             prompt = prompt.split(artifact)[-1]
 
     sents = [str(sent) for sent in nlp(prompt).sents]
-    if (
-        entity == "Kalajoki"
-        or entity == "Adam Adamant Lives!"
-        or entity == "Napalm Death"
-    ):
-        print(sents)
     sents = _rejoin_sents_on_entity(entity, sents)
     if len(sents) <= 2:
         if entity not in sents[0]:
