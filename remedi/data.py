@@ -35,6 +35,53 @@ TFIDF_VOCAB_URL = f"{ROME_BASE_URL}/tfidf_vocab.json"
 
 WINOVENTI_URL = "https://raw.githubusercontent.com/commonsense-exception/commonsense-exception/main/data/winoventi_bert_large_final.tsv"
 
+_MCRAE_BLACKLISTED_FEATURE_PREFIXES = ("bought/sold", "eg -", "killed", "king of")
+_MCRAE_SPLITTABLE_FEATURE_PREFIXES = (
+    "associated with",
+    "an",
+    "a",
+    "becomes a",
+    "causes",
+    "comes from",
+    "comes in",
+    "comes on",
+    "different",
+    "found at",
+    "found below",
+    "found by",
+    "found in",
+    "found on",
+    "found over",
+    "found near",
+    "has an",
+    "has a",
+    "has",
+    "is an",
+    "is attached to",
+    "is a",
+    "is",
+    "like a",
+    "lives in",
+    "lives on",
+    "made by",
+    "made of",
+    "made with",
+    "made from",
+    "owned by",
+    "part of a",
+    "part of",
+    "requires a",
+    "requires",
+    "used as",
+    "used at",
+    "used by",
+    "used for",
+    "used in",
+    "used on",
+    "used with",
+    "uses",
+)
+
 _BIOS_BIAS_BLACKLISTED_NAMES = frozenset(
     {
         "Non-Residential",
@@ -226,7 +273,7 @@ def _load_counterfact(
         # If jsonl file not here, means we need to download and reformat.
         if not file.exists():
             file = _determine_file(None, url)
-            if not file.exists():
+            if not file.exists() or overwrite:
                 _download_file(file, url)
 
     file = Path(file)
@@ -500,16 +547,28 @@ def _get_mcrae_sample_id(
     return f"{cid}/{cfid}/{pfid}"
 
 
-def _make_mcrae_feature_fluent(feature: str) -> str:
-    """Heuristically adjust feature so that concept can be fluently prepended."""
+def _filter_mcrae_features(rows: list[dict]) -> list[dict]:
+    """Filter out any rows with blacklisted features."""
+    filtered = []
+    for row in rows:
+        feature = _get_mcrae_feature(row)
+        if not any(map(feature.startswith, _MCRAE_BLACKLISTED_FEATURE_PREFIXES)):
+            filtered.append(row)
+    return filtered
+
+
+def _get_mcrae_feature_prefix_for_fluency(feature: str) -> str | None:
+    """Return True if feature needs to be prefixed with "is" to be fluent."""
     if any(
         feature.startswith(prefix)
         for prefix in {
             "a ",
             "an ",
             "associated ",
+            "hunted ",
             "eaten ",
             "found ",
+            "like ",
             "made ",
             "part ",
             "owned ",
@@ -517,7 +576,17 @@ def _make_mcrae_feature_fluent(feature: str) -> str:
             "worn ",
         }
     ):
-        feature = f"is {feature}"
+        return "is"
+    elif any(feature.startswith(prefix) for prefix in ("different ",)):
+        return "has"
+    return None
+
+
+def _make_mcrae_feature_fluent(feature: str) -> str:
+    """Heuristically adjust feature so that concept can be fluently prepended."""
+    prefix = _get_mcrae_feature_prefix_for_fluency(feature)
+    if prefix is not None:
+        feature = f"{prefix} {feature}"
     return feature
 
 
@@ -528,19 +597,38 @@ def _strip_mcrae_parenthetical(concept: str) -> str:
 
 def _get_mcrae_prompt_and_target(concept: str, feature: str) -> tuple[str, str]:
     """Transform McRae concept and target feature to a prompt and target token."""
-    feature = _make_mcrae_feature_fluent(feature)
+    # We will split the feature into a prompt part (what is fed into the LM)
+    # and a target part (the probability of which is maximized via REMEDI and
+    # measured during eval). This split depends on how the feature is phrased,
+    # as we want to avoid cases where the prompt inadvertantly pigeonholes the LM
+    # into saying the correct thing.
+    components = None
+    for prefix in _MCRAE_SPLITTABLE_FEATURE_PREFIXES:
+        prefix = f"{prefix.strip()} "
+        if feature.startswith(prefix):
+            logger.debug(f'splitting feature "{feature}" on "{prefix}"')
+            components = [
+                _make_mcrae_feature_fluent(prefix).lstrip(),
+                feature[len(prefix) :].strip(),
+            ]
+            break
 
-    # Pick last word to be target.
-    components = feature.strip().split()
-    target = components[-1]
+    if components is None:
+        logger.debug(f'feature "{feature}" will be the full target')
+        prompt = _get_mcrae_feature_prefix_for_fluency(feature)
+        if prompt is None:
+            prompt = ""
+        components = [prompt, feature]
 
-    # To make sentences look realistic, pick an article for the concept.
-    # We'll just default to "a" for cases where we can't figure it out.
-    a = lang_utils.determine_article(concept).capitalize()
-    prompt = " ".join(components[:-1]).strip()
-    prompt = f"{a} {concept} {prompt}"
-
+    [prompt, target] = components
     return prompt, target
+
+
+def _get_mcrae_prompt_with_entity(concept: str, prompt: str) -> str:
+    """Glue the concept and prompt together."""
+    a = lang_utils.determine_article(concept).capitalize()
+    prompt = f"{a} {concept} {prompt}".strip()
+    return prompt
 
 
 def _get_mcrae_context_and_attribute(concept: str, feature: str) -> tuple[str, str]:
@@ -569,20 +657,26 @@ def _create_samples_from_mcrae_norms(
     by the context as well as the probability that they co-occur.
     """
     with text_file.open("r") as handle:
-        rows = tuple(csv.DictReader(handle, delimiter="\t"))
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    rows = _filter_mcrae_features(rows)
 
     # Index features and concepts.
     features_by_concept = defaultdict(set)
     concepts_by_feature = defaultdict(set)
     probs_by_concept_feature = defaultdict(float)
+    prompts_by_feature = {}
+    targets_by_feature = {}
     for row in rows:
         concept = _get_mcrae_concept(row)
         feature = _get_mcrae_feature(row)
         prob = _get_mcrae_feature_prob(row)
+        prompt, target = _get_mcrae_prompt_and_target(concept, feature)
 
         concepts_by_feature[feature].add(concept)
         features_by_concept[concept].add(feature)
         probs_by_concept_feature[concept, feature] = prob
+        prompts_by_feature[feature] = prompt
+        targets_by_feature[feature] = target
 
     # Find attributes that co-occur.
     f_o: dict[str, int] = defaultdict(int)
@@ -631,9 +725,10 @@ def _create_samples_from_mcrae_norms(
         for concept in concepts:
             sid = _get_mcrae_sample_id(concept, context_feature, prompt_feature)
             entity = _strip_mcrae_parenthetical(concept)
-            prompt, target_mediated = _get_mcrae_prompt_and_target(
-                entity, prompt_feature
+            prompt = _get_mcrae_prompt_with_entity(
+                entity, prompts_by_feature[prompt_feature]
             )
+            target_mediated = targets_by_feature[prompt_feature]
             context, attribute = _get_mcrae_context_and_attribute(
                 entity, context_feature
             )
@@ -648,12 +743,22 @@ def _create_samples_from_mcrae_norms(
                 source={
                     "concept": concept,
                     "context_feature": context_feature,
-                    "context_feature_freq": f_o[context_feature],
+                    "context_feature_fluent": _make_mcrae_feature_fluent(
+                        context_feature
+                    ),
                     "prompt_feature": prompt_feature,
-                    "prompt_feature_freq": f_o[prompt_feature],
-                    "co_freq": f_co[context_feature][prompt_feature],
+                    "prompt_feature_fluent": _make_mcrae_feature_fluent(prompt_feature),
+                    "co_prob": f_prob[context_feature][prompt_feature],
                     "all_co_features": [
-                        (co_feat, f"{co_prob:.2f}")
+                        {
+                            "feature": co_feat,
+                            "feature_fluent": _make_mcrae_feature_fluent(co_feat),
+                            "prompt": _get_mcrae_prompt_with_entity(
+                                entity, prompts_by_feature[co_feat]
+                            ),
+                            "target": targets_by_feature[co_feat],
+                            "co_prob": f"{co_prob:.2f}",
+                        }
                         for co_feat, co_prob in f_prob[context_feature].items()
                     ],
                 },
