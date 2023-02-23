@@ -527,8 +527,6 @@ def _get_mcrae_feature(row: dict) -> str:
     for prefix in ("inbeh", "beh"):
         feature = feature.replace(f"{prefix}_-_", "")
     feature = feature.replace("_", " ")
-    if feature.startswith("eg -"):
-        feature = feature.replace("eg -", "an example of which is")
     return feature
 
 
