@@ -61,8 +61,6 @@ _MCRAE_SPLITTABLE_FEATURE_PREFIXES = (
     "is a",
     "is",
     "like a",
-    "lives in",
-    "lives on",
     "made by",
     "made of",
     "made with",
