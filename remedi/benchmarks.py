@@ -362,8 +362,7 @@ class ClassificationBenchmarkResults(DataClassJsonMixin):
 
     Fields:
         samples: Individual results for each sample in dataset.
-        editor: Metrics from using editor as classifier.
-        baseline: Metrics from always guessing majority label.
+        metrics: All classification metrics.
 
     """
 
