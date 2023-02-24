@@ -23,7 +23,6 @@ def main(args: argparse.Namespace) -> None:
     use_entity = args.use_entity
     input_last_entity_token = edit_last_entity_token = not args.use_all_entity_tokens
 
-    logger.info(f"loading {args.model} (device={device}, fp16={fp16})")
     mt = models.load_model(args.model, device=device, fp16=fp16)
 
     dataset: Dataset = data.load_dataset(args.dataset, split="train[:5000]")

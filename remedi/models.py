@@ -5,6 +5,7 @@ that comes with supporting analysis of many slightly different model
 implementations.
 """
 import argparse
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, Literal, Optional, Sequence, overload
@@ -14,6 +15,8 @@ from remedi.utils.typing import Device, Model, Tokenizer
 
 import torch
 import transformers
+
+logger = logging.getLogger(__name__)
 
 GPT_J_NAME_SHORT = "gptj"  # A useful alias for the CLI.
 GPT_J_NAME = "EleutherAI/gpt-j-6B"
@@ -224,6 +227,8 @@ def load_model(
         kwargs["low_cpu_mem_usage"] = True
         if fp16:
             kwargs["revision"] = "float16"
+
+    logger.info(f"loading {name} (device={device}, fp16={fp16})")
 
     model = transformers.AutoModelForCausalLM.from_pretrained(name, **kwargs)
     if is_neo_x_variant:

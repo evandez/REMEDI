@@ -19,7 +19,6 @@ def main(args: argparse.Namespace) -> None:
     data.disable_caching()
 
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(f"loading {args.model} (device={device}, fp16={args.fp16})")
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
     if args.small:
