@@ -593,7 +593,7 @@ def _strip_mcrae_parenthetical(concept: str) -> str:
     return concept.split("(")[0].strip()
 
 
-def _get_mcrae_prompt_and_target(concept: str, feature: str) -> tuple[str, str]:
+def _get_mcrae_prompt_and_target(feature: str) -> tuple[str, str]:
     """Transform McRae concept and target feature to a prompt and target token."""
     # We will split the feature into a prompt part (what is fed into the LM)
     # and a target part (the probability of which is maximized via REMEDI and
@@ -668,7 +668,7 @@ def _create_samples_from_mcrae_norms(
         concept = _get_mcrae_concept(row)
         feature = _get_mcrae_feature(row)
         prob = _get_mcrae_feature_prob(row)
-        prompt, target = _get_mcrae_prompt_and_target(concept, feature)
+        prompt, target = _get_mcrae_prompt_and_target(feature)
 
         concepts_by_feature[feature].add(concept)
         features_by_concept[concept].add(feature)
