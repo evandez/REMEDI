@@ -759,6 +759,18 @@ def _create_samples_from_mcrae_norms(
                         }
                         for co_feat, co_prob in f_prob[context_feature].items()
                     ],
+                    "original_features": [
+                        {
+                            "feature": feat,
+                            "feature_fluent": _make_mcrae_feature_fluent(feat),
+                            "prompt": _get_mcrae_prompt_with_entity(
+                                entity, prompts_by_feature[feat]
+                            ),
+                            "target": targets_by_feature[feat],
+                            "prob": f"{probs_by_concept_feature[concept, feat]:.2f}",
+                        }
+                        for feat in features_by_concept[concept]
+                    ],
                 },
             )
             samples.append(sample)
