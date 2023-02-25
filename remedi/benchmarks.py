@@ -3,6 +3,7 @@ import logging
 import random
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
+from itertools import chain
 from typing import Any, Callable, Sequence, cast
 
 from remedi import data, editors, metrics, models, precompute
@@ -1357,3 +1358,163 @@ def mediation(
         results_kwargs[key] = mediation_task_results
 
     return MediationBenchmarkResults(**results_kwargs)
+
+
+@dataclass(frozen=True)
+class EntailmentFeature(DataClassJsonMixin):
+    """A single feature (one of many for a sample) studied in entailment bench."""
+
+    feature: str
+    logp_pre: float
+    logp_post: float
+
+
+@dataclass(frozen=True)
+class EntailmentSample(DataClassJsonMixin):
+    """Single sample from the entailment task."""
+
+    id: str
+    co_features: list[EntailmentFeature]
+    orig_features: list[EntailmentFeature]
+
+
+@dataclass(frozen=True)
+class EntailmentMetrics(DataClassJsonMixin):
+    """Aggregate metrics for entailment task."""
+
+
+@dataclass(frozen=True)
+class McraeEntailmentBenchmarkResults(DataClassJsonMixin):
+    """Results from the McRae entailment benchmark."""
+
+    samples: list[EntailmentSample]
+    metrics: EntailmentMetrics
+
+
+@torch.inference_mode()
+def mcrae_entailment(
+    *,
+    editor: editors.Editor,
+    dataset: Dataset,
+    mt: models.ModelAndTokenizer | None = None,
+    batch_size: int = editors.DEFAULT_BATCH_SIZE,
+    device: Device | None = None,
+    desc: str | None = None,
+) -> McraeEntailmentBenchmarkResults:
+    if mt is None:
+        mt = editor.mt
+    if desc is None:
+        desc = "entailment"
+
+    # Flatten everything into a list so we can batch as normal.
+    dataset_flattened = [
+        {
+            "index": index,
+            "entity": x["entity"],
+            "context": x["context"],
+            "attribute": x["attribute"],
+            "prompt": feature["prompt"],
+            "target": feature["target"],
+            "co": "co_prob" in feature,
+        }
+        for index, x in enumerate(dataset)
+        for feature in chain(
+            x["source"]["all_co_features"], x["source"]["original_features"]
+        )
+    ]
+    logger.info(f"after flattening, found {len(dataset_flattened)} prompts to process")
+
+    loader = torch.utils.data.DataLoader(
+        cast(torch.utils.data.Dataset, dataset_flattened),
+        batch_size=batch_size,
+        shuffle=False,
+    )
+
+    # Compute probabilities for flattened features, we'll rejoin them after.
+    results_flattened = []
+    for batch in tqdm(loader, desc=desc):
+        entities = batch["entity"]
+        prompts = batch["prompt"]
+        targets = batch["target"]
+
+        with models.set_padding_side(mt, padding_side="right"):
+            inputs = mt.tokenizer(
+                [f"{prompt} {target}" for prompt, target in zip(prompts, targets)],
+                return_tensors="pt",
+                padding="longest",
+                truncation=True,
+            )
+
+        outputs_pre = mt.model(**inputs)
+        with editors.apply(editor, mt=mt, device=device) as edited_mt:
+            outputs_post = edited_mt.model(
+                {
+                    "entity": entities,
+                    "prompts": prompts,
+                    "context": batch["context"],
+                    "attribute": batch["attribute"],
+                },
+                inputs=inputs,
+            )
+
+        dist_pre = torch.log_softmax(outputs_pre.logits, dim=-1)
+        dist_post = torch.log_softmax(outputs_post.logits, dim=-1)
+
+        # Determine target token ranges.
+        prompts_length = mt.tokenizer(prompts, return_length=True).length
+        targets_tokenized = mt.tokenizer(targets, return_length=True)
+        targets_length = targets_tokenized.length
+        targets_idx = targets_tokenized.input_ids
+
+        seq_ijs = [(pl, pl + tl) for pl, tl in zip(prompts_length, targets_length)]
+
+        # Determine probability of full target sequence.
+        for bi, ((si, sj), ti) in enumerate(zip(seq_ijs, targets_idx)):
+            logp_pre = dist_pre[bi, si:sj, ti].sum().item()
+            logp_post = dist_post[bi, si:sj, ti].sum().item()
+            results_flattened.append(
+                {
+                    "logp_pre": logp_pre,
+                    "logp_post": logp_post,
+                }
+            )
+
+    # Group everything by dataset sample again.
+    co_results_by_index = defaultdict(list)
+    orig_results_by_index = defaultdict(list)
+    for sample_flat, result_flat in zip(dataset_flattened, results_flattened):
+        index = sample_flat["index"]
+        co = sample_flat["co"]
+        if co:
+            co_results_by_index[index].append(result_flat)
+        else:
+            orig_results_by_index[index].append(result_flat)
+
+    samples = []
+    for index, x in enumerate(dataset):
+        sample = EntailmentSample(
+            id=x["id"],
+            co_features=[
+                EntailmentFeature(
+                    feature=feature["feature_fluent"],
+                    logp_pre=result["logp_pre"],
+                    logp_post=result["logp_post"],
+                )
+                for feature, result in zip(
+                    x["source"]["all_co_features"], co_results_by_index[index]
+                )
+            ],
+            orig_features=[
+                EntailmentFeature(
+                    feature=feature["feature_fluent"],
+                    logp_pre=result["logp_pre"],
+                    logp_post=result["logp_post"],
+                )
+                for feature, result in zip(
+                    x["source"]["original_features"], orig_results_by_index[index]
+                )
+            ],
+        )
+        samples.append(sample)
+
+    return McraeEntailmentBenchmarkResults(samples=samples, metrics=EntailmentMetrics())

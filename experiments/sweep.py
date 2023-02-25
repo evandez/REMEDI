@@ -26,6 +26,16 @@ def sweep_gen_bb(c, model=DEFAULT_MODEL, device=None):
     _sweep_gen(c, model, BB, device=device)
 
 
+@task
+def sweep_ent_mc(c, model=DEFAULT_MODEL, device=None):
+    """Sweep for best layer to apply REMEDI at in McRae."""
+    editors_dir = utils.require_editors_dir(model, MC)
+    name = utils.experiment_name("sweep_gen", dataset=MC, model=model)
+    cmd = f"python -m scripts.eval_entailment --small -m {model} -n {name} -e {editors_dir}"
+    cmd = utils.maybe_set_device(cmd, device=device)
+    c.run(cmd)
+
+
 def _sweep_cls(c, model, dataset, device=None):
     editors_dir = utils.require_editors_dir(model, dataset)
     name = utils.experiment_name("sweep_cls", dataset=dataset, model=model)
@@ -59,3 +69,7 @@ ns_cls = Collection("cls")
 ns_cls.add_task(sweep_cls_cf, CF)
 ns_cls.add_task(sweep_cls_bb, BB)
 ns.add_collection(ns_cls)
+
+ns_ent = Collection("ent")
+ns_ent.add_task(sweep_ent_mc, MC)
+ns.add_collection(ns_ent)
