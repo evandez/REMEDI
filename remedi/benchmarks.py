@@ -1473,9 +1473,10 @@ def mcrae_entailment(
         prompts = batch["prompt"]
         targets = batch["target"]
 
+        sequences = [f"{prompt} {target}" for prompt, target in zip(prompts, targets)]
         with models.set_padding_side(mt, padding_side="right"):
             inputs = mt.tokenizer(
-                [f"{prompt} {target}" for prompt, target in zip(prompts, targets)],
+                sequences,
                 return_tensors="pt",
                 padding="longest",
                 truncation=True,
@@ -1486,7 +1487,7 @@ def mcrae_entailment(
             outputs_post = edited_mt.model(
                 {
                     "entity": entities,
-                    "prompt": prompts,
+                    "prompt": sequences,
                     "context": batch["context"],
                     "attribute": batch["attribute"],
                 },
@@ -1498,7 +1499,10 @@ def mcrae_entailment(
 
         # Determine target token ranges.
         prompts_length = mt.tokenizer(prompts, return_length=True).length
-        targets_tokenized = mt.tokenizer(targets, return_length=True)
+        targets_tokenized = mt.tokenizer(
+            [" " + t for t in targets],
+            return_length=True,
+        )
         targets_length = targets_tokenized.length
         targets_idx = targets_tokenized.input_ids
 
