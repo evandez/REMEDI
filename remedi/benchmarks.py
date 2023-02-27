@@ -10,6 +10,7 @@ from remedi import data, editors, metrics, models, precompute
 from remedi.utils import experiment_utils
 from remedi.utils.typing import Dataset, Device, StrSequence
 
+import numpy as np
 import torch
 import torch.utils.data
 from dataclasses_json import DataClassJsonMixin
@@ -1365,6 +1366,7 @@ class EntailmentFeature(DataClassJsonMixin):
     """A single feature (one of many for a sample) studied in entailment bench."""
 
     feature: str
+    logp_ref: float
     logp_pre: float
     logp_post: float
 
@@ -1377,10 +1379,43 @@ class EntailmentSample(DataClassJsonMixin):
     co_features: list[EntailmentFeature]
     orig_features: list[EntailmentFeature]
 
+    def _corr(self, f_key: str, x_key: str, y_key: str = "logp_ref") -> float:
+        """Compute some correlation between feature probs."""
+        features = getattr(self, f_key)
+        return np.corrcoef(
+            [getattr(feature, x_key) for feature in features],
+            [getattr(feature, y_key) for feature in features],
+        ).item()
+
+    @property
+    def co_corr_pre(self) -> float:
+        """Return correlation of co-occurring features pre edit."""
+        return self._corr("co_features", "logp_pre")
+
+    @property
+    def co_corr_post(self) -> float:
+        """Return correlation of co-occurring features post edit."""
+        return self._corr("co_features", "logp_post")
+
+    @property
+    def orig_corr_pre(self) -> float:
+        """Return correlation of original features pre edit."""
+        return self._corr("orig_features", "logp_pre")
+
+    @property
+    def orig_corr_post(self) -> float:
+        """Return correlation of original feature post edit."""
+        return self._corr("orig_features", "logp_post")
+
 
 @dataclass(frozen=True)
 class EntailmentMetrics(DataClassJsonMixin):
     """Aggregate metrics for entailment task."""
+
+    orig_corr_pre: metrics.Metric
+    orig_corr_post: metrics.Metric
+    co_corr_pre: metrics.Metric
+    co_corr_post: metrics.Metric
 
 
 @dataclass(frozen=True)
@@ -1497,6 +1532,7 @@ def mcrae_entailment(
             co_features=[
                 EntailmentFeature(
                     feature=feature["feature_fluent"],
+                    logp_ref=np.log(float(feature["co_prob"])),
                     logp_pre=result["logp_pre"],
                     logp_post=result["logp_post"],
                 )
@@ -1507,6 +1543,7 @@ def mcrae_entailment(
             orig_features=[
                 EntailmentFeature(
                     feature=feature["feature_fluent"],
+                    logp_ref=np.log(float(result["prob"])),
                     logp_pre=result["logp_pre"],
                     logp_post=result["logp_post"],
                 )
@@ -1517,4 +1554,11 @@ def mcrae_entailment(
         )
         samples.append(sample)
 
-    return McraeEntailmentBenchmarkResults(samples=samples, metrics=EntailmentMetrics())
+    metrics_kwargs = {}
+    for key in ("orig_corr_pre", "orig_corr_post", "co_corr_pre", "co_corr_post"):
+        corrs = [getattr(sample, key) for sample in samples]
+        metrics_kwargs[key] = metrics.Metric.aggregate(corrs, store_values=False)
+
+    return McraeEntailmentBenchmarkResults(
+        samples=samples, metrics=EntailmentMetrics(**metrics_kwargs)
+    )
