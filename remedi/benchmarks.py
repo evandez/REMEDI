@@ -1543,7 +1543,7 @@ def mcrae_entailment(
             orig_features=[
                 EntailmentFeature(
                     feature=feature["feature_fluent"],
-                    logp_ref=np.log(float(result["prob"])),
+                    logp_ref=np.log(float(feature["prob"])),
                     logp_pre=result["logp_pre"],
                     logp_post=result["logp_post"],
                 )
