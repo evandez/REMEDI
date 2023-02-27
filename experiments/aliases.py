@@ -41,7 +41,15 @@ REMEDI_EDITOR_LAYER = {
 # Layer to take entity from during classification.
 REMEDI_ENTITY_CLS_LAYER = {
     GPTJ: {
-        CF: 26,
-        BB: 23,
+        CF: 24,
+        BB: 24,
+    },
+    GPT2_XL: {
+        CF: 14,
+        BB: 37,
+    },
+    GPT2: {
+        CF: 10,
+        BB: 11,
     },
 }
