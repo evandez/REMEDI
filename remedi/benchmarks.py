@@ -1540,6 +1540,7 @@ def mcrae_entailment(
                 for feature, result in zip(
                     x["source"]["all_co_features"], co_results_by_index[index]
                 )
+                if float(feature["co_prob"]) > 0
             ],
             orig_features=[
                 EntailmentFeature(
@@ -1551,6 +1552,7 @@ def mcrae_entailment(
                 for feature, result in zip(
                     x["source"]["original_features"], orig_results_by_index[index]
                 )
+                if float(feature["prob"]) > 0
             ],
         )
         samples.append(sample)
