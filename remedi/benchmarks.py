@@ -1475,12 +1475,9 @@ def mcrae_entailment(
 
         sequences = [f"{prompt} {target}" for prompt, target in zip(prompts, targets)]
         with models.set_padding_side(mt, padding_side="right"):
-            inputs = mt.tokenizer(
-                sequences,
-                return_tensors="pt",
-                padding="longest",
-                truncation=True,
-            ).to(device)
+            inputs, offsets_mapping = precompute.inputs_from_batch(
+                mt, sequences, device=device
+            )
 
         outputs_pre = mt.model(**inputs)
         with editors.apply(editor, mt=mt, device=device) as edited_mt:
@@ -1497,19 +1494,13 @@ def mcrae_entailment(
         dist_pre = torch.log_softmax(outputs_pre.logits, dim=-1)
         dist_post = torch.log_softmax(outputs_post.logits, dim=-1)
 
-        # Determine target token ranges.
-        prompts_length = mt.tokenizer(prompts, return_length=True).length
-        targets_tokenized = mt.tokenizer(
-            [" " + t for t in targets],
-            return_length=True,
+        seq_ijs = precompute.token_ranges_from_batch(
+            sequences, targets, offsets_mapping=offsets_mapping
         )
-        targets_length = targets_tokenized.length
-        targets_idx = targets_tokenized.input_ids
-
-        seq_ijs = [(pl, pl + tl) for pl, tl in zip(prompts_length, targets_length)]
 
         # Determine probability of full target sequence.
-        for bi, ((si, sj), ti) in enumerate(zip(seq_ijs, targets_idx)):
+        for bi, (si, sj) in enumerate(seq_ijs):
+            ti = inputs.input_ids[bi, si:sj].tolist()
             logp_pre = dist_pre[bi, si:sj, ti].sum().item()
             logp_post = dist_post[bi, si:sj, ti].sum().item()
             results_flattened.append(
