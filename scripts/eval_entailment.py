@@ -51,9 +51,14 @@ def main(args: argparse.Namespace) -> None:
             editor=editor, dataset=dataset, device=device
         )
 
+        logger.info(
+            f"results:\n%s",
+            json.dumps(results.metrics.to_dict(), indent=1),
+        )
+
         results_file.parent.mkdir(exist_ok=True, parents=True)
         with results_file.open("w") as handle:
-            json.dump(results, handle)
+            json.dump(results.to_dict(), handle)
 
         metrics_file = results_file.parent / f"{results_file.stem}_metrics.json"
         with metrics_file.open("w") as handle:
