@@ -11,6 +11,7 @@ from remedi.utils import experiment_utils
 from remedi.utils.typing import Dataset, Device, StrSequence
 
 import numpy as np
+import scipy.stats
 import torch
 import torch.utils.data
 from dataclasses_json import DataClassJsonMixin
@@ -1382,10 +1383,10 @@ class EntailmentSample(DataClassJsonMixin):
     def _corr(self, f_key: str, x_key: str, y_key: str = "logp_ref") -> float:
         """Compute some correlation between feature probs."""
         features = getattr(self, f_key)
-        return np.corrcoef(
+        return scipy.stats.pearsonr(
             [getattr(feature, x_key) for feature in features],
             [getattr(feature, y_key) for feature in features],
-        ).item()
+        )[0]
 
     @property
     def co_corr_pre(self) -> float:
