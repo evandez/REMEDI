@@ -1485,7 +1485,7 @@ def mcrae_entailment(
             outputs_post = edited_mt.model(
                 {
                     "entity": entities,
-                    "prompts": prompts,
+                    "prompt": prompts,
                     "context": batch["context"],
                     "attribute": batch["attribute"],
                 },
