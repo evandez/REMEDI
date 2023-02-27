@@ -25,7 +25,7 @@ def main(args: argparse.Namespace) -> None:
         split = "train[5000:5100]"
     else:
         split = "train[5000:6000]"
-    dataset = data.load_dataset(args.dataset, split=split)
+    dataset = data.load_dataset("mcrae", split=split)
 
     layers = args.layers
     if layers is None:
