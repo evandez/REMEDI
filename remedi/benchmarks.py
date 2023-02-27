@@ -1478,7 +1478,7 @@ def mcrae_entailment(
                 return_tensors="pt",
                 padding="longest",
                 truncation=True,
-            )
+            ).to(device)
 
         outputs_pre = mt.model(**inputs)
         with editors.apply(editor, mt=mt, device=device) as edited_mt:
