@@ -1500,9 +1500,10 @@ def mcrae_entailment(
 
         # Determine probability of full target sequence.
         for bi, (si, sj) in enumerate(seq_ijs):
-            ti = inputs.input_ids[bi, si:sj].tolist()
-            logp_pre = dist_pre[bi, si - 1 : sj - 1, ti].sum().item()
-            logp_post = dist_post[bi, si - 1 : sj - 1, ti].sum().item()
+            s_idx = torch.arange(si, sj)
+            t_idx = inputs.input_ids[bi, s_idx]
+            logp_pre = dist_pre[bi, s_idx - 1, t_idx].sum().item()
+            logp_post = dist_post[bi, s_idx - 1, t_idx].sum().item()
             results_flattened.append(
                 {
                     "logp_pre": logp_pre,
