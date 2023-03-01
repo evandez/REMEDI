@@ -66,8 +66,8 @@ def main(args: argparse.Namespace) -> None:
             for batch in tqdm(loader):
                 with editors.apply(editor, device=device) as edited_mt:
                     outputs = edited_mt.model.compute_model_outputs(batch)
-                hs_entity = batch["prompt.entity.hiddens.last"]
-                hs_attr = batch["context.attribute.hiddens.average"]
+                hs_entity = batch[f"prompt.entity.hiddens.{layer}.last"]
+                hs_attr = batch[f"context.attribute.hiddens.{layer}.average"]
 
                 for index, (direction, h_entity, h_attr) in enumerate(
                     zip(outputs.direction, hs_entity, hs_attr)
