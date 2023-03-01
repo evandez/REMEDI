@@ -1,4 +1,5 @@
 """Editing models."""
+import argparse
 import contextlib
 import logging
 from collections import defaultdict
@@ -1244,3 +1245,29 @@ def list_saved_editors(editors_dir: PathLike) -> DefaultDict[str, list[int]]:
         logger.warning(f"no editors found in {editors_dir}")
 
     return editor_configs
+
+
+def add_editor_args(parser: argparse.ArgumentParser) -> None:
+    """Add arguments for scripts that require loading a pretrained editor.
+
+    Added args include:
+        --editor-type (-t): Editor type to load.
+        --editors-dir (-d): Directory containing editors. Expected to have
+            layout like: <editors_dir> / <editor_type> / <layer> / weights.pth
+        --layers (-l): Usually we want to play with editing at multiple layers.
+            This arg specifies which layers to try editors for.
+
+    """
+    parser.add_argument(
+        "--editor-type",
+        "-t",
+        choices=SUPPORTED_EDITORS,
+        default="linear",
+        help="editor type, inferred by default",
+    )
+    parser.add_argument(
+        "--editors-dir", "-e", type=Path, help="path to editor experiment"
+    )
+    parser.add_argument(
+        "--layers", "-l", nargs="+", type=int, help="layers to apply remedi at"
+    )
