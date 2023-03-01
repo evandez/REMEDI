@@ -44,6 +44,7 @@ def main(args: argparse.Namespace) -> None:
             logger.warning(f"skipping dump for layer {layer}")
             continue
 
+        logger.info(f"begin layer {layer}")
         precomputed = precompute.editor_inputs_from_dataset(
             mt=mt,
             dataset=dataset,
@@ -102,3 +103,4 @@ if __name__ == "__main__":
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     args = parser.parse_args()
+    main(args)
