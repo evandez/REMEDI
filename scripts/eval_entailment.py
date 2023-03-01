@@ -22,9 +22,9 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
     if args.small:
-        split = "train[5000:5100]"
-    else:
         split = "train[5000:6000]"
+    else:
+        split = "train[5000:10000]"
     dataset = data.load_dataset("mcrae", split=split)
 
     layers = args.layers
