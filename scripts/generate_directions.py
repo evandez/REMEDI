@@ -73,9 +73,9 @@ def main(args: argparse.Namespace) -> None:
                     zip(outputs.direction, hs_entity, hs_attr)
                 ):
                     sample = {
-                        "direction": direction,
-                        "h_entity": torch.tensor(h_entity),
-                        "h_attr": torch.tensor(h_attr),
+                        "direction": direction.cpu(),
+                        "h_entity": h_entity.cpu(),
+                        "h_attr": h_attr.cpu(),
                     }
                     for key in ("id", "entity", "prompt", "context", "attribute"):
                         sample[key] = batch[key][index]
