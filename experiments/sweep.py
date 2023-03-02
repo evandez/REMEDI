@@ -30,7 +30,7 @@ def sweep_gen_bb(c, model=DEFAULT_MODEL, device=None):
 def sweep_ent_mc(c, model=DEFAULT_MODEL, device=None):
     """Sweep for best layer to apply REMEDI at in McRae."""
     editors_dir = utils.require_editors_dir(model, MC)
-    name = utils.experiment_name("sweep_gen", dataset=MC, model=model)
+    name = utils.experiment_name("sweep_ent", dataset=MC, model=model)
     cmd = f"python -m scripts.eval_entailment --small -m {model} -n {name} -e {editors_dir}"
     cmd = utils.maybe_set_device(cmd, device=device)
     c.run(cmd)
