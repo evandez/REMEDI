@@ -8,7 +8,7 @@ from invoke import Collection, task
 def _dump(c, model, dataset, device=None):
     name = utils.experiment_name("directions", model=model, dataset=dataset)
     editors_dir = utils.require_editors_dir(model=model, dataset=dataset)
-    layer = REMEDI_EDITOR_LAYER[model]
+    layer = REMEDI_EDITOR_LAYER[model][dataset]
     cmd = (
         f"python -m scripts.generate_directions -n {name} "
         f"-e {editors_dir} -l {layer} -d {dataset} -m {model}"
