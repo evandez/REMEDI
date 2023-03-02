@@ -63,7 +63,7 @@ def main(args: argparse.Namespace) -> None:
                 cast(torch.utils.data.Dataset, precomputed),
                 batch_size=args.batch_size,
             )
-            for batch in tqdm(loader):
+            for batch in tqdm(loader, desc="generate directions"):
                 with editors.apply(editor, device=device) as edited_mt:
                     outputs = edited_mt.model.compute_model_outputs(batch)
                 hs_entity = batch[f"entity.entity.hiddens.{layer}.last"]
