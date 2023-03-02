@@ -26,17 +26,17 @@ EX_EDITORS = "editors"
 REMEDI_EDITOR_LAYER = {
     GPTJ: {
         CF: 1,
-        BB: 17,
+        BB: 12,
         MC: 4,
     },
     GPT2_XL: {
         CF: 0,
-        BB: 37,
+        BB: 4,
         MC: 10,
     },
     GPT2: {
         CF: 0,
-        BB: 4,
+        BB: 10,
         MC: 1,
     },
 }
@@ -44,11 +44,11 @@ REMEDI_EDITOR_LAYER = {
 # Layer to take entity from during classification.
 REMEDI_ENTITY_CLS_LAYER = {
     GPTJ: {
-        CF: 24,
-        BB: 24,
+        CF: 26,
+        BB: 27,
     },
     GPT2_XL: {
-        CF: 14,
+        CF: 34,
         BB: 37,
     },
     GPT2: {
