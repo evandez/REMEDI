@@ -10,6 +10,8 @@ def _sweep_gen(c, model, dataset, device=None):
     name = utils.experiment_name("sweep_gen", dataset=dataset, model=model)
     script = "eval_fact_gen" if dataset == CF else "eval_bias_gen"
     cmd = f"python -m scripts.{script} --small -m {model} -n {name} -e {editors_dir}"
+    if dataset == BB:
+        cmd += " --decontextualized"
     cmd = utils.maybe_set_device(cmd, device=device)
     c.run(cmd)
 
