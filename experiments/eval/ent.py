@@ -11,6 +11,8 @@ def eval_ent_mc(c, model=DEFAULT_MODEL, device=None):
     editors_dir = utils.require_editors_dir(model=model, dataset=CF)
     name = utils.experiment_name("eval_ent_mcrae", model=model)
     layer = REMEDI_EDITOR_LAYER[model][MC]
-    cmd = f"python -m scripts.eval_entailment -n {name} -m {model} -l {layer} -e {editors_dir}"
+    cmd = f"python -m scripts.eval_entailment -n {name} -m {model}"
     cmd = utils.maybe_set_device(cmd, device=device)
-    c.run(cmd)
+
+    c.run(f"{cmd} -e {editors_dir} -l {layer}")
+    c.run(f"{cmd} --baseline prefix")

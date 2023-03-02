@@ -1369,7 +1369,7 @@ class EntailmentFeature(DataClassJsonMixin):
     feature: str
     logp_ref: float
     logp_pre: float
-    logp_post: float
+    logp_post: float | None
 
 
 @dataclass(frozen=True)
@@ -1396,6 +1396,8 @@ class EntailmentSample(DataClassJsonMixin):
     @property
     def co_corr_post(self) -> float:
         """Return correlation of co-occurring features post edit."""
+        if any(feat.logp_post is None for feat in self.co_features):
+            raise ValueError("at least one `logp_post` is null")
         return self._corr("co_features", "logp_post")
 
     @property
@@ -1406,6 +1408,8 @@ class EntailmentSample(DataClassJsonMixin):
     @property
     def orig_corr_post(self) -> float:
         """Return correlation of original feature post edit."""
+        if any(feat.logp_post is None for feat in self.orig_features):
+            raise ValueError("at least one `logp_post` is null")
         return self._corr("orig_features", "logp_post")
 
 
@@ -1414,9 +1418,9 @@ class EntailmentMetrics(DataClassJsonMixin):
     """Aggregate metrics for entailment task."""
 
     orig_corr_pre: metrics.Metric
-    orig_corr_post: metrics.Metric
+    orig_corr_post: metrics.Metric | None
     co_corr_pre: metrics.Metric
-    co_corr_post: metrics.Metric
+    co_corr_post: metrics.Metric | None
 
 
 @dataclass(frozen=True)
@@ -1430,14 +1434,18 @@ class McraeEntailmentBenchmarkResults(DataClassJsonMixin):
 @torch.inference_mode()
 def mcrae_entailment(
     *,
-    editor: editors.Editor,
     dataset: Dataset,
+    editor: editors.Editor | None = None,
     mt: models.ModelAndTokenizer | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     device: Device | None = None,
     desc: str | None = None,
 ) -> McraeEntailmentBenchmarkResults:
+    """Evaluate whether entailed attributes change becaue of REMEDI."""
+    if editor is None and mt is None:
+        raise ValueError("must set at least one of `editor` and `mt`")
     if mt is None:
+        assert editor is not None
         mt = editor.mt
     if desc is None:
         desc = "entailment"
@@ -1480,19 +1488,21 @@ def mcrae_entailment(
             )
 
         outputs_pre = mt.model(**inputs)
-        with editors.apply(editor, mt=mt, device=device) as edited_mt:
-            outputs_post = edited_mt.model(
-                {
-                    "entity": entities,
-                    "prompt": sequences,
-                    "context": batch["context"],
-                    "attribute": batch["attribute"],
-                },
-                inputs=inputs,
-            )
-
         dist_pre = torch.log_softmax(outputs_pre.logits, dim=-1)
-        dist_post = torch.log_softmax(outputs_post.logits, dim=-1)
+
+        dist_post = None
+        if editor is not None:
+            with editors.apply(editor, mt=mt, device=device) as edited_mt:
+                outputs_post = edited_mt.model(
+                    {
+                        "entity": entities,
+                        "prompt": sequences,
+                        "context": batch["context"],
+                        "attribute": batch["attribute"],
+                    },
+                    inputs=inputs,
+                )
+            dist_post = torch.log_softmax(outputs_post.logits, dim=-1)
 
         seq_ijs = precompute.token_ranges_from_batch(
             sequences, targets, offsets_mapping=offsets_mapping
@@ -1503,7 +1513,12 @@ def mcrae_entailment(
             s_idx = torch.arange(si, sj)
             t_idx = inputs.input_ids[bi, s_idx]
             logp_pre = dist_pre[bi, s_idx - 1, t_idx].sum().item()
-            logp_post = dist_post[bi, s_idx - 1, t_idx].sum().item()
+
+            logp_post = None
+            if editor is not None:
+                assert dist_post is not None
+                logp_post = dist_post[bi, s_idx - 1, t_idx].sum().item()
+
             results_flattened.append(
                 {
                     "logp_pre": logp_pre,
@@ -1530,7 +1545,7 @@ def mcrae_entailment(
                 EntailmentFeature(
                     feature=feature["feature_fluent"],
                     logp_ref=np.log(float(feature["co_prob"])),
-                    logp_pre=result["logp_pre"],
+                    logp_pre=cast(float, result["logp_pre"]),
                     logp_post=result["logp_post"],
                 )
                 for feature, result in zip(
@@ -1542,7 +1557,7 @@ def mcrae_entailment(
                 EntailmentFeature(
                     feature=feature["feature_fluent"],
                     logp_ref=np.log(float(feature["prob"])),
-                    logp_pre=result["logp_pre"],
+                    logp_pre=cast(float, result["logp_pre"]),
                     logp_post=result["logp_post"],
                 )
                 for feature, result in zip(
@@ -1553,10 +1568,14 @@ def mcrae_entailment(
         )
         samples.append(sample)
 
-    metrics_kwargs = {}
+    metrics_kwargs: dict = {}
     for key in ("orig_corr_pre", "orig_corr_post", "co_corr_pre", "co_corr_post"):
-        corrs = [getattr(sample, key) for sample in samples]
-        metrics_kwargs[key] = metrics.Metric.aggregate(corrs, store_values=False)
+        if editor is None and key.endswith("_post"):
+            metric = None
+        else:
+            corrs = [getattr(sample, key) for sample in samples]
+            metric = metrics.Metric.aggregate(corrs, store_values=False)
+        metrics_kwargs[key] = metric
 
     return McraeEntailmentBenchmarkResults(
         samples=samples, metrics=EntailmentMetrics(**metrics_kwargs)

@@ -2,9 +2,10 @@
 import argparse
 import json
 import logging
+from functools import partial
 from pathlib import Path
 
-from remedi import benchmarks, data, editors, models
+from remedi import benchmarks, data, editors, models, precompute
 from remedi.utils import experiment_utils, logging_utils
 
 import torch
@@ -21,35 +22,62 @@ def main(args: argparse.Namespace) -> None:
     device = args.device or "cuda" if torch.cuda.is_available() else "cpu"
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
+    layers = args.layers
+    if layers is None:
+        layers = models.determine_layers(mt)
+
     if args.small:
         split = "train[5000:6000]"
     else:
         split = "train[5000:10000]"
     dataset = data.load_dataset("mcrae", split=split)
 
-    layers = args.layers
-    if layers is None:
-        layers = models.determine_layers(mt)
+    baseline = args.baseline
+    if baseline is not None:
+        for banned in ("layers", "editors_dir"):
+            if getattr(args, banned, None) is not None:
+                raise ValueError(f"cannot set --{banned} with --baseline")
+
+        if baseline == "prefix":
+            dataset = precompute.prompt_in_context_from_dataset(
+                dataset, desc="prefix context", output_key="prompt"
+            )
+        else:
+            raise ValueError(f"unknown baseline: {baseline}")
+
+        # Not used, but set so everything still runs.
+        layers = [0]
+
+        logger.info(f"will run {baseline} baseline")
 
     for layer in layers:
-        results_file = (
-            experiment.results_dir / args.editor_type / str(layer) / f"entailment.json"
-        )
+        benchmark_kwargs: dict = dict(dataset=dataset, device=device)
+        if baseline is not None:
+            benchmark_kwargs["mt"] = mt
+            results_file = experiment.results_dir / baseline / "entailment.json"
+        else:
+            editor = editors.load_editor(
+                mt, args.editor_type, layer, editors_dir=args.editors_dir, device=device
+            )
+            if editor is None:
+                logger.warning(f"skipping benchmark for layer {layer}")
+                continue
+
+            benchmark_kwargs["editor"] = editor
+            results_file = (
+                experiment.results_dir
+                / args.editor_type
+                / str(layer)
+                / "entailment.json"
+            )
+
+            logger.info(f"eval {args.editor_type}, layer {layer}")
+
         if results_file.exists():
-            logger.info(f"found existing results for layer {layer}, skipping")
+            logger.info(f"found existing results, skipping")
             continue
 
-        logger.info(f"begin eval for layer {layer}")
-        editor = editors.load_editor(
-            mt, args.editor_type, layer, editors_dir=args.editors_dir, device=device
-        )
-        if editor is None:
-            logger.warning(f"skipping benchmark for layer {layer}")
-            continue
-
-        results = benchmarks.mcrae_entailment(
-            editor=editor, dataset=dataset, device=device
-        )
+        results = benchmarks.mcrae_entailment(**benchmark_kwargs)
 
         logger.info(
             f"results:\n%s",
@@ -75,6 +103,11 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--layers", "-l", nargs="+", type=int, help="layers to apply remedi at"
+    )
+    parser.add_argument(
+        "--baseline",
+        choices=("prefix", "replace"),
+        help="run a baseline instead of evaluating an editor",
     )
     parser.add_argument("--small", action="store_true", help="run on subset of data")
     models.add_model_args(parser)
