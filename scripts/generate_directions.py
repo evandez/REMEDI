@@ -23,7 +23,7 @@ def main(args: argparse.Namespace) -> None:
     mt = models.load_model(args.model, device=device, fp16=args.fp16)
 
     split = f"train[5000:{5000 + args.size}]"
-    dataset = data.load_dataset("mcrae", split=split)
+    dataset = data.load_dataset(args.dataset, split=split)
 
     layers = args.layers
     if layers is None:
