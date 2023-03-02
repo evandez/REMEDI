@@ -26,15 +26,15 @@ EX_EDITORS = "editors"
 REMEDI_EDITOR_LAYER = {
     GPTJ: {
         CF: 0,
-        BB: 6,
+        BB: 17,
     },
     GPT2_XL: {
         CF: 3,
-        BB: 4,
+        BB: 37,
     },
     GPT2: {
         CF: 0,
-        BB: 9,
+        BB: 4,
     },
 }
 
