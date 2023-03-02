@@ -25,12 +25,12 @@ EX_EDITORS = "editors"
 # Layers to apply REMEDI edit to.
 REMEDI_EDITOR_LAYER = {
     GPTJ: {
-        CF: 0,
+        CF: 1,
         BB: 17,
         MC: 4,
     },
     GPT2_XL: {
-        CF: 3,
+        CF: 0,
         BB: 37,
         MC: 10,
     },
