@@ -79,7 +79,7 @@ def main(args: argparse.Namespace) -> None:
                 entity_idx = batch[f"prompt.entity.token_range.last"][:, 0]
                 hs_entity = [
                     {
-                        layer: ret[layer_path][bi, ei].detach().cpu()
+                        layer: ret[layer_path].output[bi, ei].detach().cpu()
                         for layer, layer_path in subsequent_layer_paths.items()
                     }
                     for bi, ei in enumerate(entity_idx)
