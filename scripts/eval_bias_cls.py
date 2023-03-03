@@ -65,6 +65,8 @@ def main(args: argparse.Namespace) -> None:
             results_file_name = f"error_cls_layer_{entity_layer}"
             if args.control_task:
                 results_file_name = f"{results_file_name}_control_task"
+            if args.control_model:
+                results_file_name = f"{results_file_name}_control_model"
             results_file = (
                 experiment.results_dir
                 / editor_type
@@ -107,16 +109,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="evaluate classification in bias setting"
     )
-    parser.add_argument("--editor-type", "-t", default="linear", help="editor type")
-    parser.add_argument(
-        "--editors-dir",
-        "-e",
-        type=Path,
-        help="path to editor experiment",
-    )
-    parser.add_argument(
-        "--editor-layers", "-l", nargs="+", type=int, help="layers to test editors for"
-    )
     parser.add_argument(
         "--entity-layers", nargs="+", type=int, help="entity layers to probe at"
     )
@@ -130,10 +122,17 @@ if __name__ == "__main__":
         "--control-task", default=False, action="store_true", help="use control task"
     )
     parser.add_argument(
+        "--control-model",
+        default=False,
+        action="store_true",
+        help="assume input model is control model",
+    )
+    parser.add_argument(
         "--small", default=False, action="store_true", help="use subset of data"
     )
     # No data args because this only works on biosbias.
     models.add_model_args(parser)
+    editors.add_editor_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     precompute.add_preprocessing_args(parser)

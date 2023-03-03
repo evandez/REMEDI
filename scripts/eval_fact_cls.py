@@ -53,6 +53,8 @@ def main(args: argparse.Namespace) -> None:
             results_file_name = f"fact_cls_layer_{entity_layer}"
             if args.control_task:
                 results_file_name = f"{results_file_name}_control_task"
+            if args.control_model:
+                results_file_name = f"{results_file_name}_control_model"
             results_file = (
                 experiment.results_dir
                 / editor_type
@@ -99,22 +101,19 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="evaluate fact classification")
     parser.add_argument(
-        "--editor-type", "-t", default="linear", help="editor type, inferred by default"
-    )
-    parser.add_argument(
-        "--editors-dir",
-        "-e",
-        type=Path,
-        help="path to editor experiment",
-    )
-    parser.add_argument(
-        "--editor-layers", "-l", nargs="+", type=int, help="layers to test editors for"
-    )
-    parser.add_argument(
         "--entity-layers", nargs="+", type=int, help="layers to get probe entity at"
     )
     parser.add_argument(
-        "--control-task", action="store_true", help="classify on control task"
+        "--control-task",
+        default=False,
+        action="store_true",
+        help="classify on control task",
+    )
+    parser.add_argument(
+        "--control-model",
+        default=False,
+        action="store_true",
+        help="assume input model is control model",
     )
     parser.add_argument(
         "--small", action="store_true", help="run on a small subset of data"
@@ -122,6 +121,7 @@ if __name__ == "__main__":
     # No data args because this only works on CounterFact.
     models.add_model_args(parser)
     precompute.add_preprocessing_args(parser)
+    editors.add_editor_args(parser)
     experiment_utils.add_experiment_args(parser)
     logging_utils.add_logging_args(parser)
     args = parser.parse_args()
