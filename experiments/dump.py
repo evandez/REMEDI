@@ -34,7 +34,16 @@ def dump_mc(c, model=DEFAULT_MODEL, device=None):
     _dump(c, model, MC, device=device)
 
 
+@task
+def dump_all(c, model=DEFAULT_MODEL, device=None):
+    """Generate dump of REMEDI directions for all datasets."""
+    _dump(c, model, CF, device=device)
+    _dump(c, model, BB, device=device)
+    _dump(c, model, MC, device=device)
+
+
 ns = Collection()
 ns.add_task(dump_cf, CF)
 ns.add_task(dump_bb, BB)
 ns.add_task(dump_mc, MC)
+ns.add_task(dump_all, "all")
