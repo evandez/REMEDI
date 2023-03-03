@@ -357,7 +357,12 @@ def editor_inputs_from_batch(
             )
 
     # Precompute average/last hidden reps if needed.
-    for (key_string, key_substring, condition, inputs,) in (
+    for (
+        key_string,
+        key_substring,
+        condition,
+        inputs,
+    ) in (
         ("entity", "entity", return_entity_hiddens, entity_inputs),
         ("context", "attribute", return_attribute_hiddens, context_inputs),
     ):
