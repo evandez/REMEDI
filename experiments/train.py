@@ -6,7 +6,11 @@ from invoke import task
 
 
 def _train(c, model, dataset, device=None, layer=None):
-    name = utils.experiment_name("editors", model=model, dataset=dataset)
+    name = utils.experiment_name(
+        "editors",
+        model=model.name if isinstance(model, Path) else model,
+        dataset=dataset,
+    )
     cmd = f"python -m scripts.train_editors -m {model} -n {name} -d {dataset}"
     cmd = utils.maybe_set_device(cmd, device=device)
     if layer is not None:
