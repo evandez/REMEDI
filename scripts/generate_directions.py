@@ -6,6 +6,7 @@ from typing import cast
 from remedi import data, editors, models, precompute
 from remedi.utils import experiment_utils, logging_utils
 
+import baukit
 import torch
 import torch.utils.data
 from tqdm.auto import tqdm
@@ -45,6 +46,10 @@ def main(args: argparse.Namespace) -> None:
             continue
 
         logger.info(f"begin layer {layer}")
+        subsequent_layer_paths = models.determine_layer_paths(
+            mt, layers=models.determine_layers(mt)[layer:], return_dict=True
+        )
+
         precomputed = precompute.editor_inputs_from_dataset(
             mt=mt,
             dataset=dataset,
@@ -64,17 +69,28 @@ def main(args: argparse.Namespace) -> None:
                 batch_size=args.batch_size,
             )
             for batch in tqdm(loader, desc="generate directions"):
-                with editors.apply(editor, device=device) as edited_mt:
-                    outputs = edited_mt.model.compute_model_outputs(batch)
-                hs_entity = batch[f"entity.entity.hiddens.{layer}.last"]
+                with baukit.TraceDict(mt.model, subsequent_layer_paths.values()) as ret:
+                    with editors.apply(editor, device=device) as edited_mt:
+                        outputs = edited_mt.model.compute_model_outputs(batch)
+
                 hs_attr = batch[f"context.attribute.hiddens.{layer}.average"]
+
+                # Record entity reps for all layers after the edit.
+                entity_idx = batch[f"prompt.entity.token_range.last"][:, 0]
+                hs_entity = [
+                    {
+                        layer: ret[layer_path][bi, ei].detach().cpu()
+                        for layer, layer_path in subsequent_layer_paths.items()
+                    }
+                    for bi, ei in enumerate(entity_idx)
+                ]
 
                 for index, (direction, h_entity, h_attr) in enumerate(
                     zip(outputs.direction, hs_entity, hs_attr)
                 ):
                     sample = {
                         "direction": direction.cpu(),
-                        "h_entity": h_entity.cpu(),
+                        "h_entity": h_entity,
                         "h_attr": h_attr.cpu(),
                     }
                     for key in ("id", "entity", "prompt", "context", "attribute"):
