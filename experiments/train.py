@@ -5,10 +5,13 @@ from experiments.aliases import *
 from invoke import task
 
 
-def _train(c, model, dataset, device=None):
+def _train(c, model, dataset, device=None, single_layer=False):
     name = utils.experiment_name("editors", model=model, dataset=dataset)
     cmd = f"python -m scripts.train_editors -m {model} -n {name} -d {dataset}"
     cmd = utils.maybe_set_device(cmd, device=device)
+    if single_layer:
+        layer = REMEDI_EDITOR_LAYER[model][dataset]
+        cmd += f" -l {layer}"
     c.run(cmd)
 
 
@@ -25,18 +28,18 @@ def _maybe_random_model(c, model, random=False):
 def train_cf(c, model=DEFAULT_MODEL, random=False, device=None):
     """Train REMEDI for factual editing."""
     model = _maybe_random_model(c, model, random=random)
-    _train(c, model, CF, device=device)
+    _train(c, model, CF, device=device, single_layer=random)
 
 
 @task(name=BB)
 def train_bb(c, model=DEFAULT_MODEL, random=False, device=None):
     """Train REMEDI for context mediation."""
     model = _maybe_random_model(c, model, random=random)
-    _train(c, model, BB, device=device)
+    _train(c, model, BB, device=device, single_layer=random)
 
 
 @task(name=MC)
 def train_mc(c, model=DEFAULT_MODEL, random=False, device=None):
     """Train REMEDI for entailment analysis."""
     model = _maybe_random_model(c, model, random=random)
-    _train(c, model, MC, device=device)
+    _train(c, model, MC, device=device, single_layer=random)

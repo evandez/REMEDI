@@ -45,11 +45,11 @@ REMEDI_EDITOR_LAYER = {
 REMEDI_ENTITY_CLS_LAYER = {
     GPTJ: {
         CF: 26,
-        BB: 27,
+        BB: 15,
     },
     GPT2_XL: {
         CF: 34,
-        BB: 37,
+        BB: 37,  # ?
     },
     GPT2: {
         CF: 10,
