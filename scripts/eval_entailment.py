@@ -2,7 +2,6 @@
 import argparse
 import json
 import logging
-from functools import partial
 from pathlib import Path
 
 from remedi import benchmarks, data, editors, models, precompute
@@ -11,6 +10,26 @@ from remedi.utils import experiment_utils, logging_utils
 import torch
 
 logger = logging.getLogger(__name__)
+
+
+def _prefix_context(sample: dict) -> dict:
+    """Prepend context to all prompts used in the eval."""
+    entity = sample["entity"]
+    context = sample["context"]
+
+    source = {**sample["source"]}
+    for key in ("all_co_features", "original_features"):
+        source[key] = [
+            {
+                **feature,
+                "prompt": precompute.prompt_in_context_from_sample(
+                    entity, feature["prompt"], context
+                ),
+            }
+            for feature in source[key]
+        ]
+
+    return {"source": source}
 
 
 def main(args: argparse.Namespace) -> None:
@@ -39,9 +58,7 @@ def main(args: argparse.Namespace) -> None:
                 raise ValueError(f"cannot set --{banned} with --baseline")
 
         if baseline == "prefix":
-            dataset = precompute.prompt_in_context_from_dataset(
-                dataset, desc="prefix context", output_key="prompt"
-            )
+            dataset = dataset.map(_prefix_context, desc="prefix context")
         else:
             raise ValueError(f"unknown baseline: {baseline}")
 
