@@ -31,7 +31,7 @@ def _eval_cls(c, model, dataset, device=None):
     control_editors_dir = utils.require_editors_dir(
         model=control_model, dataset=dataset
     )
-    c.run(f"{cmd} -m {control_model} -e {control_editors_dir}")
+    c.run(f"{cmd} -m models/{control_model} -e {control_editors_dir}")
 
 
 @task(name=CF)
