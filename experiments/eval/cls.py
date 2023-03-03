@@ -7,8 +7,8 @@ from invoke import task
 
 def _eval_cls(c, model, dataset, device=None):
     name = utils.experiment_name("eval_cls", model=model, dataset=dataset)
-    editor_layer = REMEDI_EDITOR_LAYER[model][CF]
-    entity_layer = REMEDI_ENTITY_CLS_LAYER[model][CF]
+    editor_layer = REMEDI_EDITOR_LAYER[model][dataset]
+    entity_layer = REMEDI_ENTITY_CLS_LAYER[model][dataset]
     script = "eval_fact_cls" if dataset == CF else "eval_bias_cls"
     cmd = (
         f"python -m scripts.{script} -n {name} "
