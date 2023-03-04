@@ -14,6 +14,19 @@ from tqdm.auto import tqdm
 logger = logging.getLogger(__name__)
 
 
+def _trace_to_h(
+    trace: baukit.TraceDict, layer_paths: dict[int, str], token_idx: torch.Tensor
+) -> torch.Tensor:
+    """Pull out the desired hidden reps from the trace."""
+    return [
+        {
+            layer: trace[layer_path].output[0][bi, ti].detach().cpu()
+            for layer, layer_path in layer_paths.items()
+        }
+        for bi, ti in enumerate(token_idx)
+    ]
+
+
 def main(args: argparse.Namespace) -> None:
     """Generate the directions."""
     experiment = experiment_utils.setup_experiment(args)
@@ -69,28 +82,38 @@ def main(args: argparse.Namespace) -> None:
                 batch_size=args.batch_size,
             )
             for batch in tqdm(loader, desc="generate directions"):
+                # Get entity reps before edit.
+                inputs = precompute.inputs_from_batch(
+                    mt, batch["prompt"], device=device
+                )
+                with baukit.TraceDict(mt.model, subsequent_layer_paths.items()) as ret:
+                    with torch.inference_mode():
+                        mt.model(**inputs)
+
+                entity_idx = batch[f"prompt.entity.token_range.last"][:, 0]
+                hs_entity_pre = _trace_to_h(ret, subsequent_layer_paths, entity_idx)
+
+                # Get entity reps AFTER the edit.
                 with baukit.TraceDict(mt.model, subsequent_layer_paths.values()) as ret:
                     with editors.apply(editor, device=device) as edited_mt:
                         outputs = edited_mt.model.compute_model_outputs(batch)
 
+                    directions = outputs.direction
+                    hs_entity_post = _trace_to_h(ret, subsequent_layer_paths, entity_idx)
+
+                # We'll record the attr reps too.
                 hs_attr = batch[f"context.attribute.hiddens.{layer}.average"]
 
-                # Record entity reps for all layers after the edit.
-                entity_idx = batch[f"prompt.entity.token_range.last"][:, 0]
-                hs_entity = [
-                    {
-                        layer: ret[layer_path].output[0][bi, ei].detach().cpu()
-                        for layer, layer_path in subsequent_layer_paths.items()
-                    }
-                    for bi, ei in enumerate(entity_idx)
-                ]
-
-                for index, (direction, h_entity, h_attr) in enumerate(
-                    zip(outputs.direction, hs_entity, hs_attr)
-                ):
+                for index, (
+                    direction,
+                    h_entity_pre,
+                    h_entity_post,
+                    h_attr,
+                ) in enumerate(zip(directions, hs_entity_pre, hs_entity_post, hs_attr)):
                     sample = {
                         "direction": direction.cpu(),
-                        "h_entity": h_entity,
+                        "h_entity_pre": h_entity_pre,
+                        "h_entity_post": h_entity_post,
                         "h_attr": h_attr.cpu(),
                     }
                     for key in ("id", "entity", "prompt", "context", "attribute"):
