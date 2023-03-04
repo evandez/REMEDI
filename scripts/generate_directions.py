@@ -59,9 +59,7 @@ def main(args: argparse.Namespace) -> None:
             continue
 
         logger.info(f"begin layer {layer}")
-        subsequent_layer_paths = models.determine_layer_paths(
-            mt, layers=models.determine_layers(mt)[layer:], return_dict=True
-        )
+        subsequent_layer_paths = models.determine_layer_paths(mt, return_dict=True)
 
         precomputed = precompute.editor_inputs_from_dataset(
             mt=mt,
