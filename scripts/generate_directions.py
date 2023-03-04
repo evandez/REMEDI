@@ -86,7 +86,7 @@ def main(args: argparse.Namespace) -> None:
                 inputs = precompute.inputs_from_batch(
                     mt, batch["prompt"], device=device
                 )
-                with baukit.TraceDict(mt.model, subsequent_layer_paths.items()) as ret:
+                with baukit.TraceDict(mt.model, subsequent_layer_paths.values()) as ret:
                     with torch.inference_mode():
                         mt.model(**inputs)
 
@@ -99,7 +99,9 @@ def main(args: argparse.Namespace) -> None:
                         outputs = edited_mt.model.compute_model_outputs(batch)
 
                     directions = outputs.direction
-                    hs_entity_post = _trace_to_h(ret, subsequent_layer_paths, entity_idx)
+                    hs_entity_post = _trace_to_h(
+                        ret, subsequent_layer_paths, entity_idx
+                    )
 
                 # We'll record the attr reps too.
                 hs_attr = batch[f"context.attribute.hiddens.{layer}.average"]
