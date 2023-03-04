@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def _trace_to_h(
     trace: baukit.TraceDict, layer_paths: dict[int, str], token_idx: torch.Tensor
-) -> torch.Tensor:
+) -> list[dict[int, torch.Tensor]]:
     """Pull out the desired hidden reps from the trace."""
     return [
         {
@@ -83,7 +83,7 @@ def main(args: argparse.Namespace) -> None:
             )
             for batch in tqdm(loader, desc="generate directions"):
                 # Get entity reps before edit.
-                inputs = precompute.inputs_from_batch(
+                inputs, _ = precompute.inputs_from_batch(
                     mt, batch["prompt"], device=device
                 )
                 with baukit.TraceDict(mt.model, subsequent_layer_paths.values()) as ret:
