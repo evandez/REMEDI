@@ -12,7 +12,7 @@ def _eval_cls(c, model, dataset, device=None):
     script = "eval_fact_cls" if dataset == CF else "eval_bias_cls"
     cmd = (
         f"python -m scripts.{script} -n {name} "
-        f"--editor-layer {editor_layer} --entity-layer {entity_layer}"
+        f"-l {editor_layer} --entity-layer {entity_layer}"
     )
     cmd = utils.maybe_set_device(cmd, device=device)
 
