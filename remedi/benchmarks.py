@@ -467,11 +467,10 @@ def classification(
             )
             y_true = _make_control_task(y_true, seed=control_task_seed)
 
-        # In the contextual case, we want to classify whether the model will *not* make
-        # the correct prediction. This does not change accuracy/mcc but does change f1.
-        if task == "contextual":
-            y_true = [not x for x in y_true]
-            y_pred = [not x for x in y_pred]
+        # We want to classify whether the model will *not* make the correct prediction.
+        # This does not change accuracy/mcc but does change f1.
+        y_true = [not x for x in y_true]
+        y_pred = [not x for x in y_pred]
 
         accuracy = accuracy_score(y_true, y_pred)
         f1 = f1_score(y_true, y_pred)
