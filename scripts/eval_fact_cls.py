@@ -31,7 +31,7 @@ def main(args: argparse.Namespace) -> None:
 
     editors_dir = args.editors_dir
     editor_type = args.editor_type
-    editor_layers = args.editor_layers
+    editor_layers = args.layers
     if editor_layers is None:
         editor_layers = editors.list_saved_editors(editors_dir)[editor_type]
     logger.info(f"found editors for layers: {editor_layers}")

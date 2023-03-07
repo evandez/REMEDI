@@ -44,7 +44,7 @@ def main(args: argparse.Namespace) -> None:
         desc=f"error classification [model predictions]",
     )
 
-    editor_layers = args.editor_layers
+    editor_layers = args.layers
     editor_type = args.editor_type
     editors_dir = args.editors_dir
 
