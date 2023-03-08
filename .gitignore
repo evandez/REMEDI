@@ -132,6 +132,7 @@ dmypy.json
 data/
 models/
 results/
+notebooks/figures/*.html
 *.json
 *.pth
 *.txt
