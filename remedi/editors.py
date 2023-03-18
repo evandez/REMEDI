@@ -1083,7 +1083,8 @@ class RandomEditor(Editor):
         distribution = torch.distributions.MultivariateNormal(
             self.mean, covariance_matrix=torch.diag(self.variance)
         )
-        return distribution.sample((len(attribute),))
+        size = cast(torch.Size, (len(attribute),))
+        return distribution.sample(size)
 
     def fit(
         self,
