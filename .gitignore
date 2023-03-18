@@ -136,6 +136,8 @@ notebooks/figures/*.html
 *.json
 *.pth
 *.txt
+*.pdf
+*.png
 
 # Other
 .DS_Store
