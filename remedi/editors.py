@@ -1014,7 +1014,7 @@ class MlpEditor(Editor):
         *,
         mt: models.ModelAndTokenizer,
         layer: int,
-        use_entity: bool = True,
+        use_entity: bool = False,
         use_attribute: bool = True,
         **kwargs: Any,
     ):
