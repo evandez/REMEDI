@@ -793,7 +793,7 @@ def _create_samples_from_mcrae_norms(
                             # No probability for unrelated features.
                         }
                         for feat in unrelated_features
-                    ]
+                    ],
                 },
             )
             samples.append(sample)
