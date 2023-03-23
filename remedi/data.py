@@ -639,6 +639,7 @@ def _create_samples_from_mcrae_norms(
     text_file: Path,
     min_co_prob: float = 0.1,
     samples_per_feature_pair: int = 1,
+    unrelated_features_per_sample: int = 5,
     seed: int | None = 123456,
 ) -> Path:
     """Transform McRae entries into context mediation samples.
@@ -728,6 +729,18 @@ def _create_samples_from_mcrae_norms(
             context, attribute = _get_mcrae_context_and_attribute(
                 entity, context_feature
             )
+
+            # Sample some features unrelated to the context, prompt, and concept.
+            unrelated_features = [
+                feature
+                for feature in concepts_by_feature
+                if feature not in f_prob[context_feature]
+                and feature not in features_by_concept[concept]
+            ]
+            unrelated_features = random.sample(
+                unrelated_features, k=unrelated_features_per_sample
+            )
+
             sample = ContextMediationSample(
                 id=sid,
                 entity=entity,
@@ -769,6 +782,18 @@ def _create_samples_from_mcrae_norms(
                         }
                         for feat in features_by_concept[concept]
                     ],
+                    "unrelated_features": [
+                        {
+                            "feature": feat,
+                            "feature_fluent": _make_mcrae_feature_fluent(feat),
+                            "prompt": _get_mcrae_prompt_with_entity(
+                                entity, prompts_by_feature[feat]
+                            ),
+                            "target": targets_by_feature[feat],
+                            # No probability for unrelated features.
+                        }
+                        for feat in unrelated_features
+                    ]
                 },
             )
             samples.append(sample)
