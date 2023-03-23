@@ -1366,9 +1366,9 @@ class EntailmentFeature(DataClassJsonMixin):
     """A single feature (one of many for a sample) studied in entailment bench."""
 
     feature: str
-    logp_ref: float
     logp_pre: float
     logp_post: float | None
+    logp_ref: float | None
 
 
 @dataclass(frozen=True)
@@ -1378,6 +1378,7 @@ class EntailmentSample(DataClassJsonMixin):
     id: str
     co_features: list[EntailmentFeature]
     orig_features: list[EntailmentFeature]
+    unrel_features: list[EntailmentFeature]
 
     def _corr(self, f_key: str, x_key: str, y_key: str = "logp_ref") -> float:
         """Compute some correlation between feature probs."""
@@ -1458,11 +1459,13 @@ def mcrae_entailment(
             "attribute": x["attribute"],
             "prompt": feature["prompt"],
             "target": feature["target"],
-            "co": "co_prob" in feature,
+            "kind": _determine_entailment_feature_kind(feature),
         }
         for index, x in enumerate(dataset)
         for feature in chain(
-            x["source"]["all_co_features"], x["source"]["original_features"]
+            x["source"]["all_co_features"],
+            x["source"]["original_features"],
+            x["source"]["unrelated_features"],
         )
     ]
     logger.info(f"after flattening, found {len(dataset_flattened)} prompts to process")
@@ -1528,13 +1531,16 @@ def mcrae_entailment(
     # Group everything by dataset sample again.
     co_results_by_index = defaultdict(list)
     orig_results_by_index = defaultdict(list)
+    unrel_results_by_index = defaultdict(list)
     for sample_flat, result_flat in zip(dataset_flattened, results_flattened):
         index = sample_flat["index"]
-        co = sample_flat["co"]
-        if co:
+        if sample_flat["kind"] == _ENT_FEATURE_CO:
             co_results_by_index[index].append(result_flat)
-        else:
+        elif sample_flat["kind"] == _ENT_FEATURE_ORIG:
             orig_results_by_index[index].append(result_flat)
+        else:
+            assert sample_flat["kind"] == _ENT_FEATURE_UNREL
+            unrel_results_by_index[index].append(result_flat)
 
     samples = []
     for index, x in enumerate(dataset):
@@ -1564,6 +1570,17 @@ def mcrae_entailment(
                 )
                 if float(feature["prob"]) > 0
             ],
+            unrel_features=[
+                EntailmentFeature(
+                    feature=feature["feature_fluent"],
+                    logp_ref=None,
+                    logp_pre=cast(float, result["logp_pre"]),
+                    logp_post=result["logp_post"],
+                )
+                for feature, result in zip(
+                    x["source"]["unrelated_features"], unrel_results_by_index[index]
+                )
+            ],
         )
         samples.append(sample)
 
@@ -1579,3 +1596,18 @@ def mcrae_entailment(
     return McraeEntailmentBenchmarkResults(
         samples=samples, metrics=EntailmentMetrics(**metrics_kwargs)
     )
+
+
+_ENT_FEATURE_CO = "co"
+_ENT_FEATURE_ORIG = "orig"
+_ENT_FEATURE_UNREL = "unrel"
+
+
+def _determine_entailment_feature_kind(feature: dict) -> str:
+    """Determine which kind of feature this is."""
+    if "co_prob" in feature:
+        return _ENT_FEATURE_CO
+    elif "prob" in feature:
+        return _ENT_FEATURE_ORIG
+    else:
+        return _ENT_FEATURE_UNREL
