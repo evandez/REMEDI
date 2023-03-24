@@ -27,17 +27,15 @@ REMEDI_EDITOR_LAYER = {
     GPTJ: {
         CF: 1,
         BB: 12,
-        MC: 4,
+        MC: 12,
     },
     GPT2_XL: {
         CF: 0,
         BB: 4,
-        MC: 10,
     },
     GPT2: {
         CF: 0,
         BB: 10,
-        MC: 1,
     },
 }
 
