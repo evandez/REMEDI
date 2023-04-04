@@ -98,6 +98,6 @@ invoke presubmit
   author    =   {Hernandez, Evan and Li, Belinda Z. and Andreas, Jacob},
   booktitle =   {Arxiv},
   year      =   {2023},
-  url       =   {https://arxiv.org/abs/2201.11114}
+  url       =   {https://arxiv.org/abs/2304.00740}
 }
 ```
