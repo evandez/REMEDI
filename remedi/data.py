@@ -596,7 +596,7 @@ def _get_mcrae_prompt_and_target(feature: str) -> tuple[str, str]:
     # We will split the feature into a prompt part (what is fed into the LM)
     # and a target part (the probability of which is maximized via REMEDI and
     # measured during eval). This split depends on how the feature is phrased,
-    # as we want to avoid cases where the prompt inadvertantly pigeonholes the LM
+    # as we want to avoid cases where the prompt inadvertently pigeonholes the LM
     # into saying the correct thing.
     components = None
     for prefix in _MCRAE_SPLITTABLE_FEATURE_PREFIXES:
