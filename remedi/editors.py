@@ -36,6 +36,7 @@ DEFAULT_LAM_U = 1.0
 DEFAULT_LAM_KL = 10.0
 DEFAULT_N_TOP = 10
 DEFAULT_MAX_LENGTH = 100
+DEFAULT_TOP_K = 5
 DEFAULT_BATCH_SIZE = 16
 DEFAULT_MAX_EPOCHS = 20
 DEFAULT_PATIENCE = 2
@@ -661,6 +662,7 @@ class Editor(nn.Module):
         n_top: int = DEFAULT_N_TOP,
         max_length: int | None = None,
         max_new_tokens: int | None = None,
+        top_k: int = DEFAULT_TOP_K,
         alpha: float = DEFAULT_ALPHA,
         beta: float = DEFAULT_BETA,
         desc: Optional[str] = None,
@@ -683,6 +685,7 @@ class Editor(nn.Module):
             n_top: Number of top words/probs to return.
             max_length: Number of tokens to generate including prompt.
             max_new_tokens: Number of tokens to generate not including prompt.
+            top_k: Value of k for top-k sampling, which is always used to generate.
             alpha: Weight of edit direction when applying edit direction.
             beta: Weight of entity token when applying edit direction.
             desc: The tqdm description.
@@ -743,7 +746,8 @@ class Editor(nn.Module):
                     )
 
                 generate_kwargs = dict(
-                    do_sample=False,
+                    do_sample=True,
+                    top_k=top_k,
                     return_dict_in_generate=True,
                     output_scores=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,

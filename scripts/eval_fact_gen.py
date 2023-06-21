@@ -106,6 +106,8 @@ def _precompute_essence_references(
         outputs = mt.model.generate(
             **inputs,
             max_length=benchmarks.DEFAULT_MAX_LENGTH,
+            do_sample=True,
+            top_k=benchmarks.DEFAULT_TOP_K_SAMPLING,
             pad_token_id=mt.tokenizer.eos_token_id,
         )
         references += [
