@@ -36,7 +36,6 @@ DEFAULT_LAM_U = 1.0
 DEFAULT_LAM_KL = 10.0
 DEFAULT_N_TOP = 10
 DEFAULT_MAX_LENGTH = 100
-DEFAULT_TOP_K = 5
 DEFAULT_BATCH_SIZE = 16
 DEFAULT_MAX_EPOCHS = 20
 DEFAULT_PATIENCE = 2
@@ -662,7 +661,7 @@ class Editor(nn.Module):
         n_top: int = DEFAULT_N_TOP,
         max_length: int | None = None,
         max_new_tokens: int | None = None,
-        top_k: int = DEFAULT_TOP_K,
+        top_k: int | None = None,
         alpha: float = DEFAULT_ALPHA,
         beta: float = DEFAULT_BETA,
         desc: Optional[str] = None,
@@ -746,12 +745,13 @@ class Editor(nn.Module):
                     )
 
                 generate_kwargs = dict(
-                    do_sample=True,
-                    top_k=top_k,
                     return_dict_in_generate=True,
                     output_scores=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
+                if top_k is not None:
+                    generate_kwargs["do_sample"] = True
+                    generate_kwargs["top_k"] = top_k
                 if max_length is not None:
                     generate_kwargs["max_length"] = max_length
                 if max_new_tokens is not None:
