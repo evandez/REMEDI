@@ -18,7 +18,7 @@ BB = "biosbias"
 MC = "mcrae"
 
 # Experiment keys.
-EX_PREFIX = "post_icml_"  # Prepended to every experiment name.
+EX_PREFIX = "emnlp_"  # Prepended to every experiment name.
 EX_EDITORS = "editors"
 
 
