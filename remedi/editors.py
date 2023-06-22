@@ -661,6 +661,7 @@ class Editor(nn.Module):
         n_top: int = DEFAULT_N_TOP,
         max_length: int | None = None,
         max_new_tokens: int | None = None,
+        top_k: int | None = None,
         alpha: float = DEFAULT_ALPHA,
         beta: float = DEFAULT_BETA,
         desc: Optional[str] = None,
@@ -683,6 +684,7 @@ class Editor(nn.Module):
             n_top: Number of top words/probs to return.
             max_length: Number of tokens to generate including prompt.
             max_new_tokens: Number of tokens to generate not including prompt.
+            top_k: Value of k for top-k sampling, which is always used to generate.
             alpha: Weight of edit direction when applying edit direction.
             beta: Weight of entity token when applying edit direction.
             desc: The tqdm description.
@@ -743,11 +745,13 @@ class Editor(nn.Module):
                     )
 
                 generate_kwargs = dict(
-                    do_sample=False,
                     return_dict_in_generate=True,
                     output_scores=True,
                     pad_token_id=self.mt.tokenizer.eos_token_id,
                 )
+                if top_k is not None:
+                    generate_kwargs["do_sample"] = True
+                    generate_kwargs["top_k"] = top_k
                 if max_length is not None:
                     generate_kwargs["max_length"] = max_length
                 if max_new_tokens is not None:

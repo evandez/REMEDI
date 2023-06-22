@@ -25,8 +25,9 @@ DEFAULT_PROMPT_PREFIX = "The following is an excerpt from a Wikipedia article:\n
 DEFAULT_PROMPT_TEMPLATE = "{} is"
 DEFAULT_MAX_LENGTH = 100
 DEFAULT_MAX_LENGTH_ERROR_CORRECTION = 150
-DEFAULT_TOP_K = 3
-DEFAULT_N_TOP_TOKENS = DEFAULT_TOP_K
+DEFAULT_TOP_K_SAMPLING = 5  # For matching ROME eval on CounterFact
+DEFAULT_TOP_K_LABELS = 3  # For biosbias
+DEFAULT_N_TOP_TOKENS = DEFAULT_TOP_K_LABELS
 
 
 @dataclass(frozen=True)
@@ -98,6 +99,7 @@ def essence(
     reference_post_process: GenerationPostProcessFn | None = None,
     max_new_tokens: int | None = None,
     max_length: int | None = None,
+    top_k_sampling: int = DEFAULT_TOP_K_SAMPLING,
     use_references: Sequence[StrSequence] | None = None,
     tfidf_vectorizer: TfidfVectorizer | None = None,
     desc: str | None = None,
@@ -128,6 +130,8 @@ def essence(
         max_length=max_length,
         max_new_tokens=max_new_tokens,
         pad_token_id=mt.tokenizer.eos_token_id,
+        do_sample=True,
+        top_k=top_k_sampling,
     )
 
     generations = []
@@ -698,6 +702,7 @@ def counterfact_generation(
     tfidf_vectorizer: TfidfVectorizer | None = None,
     max_length: int | None = None,
     max_new_tokens: int | None = None,
+    top_k_sampling: int = DEFAULT_TOP_K_SAMPLING,
     desc: str | None = None,
     **kwargs: Any,
 ) -> CounterFactGenerationBenchmarkResults:
@@ -734,6 +739,7 @@ def counterfact_generation(
     evaluate_kwargs = dict(
         max_new_tokens=max_new_tokens,
         max_length=max_length,
+        top_k=top_k_sampling,
         desc=f"{desc} [run model]",
         **kwargs,
     )
@@ -871,7 +877,7 @@ def biosbias_error_correction(
     tfidf_vectorizer: TfidfVectorizer | None = None,
     references: dict | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
-    top_k: int = DEFAULT_TOP_K,
+    top_k_labels: int = DEFAULT_TOP_K_LABELS,
     entity_occurrence: int = 0,
     max_length: int | None = None,
     max_new_tokens: int | None = None,
@@ -892,7 +898,7 @@ def biosbias_error_correction(
         references: Mapping from label to reference texts for that label. By default,
             full bios for each label will be used.
         batch_size: Batch size for model.
-        top_k: Compute top-k labels predicted by model.
+        top_k_labels: Compute top-k labels predicted by model.
         prompt_key: Which column in dataset to use as prompt.
         entity_occurrence: Which entity occurrence to edit. Defaults depends on
             which column is used as prompt.
@@ -980,7 +986,7 @@ def biosbias_error_correction(
                 label_log_probs = distribution[labels_token_idx]
 
                 logp_predictions, predictions_idx = label_log_probs.topk(
-                    k=top_k, dim=-1
+                    k=top_k_labels, dim=-1
                 )
                 predictions = [labels[idx] for idx in predictions_idx]
 
@@ -1020,7 +1026,7 @@ def biosbias_error_correction(
     error_correction_metrics = ErrorCorrectionMetrics(
         top1_accuracy=top1_accuracy,
         topk_accuracy=topk_accuracy,
-        k=top_k,
+        k=top_k_labels,
         fluency=fluency,
         consistency=consistency,
     )
@@ -1077,7 +1083,7 @@ def biosbias_error_classification(
     control_task: bool = False,
     control_task_seed: int | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
-    top_k: int = DEFAULT_TOP_K,
+    top_k_labels: int = DEFAULT_TOP_K_LABELS,
     labels: StrSequence | None = None,
     entity_layer: int | None = None,
     device: Device | None = None,
@@ -1188,13 +1194,13 @@ def biosbias_error_classification(
         ground_truth = row["target_mediated"]
 
         scores = h_entity[None].mul(directions).sum(dim=-1)
-        predicted_top_k_scores, predicted_top_k_idx = scores.topk(k=top_k)
+        predicted_top_k_scores, predicted_top_k_idx = scores.topk(k=top_k_labels)
         predicted_top_k_idx = predicted_top_k_idx.squeeze().tolist()
         predicted_top_k_scores = predicted_top_k_scores.squeeze().tolist()
         predicted_top_k = [labels[idx] for idx in predicted_top_k_idx]
 
         model_logp = torch.tensor(row["prompt_in_context.other_targets.logp"])
-        model_top_k_logp, model_top_k_idx = model_logp.topk(dim=-1, k=top_k)
+        model_top_k_logp, model_top_k_idx = model_logp.topk(dim=-1, k=top_k_labels)
         model_top_k_idx = model_top_k_idx.squeeze().tolist()
         model_top_k_logp = model_top_k_logp.squeeze().tolist()
         model_top_k = [labels[idx] for idx in model_top_k_idx]
@@ -1237,7 +1243,7 @@ def biosbias_error_classification(
         probe_recall_k=probe_recall_k,
         model_recall_1=model_recall_1,
         model_recall_k=model_recall_k,
-        k=top_k,
+        k=top_k_labels,
     )
 
     return BiosBiasErrorClassificationBenchmarkResults(
