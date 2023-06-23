@@ -878,6 +878,7 @@ def biosbias_error_correction(
     references: dict | None = None,
     batch_size: int = editors.DEFAULT_BATCH_SIZE,
     top_k_labels: int = DEFAULT_TOP_K_LABELS,
+    top_k_sampling: int = DEFAULT_TOP_K_SAMPLING,
     entity_occurrence: int = 0,
     max_length: int | None = None,
     max_new_tokens: int | None = None,
@@ -899,6 +900,7 @@ def biosbias_error_correction(
             full bios for each label will be used.
         batch_size: Batch size for model.
         top_k_labels: Compute top-k labels predicted by model.
+        top_k_sampling: Use top-k sampling when generating from model.
         prompt_key: Which column in dataset to use as prompt.
         entity_occurrence: Which entity occurrence to edit. Defaults depends on
             which column is used as prompt.
@@ -956,11 +958,11 @@ def biosbias_error_correction(
                 inputs, _ = precompute.inputs_from_batch(mt, prompts, device=device)
 
             generate_kwargs = dict(
-                return_dict_in_generate=True,
-                output_scores=True,
                 max_length=max_length,
                 max_new_tokens=max_new_tokens,
                 pad_token_id=mt.tokenizer.eos_token_id,
+                do_sample=True,
+                top_k=top_k_sampling,
             )
             if editor is not None:
                 with editors.apply(editor, device=device) as edited_mt:
@@ -975,10 +977,25 @@ def biosbias_error_correction(
                 outputs = mt.model.generate(**inputs, **generate_kwargs)
 
             generations = mt.tokenizer.batch_decode(
-                outputs.sequences[:, inputs.input_ids.shape[1] :],
+                outputs[:, inputs.input_ids.shape[1] :],
                 skip_special_tokens=True,
             )
-            distributions = torch.log_softmax(outputs.scores[0], dim=-1)
+
+            # NB(evan): Using top-k sampling causes `outputs.scores` to be unusable,
+            # so need to do a separate forward pass.
+            if editor is not None:
+                with editors.apply(editor, device=device) as edited_mt:
+                    outputs = edited_mt.model(
+                        batch,
+                        inputs=inputs,
+                        padding_side="left",
+                        entity_occurrence=entity_occurrence,
+                    )
+            else:
+                outputs = mt.model(**inputs)
+
+            logits = outputs.logits[:, -1]
+            distributions = torch.log_softmax(logits, dim=-1)
 
             for sid, prompt, distribution, generation, target, target_idx in zip(
                 ids, prompts, distributions, generations, targets, targets_idx
