@@ -1,6 +1,6 @@
-# REMEDI: Mediating Knowledge in Language Model Representations
+# REMEDI: Editing Knowledge in Language Model Representations
 
-[**Measuring and Manipulating Knowledge Representations in Language Models**](https://arxiv.org/abs/2304.00740)<br>
+[**Inspecting and Editing Knowledge Representations in Language Models**](https://arxiv.org/abs/2304.00740)<br>
 [Evan Hernandez](https://evandez.com), [Belinda Z. Li](https://belindal.github.io), [Jacob Andreas](https://www.mit.edu/~jda/).<br>
 <!-- TODO conference <br> -->
 
@@ -94,7 +94,7 @@ invoke presubmit
 
 ```bibtex
 @InProceedings{hernandez2023remedi,
-  title     =   {Measuring and Manipulating Knowledge Representations in Language Models},
+  title     =   {Inspecting and Editing Knowledge Representations in Language Models},
   author    =   {Hernandez, Evan and Li, Belinda Z. and Andreas, Jacob},
   booktitle =   {Arxiv},
   year      =   {2023},
