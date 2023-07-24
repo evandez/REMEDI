@@ -25,6 +25,14 @@ python -m pip install invoke
 invoke install
 ```
 
+## Data
+
+We cannot re-release the datasets used in the paper. However, you can download the raw datasets yourself and point our code to it:
+
+- `CounterFact`: Available on the [ROME website](https://rome.baulab.info/data/dsets/). Note our code will automatically download this specific dataset for you.
+- `Bias in Bios`: Must be downloaded using the [official code release](https://github.com/microsoft/biosbias). When running a REMEDI script, set `--dataset-file <pkl file>` to point to the resulting pickle file.
+- `McRae Norms`: Download the supplemental material of [this paper](https://link.springer.com/article/10.3758/BF03192726) and set `--dataset-file <path to download>/CONCS_FEATS_concstats_brm.txt`
+
 ## Replicating Experiments
 
 All experiments from the paper can be run through invoke. To see the full list, run:
